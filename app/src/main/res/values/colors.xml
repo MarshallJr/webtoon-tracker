@@ -1,12 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="brand">#00B26A</color>
-    <color name="brand_dark">#00796B</color>
-    <color name="accent">#FF7A45</color>
-    <color name="screen_bg">#F4F7F5</color>
+    <color name="brand">#6D4AFF</color>
+    <color name="brand_dark">#2A1E6E</color>
+    <color name="accent">#FFB020</color>
+    <color name="on_accent">#1A1203</color>
+    <color name="screen_bg">#F5F4FB</color>
     <color name="card_bg">#FFFFFF</color>
-    <color name="badge_bg">#E3F8EE</color>
-    <color name="badge_text">#007A48</color>
-    <color name="text_main">#14201A</color>
-    <color name="text_soft">#66756D</color>
+    <color name="badge_bg">#EEEAFF</color>
+    <color name="badge_text">#4B2FD6</color>
+    <color name="text_main">#17142B</color>
+    <color name="text_soft">#6E6A85</color>
+    <color name="chart_grid">#1F17142B</color>
 </resources>

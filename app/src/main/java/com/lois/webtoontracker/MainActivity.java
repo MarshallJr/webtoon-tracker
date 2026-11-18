@@ -51,6 +51,10 @@ public class MainActivity extends AppCompatActivity {
     private ActivityResultLauncher<String> pickAutoBackup, pickExport;
     private ActivityResultLauncher<String[]> pickRestore;
     private TextView backupStatusView; // dans la boîte Réglages quand elle est ouverte
+    private ActivityResultLauncher<String> notifPermission;
+    private com.google.android.material.materialswitch.MaterialSwitch alertsSwitchView;
+    private String selectedTag = null;
+    private List<List<String>> duplicates = new java.util.ArrayList<>();
 
     private final BroadcastReceiver updateReceiver = new BroadcastReceiver() {
         @Override
@@ -106,6 +110,16 @@ public class MainActivity extends AppCompatActivity {
         findViewById(R.id.settingsButton).setOnClickListener(v -> showSettings());
         findViewById(R.id.infoButton).setOnClickListener(v -> showDiagnostic());
         findViewById(R.id.addButton).setOnClickListener(v -> showAddDialog(null));
+        findViewById(R.id.heroCard).setOnClickListener(v -> startActivity(new Intent(this, StatsActivity.class)));
+        findViewById(R.id.dupButton).setOnClickListener(v -> showMergeSuggestions());
+        notifPermission = registerForActivityResult(new ActivityResultContracts.RequestPermission(), granted -> {
+            if (granted) {
+                setAlerts(true);
+            } else {
+                Toast.makeText(this, "Sans l'autorisation de notifications, impossible de t'alerter", Toast.LENGTH_LONG).show();
+                if (alertsSwitchView != null) alertsSwitchView.setChecked(false);
+            }
+        });
 
         ((EditText) findViewById(R.id.searchInput)).addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) {}
@@ -154,6 +168,9 @@ public class MainActivity extends AppCompatActivity {
             DbHelper db = DbHelper.get(this);
             List<DbHelper.Series> series = db.getSeries();
             adapter.setData(series);
+            buildTagChips(db);
+            updateDuplicates(series);
+            WidgetProvider.updateAll(this);
             statSeries.setText(String.valueOf(series.size()));
             statChapters.setText(String.valueOf(db.totalChapters()));
             statWeek.setText(String.valueOf(db.countSince(System.currentTimeMillis() - 7L * 24 * 3600 * 1000)));
@@ -275,6 +292,24 @@ public class MainActivity extends AppCompatActivity {
             sendBroadcast(new Intent(ReadingTrackerService.ACTION_TEST_BANNER).setPackage(getPackageName()));
         });
 
+        alertsSwitchView = v.findViewById(R.id.alertsSwitch);
+        TextView alertsInfo = v.findViewById(R.id.alertsInfo);
+        alertsSwitchView.setChecked(p.getBoolean(ChapterCheckWorker.KEY_ALERTS, false));
+        alertsInfo.setText(alertsDescription());
+        alertsSwitchView.setOnCheckedChangeListener((b, checked) -> {
+            if (checked && android.os.Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(this,
+                    android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                notifPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS);
+                return;
+            }
+            setAlerts(checked);
+            alertsInfo.setText(alertsDescription());
+        });
+        v.findViewById(R.id.alertsCheckNow).setOnClickListener(b -> {
+            ChapterCheckWorker.checkNow(this);
+            Toast.makeText(this, "Vérification lancée (quelques secondes)", Toast.LENGTH_SHORT).show();
+        });
+
         backupStatusView = v.findViewById(R.id.backupStatus);
         updateBackupStatus();
         v.findViewById(R.id.backupAutoButton).setOnClickListener(b ->
@@ -289,7 +324,220 @@ public class MainActivity extends AppCompatActivity {
                 .setTitle("Réglages")
                 .setView(v)
                 .setPositiveButton("OK", null)
-                .setOnDismissListener(d -> backupStatusView = null)
+                .setOnDismissListener(d -> {
+                    backupStatusView = null;
+                    alertsSwitchView = null;
+                })
+                .show();
+    }
+
+    // ------------------------------------------------------------------ Alertes nouveaux chapitres
+
+    private void setAlerts(boolean on) {
+        getSharedPreferences(NoteWriter.PREFS, MODE_PRIVATE).edit()
+                .putBoolean(ChapterCheckWorker.KEY_ALERTS, on).apply();
+        if (on) {
+            ChapterCheckWorker.createChannel(this);
+            ChapterCheckWorker.enable(this);
+            ChapterCheckWorker.checkNow(this); // mémorise le dernier épisode actuel de chaque série
+        } else {
+            ChapterCheckWorker.disable(this);
+        }
+    }
+
+    private String alertsDescription() {
+        int linked = 0;
+        for (DbHelper.Meta m : DbHelper.get(this).getAllMeta()) if (m.titleNo != null) linked++;
+        SharedPreferences p = getSharedPreferences(NoteWriter.PREFS, MODE_PRIVATE);
+        long last = p.getLong("last_check", 0);
+        return "Vérifie 2 fois par jour, seulement avec du réseau et une batterie non faible "
+                + "(quasi aucun impact batterie). " + linked + (linked > 1 ? " séries liées" : " série liée")
+                + " à webtoons.com : les séries lues dans le navigateur sont liées toutes seules, sinon "
+                + "utilise « ⚡ Alertes » dans la fiche d'une série."
+                + (last > 0 ? "\nDernière vérification : "
+                + new SimpleDateFormat("dd/MM HH:mm", Locale.FRANCE).format(new Date(last)) : "");
+    }
+
+    private void showLinkDialog(DbHelper.Series s) {
+        EditText input = new EditText(this);
+        input.setHint("https://www.webtoons.com/fr/…/list?title_no=…");
+        input.setSingleLine(true);
+        ClipboardManager cm = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+        if (cm != null && cm.hasPrimaryClip() && cm.getPrimaryClip().getItemCount() > 0) {
+            CharSequence clip = cm.getPrimaryClip().getItemAt(0).getText();
+            if (clip != null && clip.toString().contains("webtoons.com")) input.setText(clip);
+        }
+        int pad = (int) (24 * getResources().getDisplayMetrics().density);
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(pad, pad / 3, pad, 0);
+        TextView help = new TextView(this);
+        help.setText("Ouvre la série sur webtoons.com (ou dans l'appli WEBTOON → Partager → Copier le lien), puis colle le lien ici.");
+        help.setTextColor(ContextCompat.getColor(this, R.color.text_soft));
+        box.addView(help);
+        box.addView(input);
+
+        new MaterialAlertDialogBuilder(this)
+                .setTitle("⚡ Alertes pour « " + s.title + " »")
+                .setView(box)
+                .setPositiveButton("Lier", (d, w) -> {
+                    String[] parsed = Detector.parseSeriesLink(input.getText().toString());
+                    if (parsed == null) {
+                        Toast.makeText(this, "Lien non reconnu (il doit contenir title_no=…)", Toast.LENGTH_LONG).show();
+                        return;
+                    }
+                    DbHelper.get(this).linkWebtoons(s.title, parsed[0], parsed[1]);
+                    NoteWriter.writeAsync(this);
+                    boolean on = getSharedPreferences(NoteWriter.PREFS, MODE_PRIVATE)
+                            .getBoolean(ChapterCheckWorker.KEY_ALERTS, false);
+                    if (on) ChapterCheckWorker.checkNow(this);
+                    Toast.makeText(this, on ? "Série liée ✅ Tu seras alerté des nouveaux chapitres"
+                            : "Série liée ✅ Active les alertes dans ⚙️ Réglages", Toast.LENGTH_LONG).show();
+                })
+                .setNegativeButton("Annuler", null)
+                .show();
+    }
+
+    // ------------------------------------------------------------------ Tags
+
+    private static final String[] SUGGESTED_TAGS = {"Action", "Fantasy", "Romance", "Comédie", "Drame",
+            "Murim", "Isekai", "Thriller", "Horreur", "Sport", "Slice of life", "En cours", "Terminé", "Favori ⭐"};
+
+    private void buildTagChips(DbHelper db) {
+        com.google.android.material.chip.ChipGroup group = findViewById(R.id.tagChips);
+        java.util.Set<String> tags = db.allTags();
+        findViewById(R.id.tagScroll).setVisibility(tags.isEmpty() ? View.GONE : View.VISIBLE);
+        if (selectedTag != null && !tags.contains(selectedTag)) {
+            selectedTag = null;
+            adapter.filterTag(null);
+        }
+        group.setOnCheckedStateChangeListener(null);
+        group.removeAllViews();
+        group.addView(makeChip(group, "Tout", selectedTag == null));
+        for (String t : tags) group.addView(makeChip(group, t, t.equalsIgnoreCase(selectedTag == null ? "" : selectedTag)));
+        group.setOnCheckedStateChangeListener((g, ids) -> {
+            if (ids.isEmpty()) return;
+            com.google.android.material.chip.Chip c = g.findViewById(ids.get(0));
+            String label = c.getText().toString();
+            selectedTag = "Tout".equals(label) ? null : label;
+            adapter.filterTag(selectedTag);
+            updateEmpty();
+        });
+    }
+
+    private com.google.android.material.chip.Chip makeChip(ViewGroup parent, String label, boolean checked) {
+        com.google.android.material.chip.Chip c = (com.google.android.material.chip.Chip)
+                getLayoutInflater().inflate(R.layout.chip_filter, parent, false);
+        c.setId(View.generateViewId());
+        c.setText(label);
+        c.setChecked(checked);
+        return c;
+    }
+
+    private void showTagEditor(DbHelper.Series s) {
+        java.util.Set<String> all = new java.util.TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+        java.util.Collections.addAll(all, SUGGESTED_TAGS);
+        all.addAll(DbHelper.get(this).allTags());
+        List<String> current = Titles.splitTags(s.tags);
+
+        int pad = (int) (20 * getResources().getDisplayMetrics().density);
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(pad, pad / 3, pad, 0);
+        com.google.android.material.chip.ChipGroup group = new com.google.android.material.chip.ChipGroup(this);
+        for (String t : all) {
+            boolean on = false;
+            for (String c : current) if (c.equalsIgnoreCase(t)) on = true;
+            group.addView(makeChip(group, t, on));
+        }
+        box.addView(group);
+        EditText custom = new EditText(this);
+        custom.setHint("Autre tag (ex : Webtoon du dimanche)");
+        custom.setSingleLine(true);
+        box.addView(custom);
+
+        new MaterialAlertDialogBuilder(this)
+                .setTitle("🏷 Tags · " + s.title)
+                .setView(box)
+                .setPositiveButton("Enregistrer", (d, w) -> {
+                    StringBuilder sb = new StringBuilder();
+                    for (int i = 0; i < group.getChildCount(); i++) {
+                        com.google.android.material.chip.Chip c = (com.google.android.material.chip.Chip) group.getChildAt(i);
+                        if (c.isChecked()) sb.append(c.getText()).append(',');
+                    }
+                    sb.append(custom.getText());
+                    DbHelper.get(this).setTags(s.title, sb.toString());
+                    NoteWriter.writeAsync(this);
+                    refresh();
+                })
+                .setNegativeButton("Annuler", null)
+                .show();
+    }
+
+    // ------------------------------------------------------------------ Fusion des doublons
+
+    private void updateDuplicates(List<DbHelper.Series> series) {
+        List<String> titles = new java.util.ArrayList<>();
+        for (DbHelper.Series s : series) titles.add(s.title);
+        duplicates = Titles.duplicateGroups(titles);
+        View card = findViewById(R.id.dupCard);
+        card.setVisibility(duplicates.isEmpty() ? View.GONE : View.VISIBLE);
+        if (!duplicates.isEmpty()) {
+            List<String> g = duplicates.get(0);
+            ((TextView) findViewById(R.id.dupText)).setText("🔗 Doublon probable : « " + g.get(0) + " » et « "
+                    + g.get(1) + " »" + (duplicates.size() > 1 ? " (+" + (duplicates.size() - 1) + " autres)" : ""));
+        }
+    }
+
+    private void showMergeSuggestions() {
+        if (duplicates.isEmpty()) return;
+        List<String> group = duplicates.get(0);
+        // On garde par défaut le titre qui a le plus de chapitres.
+        String keep = group.get(0);
+        int best = -1;
+        for (DbHelper.Series s : DbHelper.get(this).getSeries()) {
+            for (String t : group) if (t.equalsIgnoreCase(s.title) && s.count > best) {
+                best = s.count;
+                keep = s.title;
+            }
+        }
+        String[] items = group.toArray(new String[0]);
+        int checked = group.indexOf(keep);
+        final int[] choice = {Math.max(0, checked)};
+        new MaterialAlertDialogBuilder(this)
+                .setTitle("Fusionner sous quel nom ?")
+                .setSingleChoiceItems(items, choice[0], (d, w) -> choice[0] = w)
+                .setPositiveButton("Fusionner", (d, w) -> {
+                    String into = items[choice[0]];
+                    for (String t : group) if (!t.equalsIgnoreCase(into)) DbHelper.get(this).mergeSeries(t, into);
+                    NoteWriter.writeAsync(this);
+                    Toast.makeText(this, "Fusionné dans « " + into + " » ✅", Toast.LENGTH_SHORT).show();
+                    refresh();
+                })
+                .setNegativeButton("Plus tard", null)
+                .show();
+    }
+
+    private void showMergePicker(DbHelper.Series s) {
+        List<String> others = new java.util.ArrayList<>();
+        for (DbHelper.Series o : DbHelper.get(this).getSeries()) if (!o.title.equalsIgnoreCase(s.title)) others.add(o.title);
+        if (others.isEmpty()) {
+            Toast.makeText(this, "Aucune autre série à fusionner", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        String[] items = others.toArray(new String[0]);
+        new MaterialAlertDialogBuilder(this)
+                .setTitle("Fusionner « " + s.title + " » avec…")
+                .setItems(items, (d, w) -> new MaterialAlertDialogBuilder(this)
+                        .setMessage("Les chapitres de « " + items[w] + " » seront rangés dans « " + s.title + " ».")
+                        .setPositiveButton("Fusionner", (d2, w2) -> {
+                            DbHelper.get(this).mergeSeries(items[w], s.title);
+                            NoteWriter.writeAsync(this);
+                            refresh();
+                        })
+                        .setNegativeButton("Annuler", null)
+                        .show())
+                .setNegativeButton("Annuler", null)
                 .show();
     }
 
@@ -399,6 +647,29 @@ public class MainActivity extends AppCompatActivity {
             sheet.dismiss();
             confirmDeleteEntry(s, e);
         }));
+
+        TextView tagsView = v.findViewById(R.id.sTags);
+        tagsView.setText(s.tags.isEmpty() ? "" : "🏷 " + s.tags);
+        tagsView.setVisibility(s.tags.isEmpty() ? View.GONE : View.VISIBLE);
+        DbHelper.Meta meta = DbHelper.get(this).getMeta(s.title);
+        ((TextView) v.findViewById(R.id.sLinkButton)).setText(
+                meta != null && meta.titleNo != null ? "⚡ Lié ✓" : "⚡ Alertes");
+        v.findViewById(R.id.sResume).setOnClickListener(b -> {
+            sheet.dismiss();
+            Resume.open(this, s.title);
+        });
+        v.findViewById(R.id.sTagButton).setOnClickListener(b -> {
+            sheet.dismiss();
+            showTagEditor(s);
+        });
+        v.findViewById(R.id.sMergeButton).setOnClickListener(b -> {
+            sheet.dismiss();
+            showMergePicker(s);
+        });
+        v.findViewById(R.id.sLinkButton).setOnClickListener(b -> {
+            sheet.dismiss();
+            showLinkDialog(s);
+        });
 
         v.findViewById(R.id.sAdd).setOnClickListener(b -> {
             sheet.dismiss();

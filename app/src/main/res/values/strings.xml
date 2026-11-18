@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Webtoon Tracker</string>
-    <string name="accessibility_description">Lit le titre et le numéro de chapitre affichés dans l\'app WEBTOON, Mihon/Tachiyomi et les navigateurs, pour noter automatiquement les chapitres que tu lis. Rien n\'est envoyé sur Internet : tout reste sur le téléphone.</string>
+    <string name="accessibility_description">Lit le titre et le numéro de chapitre affichés dans l\'app WEBTOON, Mihon/Tachiyomi et les navigateurs, pour noter automatiquement les chapitres que tu lis. Tes lectures restent sur le téléphone : rien n\'est envoyé sur Internet.</string>
+    <string name="widget_description">Ta dernière lecture et un bouton pour reprendre, style verre.</string>
+    <string name="notif_channel">Nouveaux chapitres</string>
 </resources>

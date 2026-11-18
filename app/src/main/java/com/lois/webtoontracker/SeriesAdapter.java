@@ -31,6 +31,7 @@ public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.VH> {
     private List<DbHelper.Series> all = new ArrayList<>();
     private final List<DbHelper.Series> shown = new ArrayList<>();
     private String query = "";
+    private String tag = null; // null = toutes
 
     public SeriesAdapter(OnSeries onClick, OnSeries onLongClick) {
         this.onClick = onClick;
@@ -69,14 +70,25 @@ public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.VH> {
         return shown.size();
     }
 
+    public void filterTag(String t) {
+        tag = t;
+        applyFilter();
+    }
+
     public boolean isFiltering() {
-        return !query.isEmpty();
+        return !query.isEmpty() || tag != null;
     }
 
     private void applyFilter() {
         shown.clear();
         for (DbHelper.Series s : all) {
-            if (query.isEmpty() || s.title.toLowerCase(Locale.ROOT).contains(query)) shown.add(s);
+            if (!query.isEmpty() && !s.title.toLowerCase(Locale.ROOT).contains(query)) continue;
+            if (tag != null) {
+                boolean has = false;
+                for (String t : Titles.splitTags(s.tags)) if (t.equalsIgnoreCase(tag)) has = true;
+                if (!has) continue;
+            }
+            shown.add(s);
         }
         notifyDataSetChanged();
     }
@@ -96,7 +108,8 @@ public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.VH> {
         h.chapter.setText("Ch. " + Detector.formatChapter(s.lastChapter));
         CharSequence when = DateUtils.getRelativeTimeSpanString(
                 s.lastReadAt, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS);
-        h.subtitle.setText(s.count + (s.count > 1 ? " chapitres" : " chapitre") + " · " + when);
+        String tags = s.tags.isEmpty() ? "" : " · " + s.tags;
+        h.subtitle.setText(s.count + (s.count > 1 ? " chapitres" : " chapitre") + " · " + when + tags);
         h.itemView.setOnClickListener(v -> onClick.on(s));
         h.itemView.setOnLongClickListener(v -> {
             onLongClick.on(s);

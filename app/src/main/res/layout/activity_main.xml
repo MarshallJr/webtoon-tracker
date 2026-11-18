@@ -83,9 +83,13 @@
 
         <!-- Carte stats -->
         <LinearLayout
+            android:id="@+id/heroCard"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:background="@drawable/bg_hero"
+            android:clickable="true"
+            android:focusable="true"
+            android:foreground="?attr/selectableItemBackground"
             android:elevation="4dp"
             android:orientation="vertical"
             android:padding="20dp">
@@ -154,6 +158,15 @@
                         android:text="cette semaine" />
                 </LinearLayout>
             </LinearLayout>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:text="Statistiques détaillées  ›"
+                android:textColor="#FFFFC93C"
+                android:textSize="13sp"
+                android:textStyle="bold" />
         </LinearLayout>
 
         <!-- Recherche -->
@@ -178,6 +191,58 @@
                 android:inputType="text"
                 android:maxLines="1" />
         </com.google.android.material.textfield.TextInputLayout>
+
+        <HorizontalScrollView
+            android:id="@+id/tagScroll"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:scrollbars="none"
+            android:visibility="gone">
+
+            <com.google.android.material.chip.ChipGroup
+                android:id="@+id/tagChips"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                app:selectionRequired="true"
+                app:singleLine="true"
+                app:singleSelection="true" />
+        </HorizontalScrollView>
+
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/dupCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:visibility="gone"
+            app:cardBackgroundColor="@color/badge_bg"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="0dp"
+            app:strokeWidth="0dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:padding="12dp">
+
+                <TextView
+                    android:id="@+id/dupText"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:textColor="@color/badge_text"
+                    android:textSize="13sp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/dupButton"
+                    style="@style/Widget.Material3.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Fusionner" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
 
         <TextView
             android:id="@+id/sectionTitle"
@@ -258,8 +323,8 @@
         android:layout_gravity="bottom|end"
         android:layout_margin="20dp"
         android:text="Ajouter"
-        android:textColor="#FFFFFF"
+        android:textColor="@color/on_accent"
         app:backgroundTint="@color/accent"
         app:icon="@drawable/ic_add"
-        app:iconTint="#FFFFFF" />
+        app:iconTint="@color/on_accent" />
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

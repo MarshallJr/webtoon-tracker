@@ -35,6 +35,13 @@ public final class Detector {
         public final String title;
         public final double chapter;
         public final String source;
+        /** URL du chapitre (si lue dans un navigateur), sinon null. */
+        public String url;
+        /** webtoons.com : identifiant de série et base pour le flux RSS (alertes nouveaux chapitres). */
+        public String titleNo;
+        public String rssBase;
+        /** Appli dans laquelle le chapitre a été lu. */
+        public String pkg;
 
         public Result(String title, double chapter, String source) {
             this.title = title;
@@ -97,8 +104,9 @@ public final class Detector {
 
     /** URL webtoons.com : /fr/fantasy/tower-of-god/saison-1-ep-12/viewer?title_no=..&episode_no=12 */
     static final Pattern WEBTOONS_URL = Pattern.compile(
-            "webtoons\\.com/[a-z-]+/[^/\\s]+/([^/\\s?#]+)/[^/\\s?#]+/viewer\\S*?[?&]episode_no=(\\d+)",
+            "webtoons\\.com/([a-z-]+)/([^/\\s]+)/([^/\\s?#]+)/[^/\\s?#]+/viewer\\S*?[?&]episode_no=(\\d+)",
             Pattern.CASE_INSENSITIVE);
+    static final Pattern TITLE_NO = Pattern.compile("[?&]title_no=(\\d+)");
 
     /** Segment d'URL de chapitre générique : "chapter-12", "solo-leveling-chapitre-120", "ep_3" */
     static final Pattern URL_CHAPTER_SEGMENT = Pattern.compile(
@@ -120,12 +128,25 @@ public final class Detector {
     // ---------------------------------------------------------------- API
 
     public static Result detect(String pkg, List<TextNode> nodes, int screenHeight) {
+        Result r = null;
         for (TextNode n : nodes) {
-            Result r = fromUrl(n.text);
-            if (r != null) return r;
+            r = fromUrl(n.text);
+            if (r != null) break;
         }
-        if (BROWSERS.contains(pkg)) return null;
-        return fromScreen(nodes, screenHeight);
+        if (r == null && !BROWSERS.contains(pkg)) r = fromScreen(nodes, screenHeight);
+        if (r != null) r.pkg = pkg;
+        return r;
+    }
+
+    /** Lien webtoons.com collé par l'utilisateur → base RSS + title_no (ou null). */
+    public static String[] parseSeriesLink(String link) {
+        if (link == null) return null;
+        Matcher t = TITLE_NO.matcher(link);
+        Matcher p = Pattern.compile("webtoons\\.com/([a-z-]+)/([^/\\s?#]+)/([^/\\s?#]+)", Pattern.CASE_INSENSITIVE)
+                .matcher(link);
+        if (!t.find() || !p.find()) return null;
+        return new String[]{"https://www.webtoons.com/" + p.group(1) + "/" + p.group(2) + "/" + p.group(3),
+                t.group(1), slugToTitle(p.group(3))};
     }
 
     /** Détection depuis une URL (barre d'adresse du navigateur). */
@@ -136,7 +157,14 @@ public final class Detector {
 
         Matcher w = WEBTOONS_URL.matcher(text);
         if (w.find()) {
-            return new Result(slugToTitle(w.group(1)), parseChapter(w.group(2)), "webtoons.com");
+            Result r = new Result(slugToTitle(w.group(3)), parseChapter(w.group(4)), "webtoons.com");
+            r.url = text.startsWith("http") ? text : "https://" + text.replaceFirst("^/+", "");
+            Matcher t = TITLE_NO.matcher(text);
+            if (t.find()) {
+                r.titleNo = t.group(1);
+                r.rssBase = "https://www.webtoons.com/" + w.group(1) + "/" + w.group(2) + "/" + w.group(3);
+            }
+            return r;
         }
 
         String noScheme = text.replaceFirst("^[a-zA-Z]+://", "");
@@ -159,7 +187,9 @@ public final class Detector {
                 }
             }
             if (slug == null || slug.isEmpty()) return null;
-            return new Result(slugToTitle(slug), parseChapter(m.group(2)), host(segs[0]));
+            Result r = new Result(slugToTitle(slug), parseChapter(m.group(2)), host(segs[0]));
+            r.url = text.startsWith("http") ? text : "https://" + text;
+            return r;
         }
         return null;
     }

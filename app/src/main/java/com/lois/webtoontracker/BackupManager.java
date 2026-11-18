@@ -54,9 +54,23 @@ public final class BackupManager {
         settings.put(ReadingTrackerService.KEY_NOTIFY_ALREADY,
                 p.getBoolean(ReadingTrackerService.KEY_NOTIFY_ALREADY, true));
 
+        JSONArray metas = new JSONArray();
+        for (DbHelper.Meta m : db.getAllMeta()) {
+            JSONObject o = new JSONObject();
+            o.put("title", m.title);
+            o.put("tags", m.tags == null ? "" : m.tags);
+            o.put("lastUrl", m.lastUrl == null ? "" : m.lastUrl);
+            o.put("lastPkg", m.lastPkg == null ? "" : m.lastPkg);
+            o.put("titleNo", m.titleNo == null ? "" : m.titleNo);
+            o.put("rssBase", m.rssBase == null ? "" : m.rssBase);
+            o.put("rssLastEp", m.rssLastEp);
+            metas.put(o);
+        }
+
         JSONObject root = new JSONObject();
         root.put("app", "webtoon-tracker");
-        root.put("format", 1);
+        root.put("format", 2);
+        root.put("meta", metas);
         root.put("exportedAt", System.currentTimeMillis());
         root.put("settings", settings);
         root.put("reads", reads);
@@ -90,6 +104,7 @@ public final class BackupManager {
         String text = readAll(ctx, uri).trim();
         int added = text.startsWith("{") ? restoreJson(ctx, text) : restoreMarkdown(ctx, text);
         NoteWriter.write(ctx); // réécrit aussi la sauvegarde auto
+        WidgetProvider.updateAll(ctx);
         return added;
     }
 
@@ -105,6 +120,26 @@ public final class BackupManager {
                 added++;
             }
         }
+        JSONArray metas = root.optJSONArray("meta");
+        if (metas != null) {
+            for (int i = 0; i < metas.length(); i++) {
+                JSONObject o = metas.getJSONObject(i);
+                DbHelper.Meta m = db.getMeta(o.getString("title"));
+                if (m == null) {
+                    m = new DbHelper.Meta();
+                    m.title = o.getString("title");
+                }
+                m.tags = Titles.normalizeTags((m.tags == null ? "" : m.tags) + "," + o.optString("tags"));
+                if (m.lastUrl == null) m.lastUrl = emptyToNull(o.optString("lastUrl"));
+                if (m.lastPkg == null) m.lastPkg = emptyToNull(o.optString("lastPkg"));
+                if (m.titleNo == null) {
+                    m.titleNo = emptyToNull(o.optString("titleNo"));
+                    m.rssBase = emptyToNull(o.optString("rssBase"));
+                    m.rssLastEp = o.optLong("rssLastEp", 0);
+                }
+                db.saveMeta(m);
+            }
+        }
         JSONObject s = root.optJSONObject("settings");
         if (s != null) {
             ctx.getSharedPreferences(NoteWriter.PREFS, Context.MODE_PRIVATE).edit()
@@ -115,6 +150,10 @@ public final class BackupManager {
                     .apply();
         }
         return added;
+    }
+
+    private static String emptyToNull(String s) {
+        return s == null || s.isEmpty() ? null : s;
     }
 
     // "- Chapitre 12 — 18/11/2026 21:40 _(webtoons.com)_"

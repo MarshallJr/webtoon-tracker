@@ -7,13 +7,16 @@ import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
 
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.List;
+import java.util.Set;
+import java.util.TreeSet;
 
-/** Stockage local (SQLite) de l'historique de lecture. */
+/** Stockage local (SQLite) de l'historique de lecture + infos par série. */
 public class DbHelper extends SQLiteOpenHelper {
 
     private static final String DB_NAME = "webtoons.db";
-    private static final int DB_VERSION = 1;
+    private static final int DB_VERSION = 2;
     private static DbHelper instance;
 
     public static synchronized DbHelper get(Context ctx) {
@@ -34,11 +37,23 @@ public class DbHelper extends SQLiteOpenHelper {
                 "read_at INTEGER NOT NULL," +
                 "source TEXT)");
         db.execSQL("CREATE UNIQUE INDEX idx_reads_unique ON reads(title COLLATE NOCASE, chapter)");
+        createMeta(db);
+    }
+
+    private void createMeta(SQLiteDatabase db) {
+        db.execSQL("CREATE TABLE IF NOT EXISTS series_meta (" +
+                "title TEXT PRIMARY KEY COLLATE NOCASE," +
+                "tags TEXT," +
+                "last_url TEXT," +
+                "last_pkg TEXT," +
+                "title_no TEXT," +
+                "rss_base TEXT," +
+                "rss_last_ep INTEGER DEFAULT 0)");
     }
 
     @Override
     public void onUpgrade(SQLiteDatabase db, int oldV, int newV) {
-        // Rien pour l'instant (v1).
+        if (oldV < 2) createMeta(db); // v1 → v2 : on garde toutes les lectures
     }
 
     // ------------------------------------------------------------------ Modèles
@@ -48,12 +63,14 @@ public class DbHelper extends SQLiteOpenHelper {
         public final double lastChapter;
         public final int count;
         public final long lastReadAt;
+        public final String tags;
 
-        Series(String title, double lastChapter, int count, long lastReadAt) {
+        Series(String title, double lastChapter, int count, long lastReadAt, String tags) {
             this.title = title;
             this.lastChapter = lastChapter;
             this.count = count;
             this.lastReadAt = lastReadAt;
+            this.tags = tags == null ? "" : tags;
         }
     }
 
@@ -71,7 +88,12 @@ public class DbHelper extends SQLiteOpenHelper {
         }
     }
 
-    // ------------------------------------------------------------------ Requêtes
+    public static final class Meta {
+        public String title, tags, lastUrl, lastPkg, titleNo, rssBase;
+        public long rssLastEp;
+    }
+
+    // ------------------------------------------------------------------ Lectures
 
     /** @return true si c'est un nouveau chapitre (pas déjà enregistré). */
     public synchronized boolean insertRead(String title, double chapter, long readAt, String source) {
@@ -87,10 +109,11 @@ public class DbHelper extends SQLiteOpenHelper {
     public List<Series> getSeries() {
         List<Series> out = new ArrayList<>();
         try (Cursor c = getReadableDatabase().rawQuery(
-                "SELECT title, MAX(chapter), COUNT(*), MAX(read_at) AS last FROM reads " +
-                        "GROUP BY title COLLATE NOCASE ORDER BY last DESC", null)) {
+                "SELECT r.title, MAX(r.chapter), COUNT(*), MAX(r.read_at) AS last, m.tags FROM reads r " +
+                        "LEFT JOIN series_meta m ON m.title = r.title COLLATE NOCASE " +
+                        "GROUP BY r.title COLLATE NOCASE ORDER BY last DESC", null)) {
             while (c.moveToNext()) {
-                out.add(new Series(c.getString(0), c.getDouble(1), c.getInt(2), c.getLong(3)));
+                out.add(new Series(c.getString(0), c.getDouble(1), c.getInt(2), c.getLong(3), c.getString(4)));
             }
         }
         return out;
@@ -106,12 +129,6 @@ public class DbHelper extends SQLiteOpenHelper {
             }
         }
         return out;
-    }
-
-    public int totalChapters() {
-        try (Cursor c = getReadableDatabase().rawQuery("SELECT COUNT(*) FROM reads", null)) {
-            return c.moveToFirst() ? c.getInt(0) : 0;
-        }
     }
 
     /** @return la date de lecture de ce chapitre, ou -1 s'il n'a jamais été lu. */
@@ -130,6 +147,12 @@ public class DbHelper extends SQLiteOpenHelper {
         }
     }
 
+    public int totalChapters() {
+        try (Cursor c = getReadableDatabase().rawQuery("SELECT COUNT(*) FROM reads", null)) {
+            return c.moveToFirst() ? c.getInt(0) : 0;
+        }
+    }
+
     public int countSince(long since) {
         try (Cursor c = getReadableDatabase().rawQuery(
                 "SELECT COUNT(*) FROM reads WHERE read_at >= ?", new String[]{String.valueOf(since)})) {
@@ -137,11 +160,156 @@ public class DbHelper extends SQLiteOpenHelper {
         }
     }
 
+    public List<Long> allReadTimes() {
+        List<Long> out = new ArrayList<>();
+        try (Cursor c = getReadableDatabase().rawQuery("SELECT read_at FROM reads ORDER BY read_at", null)) {
+            while (c.moveToNext()) out.add(c.getLong(0));
+        }
+        return out;
+    }
+
     public synchronized void deleteSeries(String title) {
-        getWritableDatabase().delete("reads", "title = ? COLLATE NOCASE", new String[]{title});
+        SQLiteDatabase db = getWritableDatabase();
+        db.delete("reads", "title = ? COLLATE NOCASE", new String[]{title});
+        db.delete("series_meta", "title = ? COLLATE NOCASE", new String[]{title});
     }
 
     public synchronized void deleteEntry(long id) {
         getWritableDatabase().delete("reads", "id = ?", new String[]{String.valueOf(id)});
+    }
+
+    /** Fusionne la série "from" dans "into" (chapitres, tags, liens). Les doublons disparaissent. */
+    public synchronized void mergeSeries(String from, String into) {
+        if (from.equalsIgnoreCase(into)) return;
+        SQLiteDatabase db = getWritableDatabase();
+        db.beginTransaction();
+        try {
+            db.execSQL("UPDATE OR IGNORE reads SET title = ? WHERE title = ? COLLATE NOCASE", new Object[]{into, from});
+            db.delete("reads", "title = ? COLLATE NOCASE", new String[]{from});
+
+            Meta a = getMeta(from), b = getMeta(into);
+            if (a != null) {
+                Meta m = b != null ? b : new Meta();
+                m.title = into;
+                m.tags = Titles.normalizeTags((m.tags == null ? "" : m.tags) + "," + (a.tags == null ? "" : a.tags));
+                if (m.lastUrl == null) m.lastUrl = a.lastUrl;
+                if (m.lastPkg == null) m.lastPkg = a.lastPkg;
+                if (m.titleNo == null) {
+                    m.titleNo = a.titleNo;
+                    m.rssBase = a.rssBase;
+                    m.rssLastEp = a.rssLastEp;
+                }
+                saveMeta(db, m);
+                db.delete("series_meta", "title = ? COLLATE NOCASE", new String[]{from});
+            }
+            db.setTransactionSuccessful();
+        } finally {
+            db.endTransaction();
+        }
+    }
+
+    // ------------------------------------------------------------------ Infos par série
+
+    public Meta getMeta(String title) {
+        try (Cursor c = getReadableDatabase().rawQuery(
+                "SELECT title, tags, last_url, last_pkg, title_no, rss_base, rss_last_ep FROM series_meta " +
+                        "WHERE title = ? COLLATE NOCASE", new String[]{title})) {
+            if (!c.moveToFirst()) return null;
+            Meta m = new Meta();
+            m.title = c.getString(0);
+            m.tags = c.getString(1);
+            m.lastUrl = c.getString(2);
+            m.lastPkg = c.getString(3);
+            m.titleNo = c.getString(4);
+            m.rssBase = c.getString(5);
+            m.rssLastEp = c.getLong(6);
+            return m;
+        }
+    }
+
+    public List<Meta> getAllMeta() {
+        List<Meta> out = new ArrayList<>();
+        try (Cursor c = getReadableDatabase().rawQuery("SELECT title FROM series_meta", null)) {
+            while (c.moveToNext()) {
+                Meta m = getMeta(c.getString(0));
+                if (m != null) out.add(m);
+            }
+        }
+        return out;
+    }
+
+    private void saveMeta(SQLiteDatabase db, Meta m) {
+        ContentValues v = new ContentValues();
+        v.put("title", m.title);
+        v.put("tags", m.tags);
+        v.put("last_url", m.lastUrl);
+        v.put("last_pkg", m.lastPkg);
+        v.put("title_no", m.titleNo);
+        v.put("rss_base", m.rssBase);
+        v.put("rss_last_ep", m.rssLastEp);
+        db.insertWithOnConflict("series_meta", null, v, SQLiteDatabase.CONFLICT_REPLACE);
+    }
+
+    public synchronized void saveMeta(Meta m) {
+        saveMeta(getWritableDatabase(), m);
+    }
+
+    private Meta metaOrNew(String title) {
+        Meta m = getMeta(title);
+        if (m == null) {
+            m = new Meta();
+            m.title = title;
+        }
+        return m;
+    }
+
+    /** Mémorise où le chapitre a été lu (pour "Reprendre") et l'identifiant webtoons.com. */
+    public synchronized void rememberSource(Detector.Result r) {
+        Meta m = metaOrNew(r.title);
+        if (r.url != null) m.lastUrl = r.url;
+        if (r.pkg != null) m.lastPkg = r.pkg;
+        if (r.titleNo != null && !r.titleNo.equals(m.titleNo)) {
+            m.titleNo = r.titleNo;
+            m.rssBase = r.rssBase;
+            m.rssLastEp = 0;
+        }
+        saveMeta(m);
+    }
+
+    public synchronized void setTags(String title, String tags) {
+        Meta m = metaOrNew(title);
+        m.tags = Titles.normalizeTags(tags);
+        saveMeta(m);
+    }
+
+    public synchronized void linkWebtoons(String title, String rssBase, String titleNo) {
+        Meta m = metaOrNew(title);
+        m.rssBase = rssBase;
+        m.titleNo = titleNo;
+        m.rssLastEp = 0;
+        saveMeta(m);
+    }
+
+    public synchronized void setRssLastEp(String title, long ep) {
+        Meta m = metaOrNew(title);
+        m.rssLastEp = ep;
+        saveMeta(m);
+    }
+
+    public Set<String> allTags() {
+        Set<String> out = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+        for (Series s : getSeries()) out.addAll(Titles.splitTags(s.tags));
+        return out;
+    }
+
+    /** Début du jour (minuit local) pour un instant donné. */
+    public static long dayStart(long t) {
+        Calendar c = Calendar.getInstance();
+        c.setTimeInMillis(t);
+        c.set(Calendar.HOUR_OF_DAY, 0);
+        c.set(Calendar.MINUTE, 0);
+        c.set(Calendar.SECOND, 0);
+        c.set(Calendar.MILLISECOND, 0);
+        return c.getTimeInMillis();
     }
 }

@@ -158,9 +158,11 @@ public class ReadingTrackerService extends AccessibilityService {
         DbHelper db = DbHelper.get(this);
         boolean newSeries = !db.seriesExists(r.title);
         boolean isNew = db.insertRead(r.title, r.chapter, System.currentTimeMillis(), r.source);
+        db.rememberSource(r); // pour "Reprendre" et les alertes, même si le chapitre était déjà lu
         if (!isNew) return;
 
         NoteWriter.write(this);
+        WidgetProvider.updateAll(this);
         sendBroadcast(new Intent(ACTION_UPDATED).setPackage(getPackageName()));
 
         NotifyPolicy.Decision d = policy.onNewChapter(r.title, newSeries, System.currentTimeMillis(),
