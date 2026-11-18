@@ -56,6 +56,21 @@ public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.VH> {
         bg.setColor(colorFor(title));
     }
 
+    /** Affiche la miniature si elle existe, sinon la pastille avec l'initiale. */
+    public static void bindCover(TextView avatar, android.widget.ImageView cover, String title) {
+        paintAvatar(avatar, title);
+        android.graphics.Bitmap b = Covers.get(avatar.getContext(), title);
+        if (b != null) {
+            cover.setImageBitmap(b);
+            cover.setVisibility(View.VISIBLE);
+            avatar.setVisibility(View.INVISIBLE);
+        } else {
+            cover.setImageDrawable(null);
+            cover.setVisibility(View.GONE);
+            avatar.setVisibility(View.VISIBLE);
+        }
+    }
+
     public void setData(List<DbHelper.Series> data) {
         all = data;
         applyFilter();
@@ -104,7 +119,7 @@ public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.VH> {
     public void onBindViewHolder(@NonNull VH h, int position) {
         DbHelper.Series s = shown.get(position);
         h.title.setText(s.title);
-        paintAvatar(h.avatar, s.title);
+        bindCover(h.avatar, h.cover, s.title);
         h.chapter.setText("Ch. " + Detector.formatChapter(s.lastChapter));
         CharSequence when = DateUtils.getRelativeTimeSpanString(
                 s.lastReadAt, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS);
@@ -124,6 +139,7 @@ public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.VH> {
 
     static class VH extends RecyclerView.ViewHolder {
         final TextView title, subtitle, chapter, avatar;
+        final android.widget.ImageView cover;
 
         VH(View v) {
             super(v);
@@ -131,6 +147,7 @@ public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.VH> {
             subtitle = v.findViewById(R.id.subtitle);
             chapter = v.findViewById(R.id.chapter);
             avatar = v.findViewById(R.id.avatar);
+            cover = v.findViewById(R.id.cover);
         }
     }
 }

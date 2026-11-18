@@ -52,14 +52,21 @@
             android:orientation="horizontal">
 
             <FrameLayout
-                android:layout_width="48dp"
-                android:layout_height="48dp">
+                android:layout_width="56dp"
+                android:layout_height="56dp">
 
                 <ImageView
                     android:id="@+id/wAvatarBg"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:src="@drawable/widget_circle" />
+
+                <ImageView
+                    android:id="@+id/wCover"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:scaleType="centerCrop"
+                    android:visibility="gone" />
 
                 <TextView
                     android:id="@+id/wAvatar"

@@ -162,11 +162,66 @@ public class ReadingTrackerService extends AccessibilityService {
         if (!isNew) return;
 
         NoteWriter.write(this);
-        WidgetProvider.updateAll(this);
-        sendBroadcast(new Intent(ACTION_UPDATED).setPackage(getPackageName()));
 
         NotifyPolicy.Decision d = policy.onNewChapter(r.title, newSeries, System.currentTimeMillis(),
                 settings().getInt(KEY_NOTIFY_MODE, NotifyPolicy.MODE_SMART));
+
+        // Miniature : capture de la case lue, AVANT d'afficher la bannière (pour ne pas la capturer).
+        captureCoverIfNeeded(r.title, () -> {
+            WidgetProvider.updateAll(this);
+            sendBroadcast(new Intent(ACTION_UPDATED).setPackage(getPackageName()));
+            showBannerFor(d, r);
+        });
+    }
+
+    // ------------------------------------------------------------------ Miniatures
+
+    private final java.util.Map<String, Long> lastCapture = new java.util.HashMap<>();
+
+    /** Une capture si la série n'a pas encore de miniature, sinon une par session de lecture (30 min). */
+    private void captureCoverIfNeeded(String title, Runnable then) {
+        long now = System.currentTimeMillis();
+        String k = title.toLowerCase(Locale.ROOT);
+        Long last = lastCapture.get(k);
+        boolean need = android.os.Build.VERSION.SDK_INT >= 30
+                && !Covers.isCustom(this, title)
+                && (!Covers.has(this, title) || last == null || now - last > NotifyPolicy.SESSION_GAP_MS);
+        if (!need) {
+            then.run();
+            return;
+        }
+        lastCapture.put(k, now);
+        handler.post(() -> {
+            try {
+                takeScreenshot(android.view.Display.DEFAULT_DISPLAY, io, new TakeScreenshotCallback() {
+                    @Override
+                    public void onSuccess(ScreenshotResult res) {
+                        try {
+                            android.hardware.HardwareBuffer hb = res.getHardwareBuffer();
+                            android.graphics.Bitmap hw = android.graphics.Bitmap.wrapHardwareBuffer(hb, res.getColorSpace());
+                            if (hw != null) {
+                                android.graphics.Bitmap sw = hw.copy(android.graphics.Bitmap.Config.ARGB_8888, false);
+                                Covers.saveFromScreenshot(ReadingTrackerService.this, title, sw);
+                            }
+                            hb.close();
+                        } catch (Throwable t) {
+                            App.saveError(ReadingTrackerService.this, "Miniature", t);
+                        }
+                        then.run();
+                    }
+
+                    @Override
+                    public void onFailure(int errorCode) {
+                        then.run();
+                    }
+                });
+            } catch (Throwable t) {
+                io.execute(then);
+            }
+        });
+    }
+
+    private void showBannerFor(NotifyPolicy.Decision d, Detector.Result r) {
         if (d == null || banner == null) return;
 
         String sub = r.title + " · Ch. " + Detector.formatChapter(r.chapter);

@@ -61,6 +61,18 @@ public class WidgetProvider extends AppWidgetProvider {
             v.setTextViewText(R.id.wSub, "Chapitre " + Detector.formatChapter(s.lastChapter) + " · " + when(s.lastReadAt));
             v.setTextViewText(R.id.wAvatar, SeriesAdapter.initialFor(s.title));
             v.setInt(R.id.wAvatarBg, "setColorFilter", SeriesAdapter.colorFor(s.title));
+            android.graphics.Bitmap cover = Covers.get(ctx, s.title);
+            if (cover != null) {
+                android.graphics.Bitmap small = android.graphics.Bitmap.createScaledBitmap(cover, 168, 168, true);
+                v.setImageViewBitmap(R.id.wCover, Covers.rounded(small, 0.28f));
+                v.setViewVisibility(R.id.wCover, View.VISIBLE);
+                v.setViewVisibility(R.id.wAvatar, View.GONE);
+                v.setViewVisibility(R.id.wAvatarBg, View.GONE);
+            } else {
+                v.setViewVisibility(R.id.wCover, View.GONE);
+                v.setViewVisibility(R.id.wAvatar, View.VISIBLE);
+                v.setViewVisibility(R.id.wAvatarBg, View.VISIBLE);
+            }
             v.setViewVisibility(R.id.wResume, View.VISIBLE);
             PendingIntent resume = pending(ctx, 10, Resume.intentFor(ctx, s.title));
             v.setOnClickPendingIntent(R.id.wResume, resume);

@@ -54,6 +54,8 @@ public class MainActivity extends AppCompatActivity {
     private ActivityResultLauncher<String> notifPermission;
     private com.google.android.material.materialswitch.MaterialSwitch alertsSwitchView;
     private String selectedTag = null;
+    private ActivityResultLauncher<androidx.activity.result.PickVisualMediaRequest> pickCover;
+    private String coverTarget;
     private List<List<String>> duplicates = new java.util.ArrayList<>();
 
     private final BroadcastReceiver updateReceiver = new BroadcastReceiver() {
@@ -112,6 +114,16 @@ public class MainActivity extends AppCompatActivity {
         findViewById(R.id.addButton).setOnClickListener(v -> showAddDialog(null));
         findViewById(R.id.heroCard).setOnClickListener(v -> startActivity(new Intent(this, StatsActivity.class)));
         findViewById(R.id.dupButton).setOnClickListener(v -> showMergeSuggestions());
+        pickCover = registerForActivityResult(new ActivityResultContracts.PickVisualMedia(), uri -> {
+            if (uri == null || coverTarget == null) return;
+            String t = coverTarget;
+            runIo(() -> {
+                Covers.saveFromUri(this, t, uri);
+                Covers.setCustom(this, t, true);
+                WidgetProvider.updateAll(this);
+                return "Miniature mise à jour 🖼";
+            });
+        });
         notifPermission = registerForActivityResult(new ActivityResultContracts.RequestPermission(), granted -> {
             if (granted) {
                 setAlerts(true);
@@ -398,6 +410,33 @@ public class MainActivity extends AppCompatActivity {
                 .show();
     }
 
+    // ------------------------------------------------------------------ Miniatures
+
+    private void showCoverMenu(DbHelper.Series s) {
+        boolean custom = Covers.isCustom(this, s.title);
+        String[] items = {
+                "🖼 Choisir une image dans la galerie",
+                custom ? "📸 Revenir à la capture automatique" : "📸 Recapturer au prochain chapitre lu",
+                "🗑 Supprimer la miniature"};
+        new MaterialAlertDialogBuilder(this)
+                .setTitle("Miniature · " + s.title)
+                .setItems(items, (d, w) -> {
+                    if (w == 0) {
+                        coverTarget = s.title;
+                        pickCover.launch(new androidx.activity.result.PickVisualMediaRequest.Builder()
+                                .setMediaType(ActivityResultContracts.PickVisualMedia.ImageOnly.INSTANCE).build());
+                    } else {
+                        Covers.delete(this, s.title); // supprime aussi le verrou "image perso"
+                        WidgetProvider.updateAll(this);
+                        refresh();
+                        Toast.makeText(this, w == 1 ? "Une nouvelle capture sera prise au prochain chapitre"
+                                : "Miniature supprimée", Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .setNegativeButton("Annuler", null)
+                .show();
+    }
+
     // ------------------------------------------------------------------ Tags
 
     private static final String[] SUGGESTED_TAGS = {"Action", "Fantasy", "Romance", "Comédie", "Drame",
@@ -509,7 +548,10 @@ public class MainActivity extends AppCompatActivity {
                 .setSingleChoiceItems(items, choice[0], (d, w) -> choice[0] = w)
                 .setPositiveButton("Fusionner", (d, w) -> {
                     String into = items[choice[0]];
-                    for (String t : group) if (!t.equalsIgnoreCase(into)) DbHelper.get(this).mergeSeries(t, into);
+                    for (String t : group) if (!t.equalsIgnoreCase(into)) {
+                        DbHelper.get(this).mergeSeries(t, into);
+                        Covers.merge(this, t, into);
+                    }
                     NoteWriter.writeAsync(this);
                     Toast.makeText(this, "Fusionné dans « " + into + " » ✅", Toast.LENGTH_SHORT).show();
                     refresh();
@@ -532,6 +574,7 @@ public class MainActivity extends AppCompatActivity {
                         .setMessage("Les chapitres de « " + items[w] + " » seront rangés dans « " + s.title + " ».")
                         .setPositiveButton("Fusionner", (d2, w2) -> {
                             DbHelper.get(this).mergeSeries(items[w], s.title);
+                            Covers.merge(this, items[w], s.title);
                             NoteWriter.writeAsync(this);
                             refresh();
                         })
@@ -634,7 +677,11 @@ public class MainActivity extends AppCompatActivity {
         View v = getLayoutInflater().inflate(R.layout.sheet_history, null);
         sheet.setContentView(v);
 
-        SeriesAdapter.paintAvatar(v.findViewById(R.id.sAvatar), s.title);
+        SeriesAdapter.bindCover(v.findViewById(R.id.sAvatar), v.findViewById(R.id.sCover), s.title);
+        v.findViewById(R.id.sCoverButton).setOnClickListener(b -> {
+            sheet.dismiss();
+            showCoverMenu(s);
+        });
         ((TextView) v.findViewById(R.id.sTitle)).setText(s.title);
         ((TextView) v.findViewById(R.id.sSubtitle)).setText("Dernier : chapitre "
                 + Detector.formatChapter(s.lastChapter) + " · " + s.count
@@ -748,6 +795,7 @@ public class MainActivity extends AppCompatActivity {
                 .setMessage("« " + s.title + " » et ses " + s.count + " chapitres seront supprimés.")
                 .setPositiveButton("Supprimer", (d, w) -> {
                     DbHelper.get(this).deleteSeries(s.title);
+                    Covers.delete(this, s.title);
                     NoteWriter.writeAsync(this);
                     refresh();
                 })
