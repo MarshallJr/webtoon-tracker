@@ -69,6 +69,14 @@ public final class Covers {
         CACHE.put(key(title), small);
     }
 
+    /** Affiche officielle (portrait) : carré pris dans le haut de l'image, là où sont les visages. */
+    public static void savePoster(Context ctx, String title, Bitmap poster) throws Exception {
+        int w = poster.getWidth(), h = poster.getHeight();
+        int side = Math.min(w, h);
+        int top = h > w ? (int) ((h - side) * 0.2f) : 0;
+        save(ctx, title, Bitmap.createBitmap(poster, (w - side) / 2, top, side, side));
+    }
+
     /**
      * Capture d'écran → on garde la zone centrale (là où est la case du webtoon),
      * sans la barre d'état, la barre d'adresse ni les boutons du lecteur.

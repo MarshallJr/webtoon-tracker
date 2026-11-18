@@ -167,6 +167,7 @@ public class ReadingTrackerService extends AccessibilityService {
                 settings().getInt(KEY_NOTIFY_MODE, NotifyPolicy.MODE_SMART));
 
         // Miniature : capture de la case lue, AVANT d'afficher la bannière (pour ne pas la capturer).
+        if (newSeries) CoverWorker.enqueueIfNeeded(this); // couverture officielle, en arrière-plan
         captureCoverIfNeeded(r.title, () -> {
             WidgetProvider.updateAll(this);
             sendBroadcast(new Intent(ACTION_UPDATED).setPackage(getPackageName()));

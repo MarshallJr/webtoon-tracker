@@ -183,6 +183,7 @@ public class MainActivity extends AppCompatActivity {
             buildTagChips(db);
             updateDuplicates(series);
             WidgetProvider.updateAll(this);
+            CoverWorker.enqueueIfNeeded(this);
             statSeries.setText(String.valueOf(series.size()));
             statChapters.setText(String.valueOf(db.totalChapters()));
             statWeek.setText(String.valueOf(db.countSince(System.currentTimeMillis() - 7L * 24 * 3600 * 1000)));
@@ -413,10 +414,9 @@ public class MainActivity extends AppCompatActivity {
     // ------------------------------------------------------------------ Miniatures
 
     private void showCoverMenu(DbHelper.Series s) {
-        boolean custom = Covers.isCustom(this, s.title);
         String[] items = {
                 "🖼 Choisir une image dans la galerie",
-                custom ? "📸 Revenir à la capture automatique" : "📸 Recapturer au prochain chapitre lu",
+                "🔄 Revenir à la miniature automatique",
                 "🗑 Supprimer la miniature"};
         new MaterialAlertDialogBuilder(this)
                 .setTitle("Miniature · " + s.title)
@@ -427,9 +427,12 @@ public class MainActivity extends AppCompatActivity {
                                 .setMediaType(ActivityResultContracts.PickVisualMedia.ImageOnly.INSTANCE).build());
                     } else {
                         Covers.delete(this, s.title); // supprime aussi le verrou "image perso"
+                        getSharedPreferences("covers_meta", MODE_PRIVATE).edit()
+                                .putLong("try_" + s.title.toLowerCase(Locale.ROOT), w == 1 ? 0 : System.currentTimeMillis())
+                                .apply();
                         WidgetProvider.updateAll(this);
                         refresh();
-                        Toast.makeText(this, w == 1 ? "Une nouvelle capture sera prise au prochain chapitre"
+                        Toast.makeText(this, w == 1 ? "La miniature va être recherchée automatiquement"
                                 : "Miniature supprimée", Toast.LENGTH_SHORT).show();
                     }
                 })
