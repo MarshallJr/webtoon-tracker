@@ -36,6 +36,15 @@ public class ReadingTrackerService extends AccessibilityService {
 
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
+        try {
+            handle(event);
+        } catch (Throwable t) {
+            // Jamais de crash depuis le service : on note l'erreur pour l'onglet Diagnostic.
+            App.saveError(this, "Service", t);
+        }
+    }
+
+    private void handle(AccessibilityEvent event) {
         if (event == null || event.getPackageName() == null) return;
         String pkg = event.getPackageName().toString();
         if (!Detector.isWatched(pkg)) return;
@@ -59,7 +68,13 @@ public class ReadingTrackerService extends AccessibilityService {
         if (pendingCommit != null) handler.removeCallbacks(pendingCommit);
         pending = r;
         final Detector.Result target = r;
-        pendingCommit = () -> record(target);
+        pendingCommit = () -> {
+            try {
+                record(target);
+            } catch (Throwable t) {
+                App.saveError(this, "Service", t);
+            }
+        };
         handler.postDelayed(pendingCommit, DWELL_MS);
     }
 
@@ -79,6 +94,7 @@ public class ReadingTrackerService extends AccessibilityService {
 
     private void record(Detector.Result r) {
         new Thread(() -> {
+          try {
             boolean isNew = DbHelper.get(this).insertRead(r.title, r.chapter, System.currentTimeMillis(), r.source);
             if (!isNew) return;
             NoteWriter.write(this);
@@ -86,6 +102,9 @@ public class ReadingTrackerService extends AccessibilityService {
             handler.post(() -> Toast.makeText(this,
                     "📖 " + r.title + " — ch. " + Detector.formatChapter(r.chapter) + " noté",
                     Toast.LENGTH_SHORT).show());
+          } catch (Throwable t) {
+            App.saveError(this, "Enregistrement", t);
+          }
         }).start();
     }
 

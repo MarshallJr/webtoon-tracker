@@ -87,12 +87,12 @@ public final class Detector {
 
     // ---------------------------------------------------------------- Regex
 
-    private static final int FLAGS =
-            Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE | Pattern.UNICODE_CHARACTER_CLASS;
+    // ⚠️ Pas de UNICODE_CHARACTER_CLASS : ce flag n'existe pas sur Android (crash au démarrage).
+    private static final int FLAGS = Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE;
 
     /** "Ep. 12", "Épisode 12", "Chapitre 12.5", "Chapter 120", "Ch.3", "#45" */
     static final Pattern EPISODE = Pattern.compile(
-            "(?:\\b(?:épisode|episode|ép|ep|chapitre|chapter|chap|ch)\\.?\\s*|#)(\\d{1,4}(?:[.,]\\d{1,2})?)\\b",
+            "(?:(?<![\\p{L}\\p{N}])(?:épisode|episode|ép|ep|chapitre|chapter|chap|ch)\\.?\\s*|#)(\\d{1,4}(?:[.,]\\d{1,2})?)(?![\\p{L}\\p{N}])",
             FLAGS);
 
     /** URL webtoons.com : /fr/fantasy/tower-of-god/saison-1-ep-12/viewer?title_no=..&episode_no=12 */
@@ -181,7 +181,9 @@ public final class Detector {
             if (m.find()) {
                 chapter = parseChapter(m.group(1));
                 chapterNode = n;
-                String prefix = n.text.substring(0, m.start()).replaceAll("[\\s\\-–—:|·•]+$", "").trim();
+                String prefix = n.text.substring(0, m.start())
+                        .replaceAll("(?i)[\\s\\-–—:|·•]*(?:saison|season|s)\\s*\\d+[\\s\\-–—:|·•]*$", "")
+                        .replaceAll("[\\s\\-–—:|·•]+$", "").trim();
                 if (prefix.length() >= 2 && !isUiWord(prefix) && !EPISODE.matcher(prefix).find()) {
                     titleFromSameNode = prefix;
                 }
@@ -197,6 +199,7 @@ public final class Detector {
                 String t = n.text.trim();
                 if (t.length() < 2 || t.length() > 80) continue;
                 if (EPISODE.matcher(t).find()) continue;
+                if (t.matches("(?i)(?:saison|season)\\s*\\d+")) continue;
                 if (isUiWord(t) || t.matches("[\\d\\s.,:/%]+")) continue;
                 title = t;
                 break;

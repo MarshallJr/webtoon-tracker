@@ -114,6 +114,13 @@ public class DbHelper extends SQLiteOpenHelper {
         }
     }
 
+    public int countSince(long since) {
+        try (Cursor c = getReadableDatabase().rawQuery(
+                "SELECT COUNT(*) FROM reads WHERE read_at >= ?", new String[]{String.valueOf(since)})) {
+            return c.moveToFirst() ? c.getInt(0) : 0;
+        }
+    }
+
     public synchronized void deleteSeries(String title) {
         getWritableDatabase().delete("reads", "title = ? COLLATE NOCASE", new String[]{title});
     }
