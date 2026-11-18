@@ -92,7 +92,7 @@ public class MainActivity extends AppCompatActivity {
         pickNoteFile = registerForActivityResult(
                 new ActivityResultContracts.CreateDocument("text/markdown"), this::onNoteFilePicked);
         findViewById(R.id.noteButton).setOnClickListener(v -> onNoteButton());
-        findViewById(R.id.shareButton).setOnClickListener(v -> shareNote());
+        findViewById(R.id.settingsButton).setOnClickListener(v -> showSettings());
         findViewById(R.id.infoButton).setOnClickListener(v -> showDiagnostic());
         findViewById(R.id.addButton).setOnClickListener(v -> showAddDialog(null));
 
@@ -230,11 +230,43 @@ public class MainActivity extends AppCompatActivity {
                 .setTitle("Fichier note")
                 .setMessage(msg)
                 .setPositiveButton("Choisir un fichier", (d, w) -> pickNoteFile.launch("webtoons.md"))
-                .setNeutralButton("Régénérer", (d, w) -> {
-                    NoteWriter.writeAsync(this);
-                    Toast.makeText(this, "Fichier mis à jour", Toast.LENGTH_SHORT).show();
-                })
+                .setNeutralButton("Partager", (d, w) -> shareNote())
                 .setNegativeButton("Fermer", null)
+                .show();
+        NoteWriter.writeAsync(this);
+    }
+
+    // ------------------------------------------------------------------ Réglages
+
+    private void showSettings() {
+        SharedPreferences p = getSharedPreferences(NoteWriter.PREFS, MODE_PRIVATE);
+        View v = getLayoutInflater().inflate(R.layout.dialog_settings, null);
+        android.widget.RadioGroup group = v.findViewById(R.id.modeGroup);
+        com.google.android.material.materialswitch.MaterialSwitch already = v.findViewById(R.id.alreadySwitch);
+
+        int mode = p.getInt(ReadingTrackerService.KEY_NOTIFY_MODE, NotifyPolicy.MODE_SMART);
+        group.check(mode == NotifyPolicy.MODE_ALL ? R.id.modeAll
+                : mode == NotifyPolicy.MODE_OFF ? R.id.modeOff : R.id.modeSmart);
+        already.setChecked(p.getBoolean(ReadingTrackerService.KEY_NOTIFY_ALREADY, true));
+
+        group.setOnCheckedChangeListener((g, id) -> p.edit().putInt(ReadingTrackerService.KEY_NOTIFY_MODE,
+                id == R.id.modeAll ? NotifyPolicy.MODE_ALL
+                        : id == R.id.modeOff ? NotifyPolicy.MODE_OFF : NotifyPolicy.MODE_SMART).apply());
+        already.setOnCheckedChangeListener((b, checked) ->
+                p.edit().putBoolean(ReadingTrackerService.KEY_NOTIFY_ALREADY, checked).apply());
+
+        v.findViewById(R.id.testButton).setOnClickListener(b -> {
+            if (!isServiceEnabled()) {
+                Toast.makeText(this, "Active d'abord l'analyse en fond", Toast.LENGTH_LONG).show();
+                return;
+            }
+            sendBroadcast(new Intent(ReadingTrackerService.ACTION_TEST_BANNER).setPackage(getPackageName()));
+        });
+
+        new MaterialAlertDialogBuilder(this)
+                .setTitle("Réglages")
+                .setView(v)
+                .setPositiveButton("OK", null)
                 .show();
     }
 

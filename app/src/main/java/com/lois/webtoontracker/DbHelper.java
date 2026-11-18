@@ -114,6 +114,22 @@ public class DbHelper extends SQLiteOpenHelper {
         }
     }
 
+    /** @return la date de lecture de ce chapitre, ou -1 s'il n'a jamais été lu. */
+    public long getReadAt(String title, double chapter) {
+        try (Cursor c = getReadableDatabase().rawQuery(
+                "SELECT read_at FROM reads WHERE title = ? COLLATE NOCASE AND chapter = ? LIMIT 1",
+                new String[]{title, String.valueOf(chapter)})) {
+            return c.moveToFirst() ? c.getLong(0) : -1;
+        }
+    }
+
+    public boolean seriesExists(String title) {
+        try (Cursor c = getReadableDatabase().rawQuery(
+                "SELECT 1 FROM reads WHERE title = ? COLLATE NOCASE LIMIT 1", new String[]{title})) {
+            return c.moveToFirst();
+        }
+    }
+
     public int countSince(long since) {
         try (Cursor c = getReadableDatabase().rawQuery(
                 "SELECT COUNT(*) FROM reads WHERE read_at >= ?", new String[]{String.valueOf(since)})) {

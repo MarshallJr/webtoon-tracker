@@ -1,18 +1,27 @@
 package com.lois.webtoontracker;
 
 import android.accessibilityservice.AccessibilityService;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
+import android.content.SharedPreferences;
 import android.graphics.Rect;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
-import android.widget.Toast;
 
+import androidx.core.content.ContextCompat;
+
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
+import java.util.Locale;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * Service d'accessibilité qui tourne en fond : quand une appli de lecture ou un navigateur
@@ -22,17 +31,53 @@ import java.util.List;
 public class ReadingTrackerService extends AccessibilityService {
 
     public static final String ACTION_UPDATED = "com.lois.webtoontracker.UPDATED";
+    public static final String ACTION_TEST_BANNER = "com.lois.webtoontracker.TEST_BANNER";
     public static final String PREFS_DEBUG = "debug";
+
+    public static final String KEY_NOTIFY_MODE = "notify_mode";
+    public static final String KEY_NOTIFY_ALREADY = "notify_already";
 
     /** Temps pendant lequel un chapitre doit rester affiché avant d'être compté comme lu. */
     private static final long DWELL_MS = 6000;
+    /** Délai avant d'afficher "Déjà lu" (évite de clignoter quand on fait défiler une liste). */
+    private static final long ALREADY_DELAY_MS = 1800;
     private static final long MIN_SCAN_INTERVAL_MS = 700;
     private static final int MAX_NODES = 400;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
+    private final ExecutorService io = Executors.newSingleThreadExecutor();
+    private final NotifyPolicy policy = new NotifyPolicy();
+    private Banner banner;
     private Detector.Result pending;
-    private Runnable pendingCommit;
+    private Runnable pendingCommit, pendingAlready;
     private long lastScan;
+
+    private final BroadcastReceiver testReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (banner != null) {
+                banner.show(NotifyPolicy.Kind.ADDED, "Ajouté à ta collection", "Exemple · Ch. 42");
+            }
+        }
+    };
+
+    @Override
+    protected void onServiceConnected() {
+        super.onServiceConnected();
+        banner = new Banner(this);
+        ContextCompat.registerReceiver(this, testReceiver,
+                new IntentFilter(ACTION_TEST_BANNER), ContextCompat.RECEIVER_NOT_EXPORTED);
+    }
+
+    @Override
+    public void onDestroy() {
+        try {
+            unregisterReceiver(testReceiver);
+        } catch (Throwable ignored) {
+        }
+        if (banner != null) banner.release();
+        super.onDestroy();
+    }
 
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
@@ -66,15 +111,14 @@ public class ReadingTrackerService extends AccessibilityService {
         if (pending != null && pending.sameAs(r)) return; // toujours le même chapitre → on attend
 
         if (pendingCommit != null) handler.removeCallbacks(pendingCommit);
+        if (pendingAlready != null) handler.removeCallbacks(pendingAlready);
         pending = r;
         final Detector.Result target = r;
-        pendingCommit = () -> {
-            try {
-                record(target);
-            } catch (Throwable t) {
-                App.saveError(this, "Service", t);
-            }
-        };
+
+        pendingAlready = () -> io.execute(() -> safe("Déjà lu", () -> checkAlreadyRead(target)));
+        handler.postDelayed(pendingAlready, ALREADY_DELAY_MS);
+
+        pendingCommit = () -> io.execute(() -> safe("Enregistrement", () -> record(target)));
         handler.postDelayed(pendingCommit, DWELL_MS);
     }
 
@@ -92,20 +136,56 @@ public class ReadingTrackerService extends AccessibilityService {
         }
     }
 
+    // ------------------------------------------------------------------ Logique (thread IO)
+
+    private SharedPreferences settings() {
+        return getSharedPreferences(NoteWriter.PREFS, MODE_PRIVATE);
+    }
+
+    private void checkAlreadyRead(Detector.Result r) {
+        long readAt = DbHelper.get(this).getReadAt(r.title, r.chapter);
+        if (readAt < 0) return;
+        SharedPreferences s = settings();
+        NotifyPolicy.Decision d = policy.onAlreadyRead(r.title, readAt, System.currentTimeMillis(),
+                s.getInt(KEY_NOTIFY_MODE, NotifyPolicy.MODE_SMART), s.getBoolean(KEY_NOTIFY_ALREADY, true));
+        if (d == null || banner == null) return;
+        String when = new SimpleDateFormat("d MMM yyyy", Locale.FRANCE).format(new Date(readAt));
+        banner.show(NotifyPolicy.Kind.ALREADY_READ, "Déjà lu",
+                r.title + " · Ch. " + Detector.formatChapter(r.chapter) + " · le " + when);
+    }
+
     private void record(Detector.Result r) {
-        new Thread(() -> {
-          try {
-            boolean isNew = DbHelper.get(this).insertRead(r.title, r.chapter, System.currentTimeMillis(), r.source);
-            if (!isNew) return;
-            NoteWriter.write(this);
-            sendBroadcast(new Intent(ACTION_UPDATED).setPackage(getPackageName()));
-            handler.post(() -> Toast.makeText(this,
-                    "📖 " + r.title + " — ch. " + Detector.formatChapter(r.chapter) + " noté",
-                    Toast.LENGTH_SHORT).show());
-          } catch (Throwable t) {
-            App.saveError(this, "Enregistrement", t);
-          }
-        }).start();
+        DbHelper db = DbHelper.get(this);
+        boolean newSeries = !db.seriesExists(r.title);
+        boolean isNew = db.insertRead(r.title, r.chapter, System.currentTimeMillis(), r.source);
+        if (!isNew) return;
+
+        NoteWriter.write(this);
+        sendBroadcast(new Intent(ACTION_UPDATED).setPackage(getPackageName()));
+
+        NotifyPolicy.Decision d = policy.onNewChapter(r.title, newSeries, System.currentTimeMillis(),
+                settings().getInt(KEY_NOTIFY_MODE, NotifyPolicy.MODE_SMART));
+        if (d == null || banner == null) return;
+
+        String sub = r.title + " · Ch. " + Detector.formatChapter(r.chapter);
+        switch (d.kind) {
+            case NEW_SERIES:
+                banner.show(d.kind, "Nouvelle série ajoutée ✨", sub);
+                break;
+            case STREAK:
+                banner.show(d.kind, d.streak + " chapitres d'affilée !", sub);
+                break;
+            default:
+                banner.show(d.kind, "Ajouté à ta collection", sub);
+        }
+    }
+
+    private void safe(String where, Runnable r) {
+        try {
+            r.run();
+        } catch (Throwable t) {
+            App.saveError(this, where, t);
+        }
     }
 
     /** Garde une trace du dernier écran analysé, visible dans l'appli (utile pour régler la détection). */
