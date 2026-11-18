@@ -239,6 +239,14 @@
                     android:text="Lis un chapitre dans WEBTOON, Mihon ou ton navigateur pendant quelques secondes : il apparaîtra ici automatiquement."
                     android:textColor="@color/text_soft"
                     android:textSize="14sp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/emptyRestoreButton"
+                    style="@style/Widget.Material3.Button.TonalButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:text="Restaurer une sauvegarde" />
             </LinearLayout>
         </FrameLayout>
     </LinearLayout>

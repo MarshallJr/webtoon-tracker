@@ -48,6 +48,9 @@ public class MainActivity extends AppCompatActivity {
     private TextView statusPill, statSeries, statChapters, statWeek, greeting, sectionTitle;
     private View emptyState;
     private ActivityResultLauncher<String> pickNoteFile;
+    private ActivityResultLauncher<String> pickAutoBackup, pickExport;
+    private ActivityResultLauncher<String[]> pickRestore;
+    private TextView backupStatusView; // dans la boîte Réglages quand elle est ouverte
 
     private final BroadcastReceiver updateReceiver = new BroadcastReceiver() {
         @Override
@@ -91,6 +94,14 @@ public class MainActivity extends AppCompatActivity {
 
         pickNoteFile = registerForActivityResult(
                 new ActivityResultContracts.CreateDocument("text/markdown"), this::onNoteFilePicked);
+        pickAutoBackup = registerForActivityResult(
+                new ActivityResultContracts.CreateDocument("application/json"), this::onAutoBackupPicked);
+        pickExport = registerForActivityResult(
+                new ActivityResultContracts.CreateDocument("application/json"), this::onExportPicked);
+        pickRestore = registerForActivityResult(
+                new ActivityResultContracts.OpenDocument(), this::onRestorePicked);
+        findViewById(R.id.emptyRestoreButton).setOnClickListener(v ->
+                pickRestore.launch(new String[]{"application/json", "text/*", "application/octet-stream"}));
         findViewById(R.id.noteButton).setOnClickListener(v -> onNoteButton());
         findViewById(R.id.settingsButton).setOnClickListener(v -> showSettings());
         findViewById(R.id.infoButton).setOnClickListener(v -> showDiagnostic());
@@ -160,6 +171,7 @@ public class MainActivity extends AppCompatActivity {
         ((TextView) findViewById(R.id.emptyTitle)).setText(
                 adapter.isFiltering() ? "Aucun résultat" : "Aucune lecture pour l'instant");
         findViewById(R.id.emptyText).setVisibility(adapter.isFiltering() ? View.GONE : View.VISIBLE);
+        findViewById(R.id.emptyRestoreButton).setVisibility(adapter.isFiltering() ? View.GONE : View.VISIBLE);
     }
 
     private boolean isServiceEnabled() {
@@ -263,11 +275,87 @@ public class MainActivity extends AppCompatActivity {
             sendBroadcast(new Intent(ReadingTrackerService.ACTION_TEST_BANNER).setPackage(getPackageName()));
         });
 
+        backupStatusView = v.findViewById(R.id.backupStatus);
+        updateBackupStatus();
+        v.findViewById(R.id.backupAutoButton).setOnClickListener(b ->
+                pickAutoBackup.launch("webtoon-tracker-sauvegarde.json"));
+        v.findViewById(R.id.backupExportButton).setOnClickListener(b ->
+                pickExport.launch("webtoon-tracker-" + new SimpleDateFormat("yyyy-MM-dd", Locale.FRANCE)
+                        .format(new Date()) + ".json"));
+        v.findViewById(R.id.backupRestoreButton).setOnClickListener(b ->
+                pickRestore.launch(new String[]{"application/json", "text/*", "application/octet-stream"}));
+
         new MaterialAlertDialogBuilder(this)
                 .setTitle("Réglages")
                 .setView(v)
                 .setPositiveButton("OK", null)
+                .setOnDismissListener(d -> backupStatusView = null)
                 .show();
+    }
+
+    // ------------------------------------------------------------------ Sauvegarde
+
+    private void updateBackupStatus() {
+        if (backupStatusView != null) backupStatusView.setText(BackupManager.describeAuto(this));
+    }
+
+    private void keepPermission(Uri uri) {
+        try {
+            getContentResolver().takePersistableUriPermission(uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+        } catch (SecurityException ignored) {
+        }
+    }
+
+    private void onAutoBackupPicked(Uri uri) {
+        if (uri == null) return;
+        keepPermission(uri);
+        getSharedPreferences(NoteWriter.PREFS, MODE_PRIVATE).edit()
+                .putString(BackupManager.KEY_BACKUP_URI, uri.toString()).apply();
+        runIo(() -> {
+            BackupManager.autoBackup(this);
+            return "Sauvegarde auto activée : mise à jour à chaque chapitre";
+        });
+    }
+
+    private void onExportPicked(Uri uri) {
+        if (uri == null) return;
+        runIo(() -> {
+            BackupManager.writeTo(this, uri);
+            return "Sauvegarde exportée ✅";
+        });
+    }
+
+    private void onRestorePicked(Uri uri) {
+        if (uri == null) return;
+        runIo(() -> {
+            int n = BackupManager.restore(this, uri);
+            return n == 0 ? "Rien de nouveau : tout était déjà là"
+                    : n + (n > 1 ? " chapitres restaurés ✅" : " chapitre restauré ✅");
+        });
+    }
+
+    interface IoTask {
+        String run() throws Exception;
+    }
+
+    /** Exécute en arrière-plan puis affiche le résultat et rafraîchit l'écran. */
+    private void runIo(IoTask task) {
+        new Thread(() -> {
+            String msg;
+            try {
+                msg = task.run();
+            } catch (Exception e) {
+                App.saveError(this, "Sauvegarde", e);
+                msg = "Échec : " + e.getMessage();
+            }
+            final String m = msg;
+            runOnUiThread(() -> {
+                Toast.makeText(this, m, Toast.LENGTH_LONG).show();
+                updateBackupStatus();
+                refresh();
+            });
+        }).start();
     }
 
     private void onNoteFilePicked(Uri uri) {

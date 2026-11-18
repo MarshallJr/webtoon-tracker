@@ -90,5 +90,7 @@ public final class NoteWriter {
                 Log.w(TAG, "Écriture dans le fichier choisi impossible", e);
             }
         }
+
+        BackupManager.autoBackup(ctx);
     }
 }
