@@ -11,4 +11,5 @@
     <color name="text_main">#17142B</color>
     <color name="text_soft">#6E6A85</color>
     <color name="chart_grid">#1F17142B</color>
+    <color name="icon_bg">#140C2C</color>
 </resources>
