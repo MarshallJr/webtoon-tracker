@@ -22,7 +22,8 @@ import java.util.Locale;
  */
 public final class Covers {
 
-    private static final int SIZE = 320;
+    /** Format portrait 2:3, comme une vraie couverture (lisible en grand dans la fiche et le widget). */
+    private static final int W = 360, H = 540;
     private static final LruCache<String, Bitmap> CACHE = new LruCache<String, Bitmap>(8 * 1024 * 1024) {
         @Override
         protected int sizeOf(String k, Bitmap b) {
@@ -58,35 +59,64 @@ public final class Covers {
         return b;
     }
 
-    /** Recadre en carré, réduit à 320 px et enregistre. */
-    public static void save(Context ctx, String title, Bitmap src) throws Exception {
-        int side = Math.min(src.getWidth(), src.getHeight());
-        Bitmap sq = Bitmap.createBitmap(src, (src.getWidth() - side) / 2, (src.getHeight() - side) / 2, side, side);
-        Bitmap small = Bitmap.createScaledBitmap(sq, SIZE, SIZE, true);
+    /** Recadre en portrait 2:3, réduit à 360×540 et enregistre. @param bias 0 = haut, 0.5 = centre */
+    public static void save(Context ctx, String title, Bitmap src, float bias) throws Exception {
+        int w = src.getWidth(), h = src.getHeight();
+        int cw, ch;
+        if (w * 3 > h * 2) {          // plus large que 2:3 → on coupe les côtés
+            ch = h;
+            cw = Math.round(h * 2f / 3f);
+        } else {                      // plus haut que 2:3 → on coupe en haut / en bas
+            cw = w;
+            ch = Math.round(w * 3f / 2f);
+        }
+        int x = (w - cw) / 2;
+        int y = Math.round((h - ch) * bias);
+        Bitmap crop = Bitmap.createBitmap(src, x, Math.max(0, y), cw, Math.min(ch, h));
+        Bitmap small = Bitmap.createScaledBitmap(crop, W, H, true);
         try (FileOutputStream out = new FileOutputStream(file(ctx, title))) {
-            small.compress(Bitmap.CompressFormat.JPEG, 85, out);
+            small.compress(Bitmap.CompressFormat.JPEG, 88, out);
         }
         CACHE.put(key(title), small);
     }
 
-    /** Affiche officielle (portrait) : carré pris dans le haut de l'image, là où sont les visages. */
-    public static void savePoster(Context ctx, String title, Bitmap poster) throws Exception {
-        int w = poster.getWidth(), h = poster.getHeight();
-        int side = Math.min(w, h);
-        int top = h > w ? (int) ((h - side) * 0.2f) : 0;
-        save(ctx, title, Bitmap.createBitmap(poster, (w - side) / 2, top, side, side));
+    public static void save(Context ctx, String title, Bitmap src) throws Exception {
+        save(ctx, title, src, 0.5f);
     }
 
-    /**
-     * Capture d'écran → on garde la zone centrale (là où est la case du webtoon),
-     * sans la barre d'état, la barre d'adresse ni les boutons du lecteur.
-     */
+    /** Affiche officielle (déjà en portrait) : on garde le haut si elle est plus haute que 2:3. */
+    public static void savePoster(Context ctx, String title, Bitmap poster) throws Exception {
+        save(ctx, title, poster, 0.15f);
+    }
+
+    /** Capture d'écran → la zone centrale (la case lue), sans barres du haut et du bas. */
     public static void saveFromScreenshot(Context ctx, String title, Bitmap screen) throws Exception {
         int w = screen.getWidth(), h = screen.getHeight();
-        int side = Math.min(w, (int) (h * 0.5));
-        int top = (h - side) / 2;
-        Bitmap center = Bitmap.createBitmap(screen, (w - side) / 2, top, side, side);
-        save(ctx, title, center);
+        int top = (int) (h * 0.15f), height = (int) (h * 0.70f);
+        save(ctx, title, Bitmap.createBitmap(screen, 0, top, w, height), 0.5f);
+    }
+
+    /** Ancienne miniature carrée (avant le format portrait) ? */
+    public static boolean isSquare(Context ctx, String title) {
+        File f = file(ctx, title);
+        if (!f.exists()) return false;
+        BitmapFactory.Options o = new BitmapFactory.Options();
+        o.inJustDecodeBounds = true;
+        BitmapFactory.decodeFile(f.getAbsolutePath(), o);
+        return o.outWidth > 0 && o.outWidth == o.outHeight;
+    }
+
+    /** Image choisie par toi dans la galerie : jamais remplacée automatiquement. */
+    public static void markUserPick(Context ctx, String title) {
+        try {
+            new File(file(ctx, title).getAbsolutePath() + ".user").createNewFile();
+        } catch (Exception ignored) {
+        }
+        setCustom(ctx, title, true);
+    }
+
+    public static boolean isUserPick(Context ctx, String title) {
+        return new File(file(ctx, title).getAbsolutePath() + ".user").exists();
     }
 
     public static void saveFromUri(Context ctx, String title, Uri uri) throws Exception {
@@ -96,7 +126,7 @@ public final class Covers {
             BitmapFactory.decodeStream(in, null, o);
         }
         int sample = 1;
-        while (Math.min(o.outWidth, o.outHeight) / (sample * 2) >= SIZE) sample *= 2;
+        while (Math.min(o.outWidth, o.outHeight) / (sample * 2) >= W) sample *= 2;
         BitmapFactory.Options o2 = new BitmapFactory.Options();
         o2.inSampleSize = sample;
         Bitmap b;
@@ -110,6 +140,7 @@ public final class Covers {
     public static void delete(Context ctx, String title) {
         file(ctx, title).delete();
         lockFile(ctx, title).delete();
+        new File(file(ctx, title).getAbsolutePath() + ".user").delete();
         CACHE.remove(key(title));
     }
 

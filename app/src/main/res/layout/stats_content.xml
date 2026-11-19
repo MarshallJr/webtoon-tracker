@@ -1,0 +1,381 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Page Activité (statistiques), incluse dans l'accueil -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:clipChildren="false"
+    android:clipToPadding="false"
+    android:orientation="vertical"
+    android:paddingStart="20dp"
+    android:paddingTop="14dp"
+    android:paddingEnd="20dp"
+    android:paddingBottom="24dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:fontFamily="sans-serif-black"
+        android:letterSpacing="-0.02"
+        android:text="Activité"
+        android:textColor="@color/text_main"
+        android:textSize="28sp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Ton rythme de lecture, en un coup d'œil"
+        android:textColor="@color/text_soft"
+        android:textSize="14sp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:background="@drawable/bg_hero"
+        android:elevation="12dp"
+        android:orientation="vertical"
+        android:outlineAmbientShadowColor="@color/shadow_strong"
+        android:outlineSpotShadowColor="@color/shadow_strong"
+        android:padding="20dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Temps de lecture estimé"
+            android:textColor="#D9FFFFFF"
+            android:textSize="13sp" />
+
+        <TextView
+            android:id="@+id/sTime"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:fontFamily="sans-serif-black"
+            android:textColor="#FFFFFF"
+            android:textSize="38sp" />
+
+        <TextView
+            android:id="@+id/sTotal"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="#D9FFFFFF"
+            android:textSize="13sp" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginTop="14dp"
+            android:layout_marginBottom="12dp"
+            android:background="#26FFFFFF" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/aWeek"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif-black"
+                    android:textColor="#FFFFFF"
+                    android:textSize="22sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="chapitres cette semaine"
+                    android:textColor="#D9FFFFFF"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/aTrend"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_pill"
+                android:fontFamily="sans-serif-medium"
+                android:paddingStart="12dp"
+                android:paddingTop="6dp"
+                android:paddingEnd="12dp"
+                android:paddingBottom="6dp"
+                android:textColor="#FFFFFF"
+                android:textSize="12sp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="-5dp"
+        android:layout_marginTop="9dp"
+        android:layout_marginEnd="-5dp"
+        android:baselineAligned="false"
+        android:orientation="horizontal">
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_margin="5dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_card_stroke"
+                android:elevation="3dp"
+                android:orientation="vertical"
+                android:outlineAmbientShadowColor="@color/shadow"
+                android:outlineSpotShadowColor="@color/shadow"
+                android:padding="14dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="🔥"
+                    android:textSize="18sp" />
+
+                <TextView
+                    android:id="@+id/sStreak"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:fontFamily="sans-serif-black"
+                    android:textColor="@color/text_main"
+                    android:textSize="18sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="jours d'affilée"
+                    android:textColor="@color/text_soft"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/sStreakSub"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/brand"
+                    android:textSize="11sp" />
+            </LinearLayout>
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_margin="5dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_card_stroke"
+                android:elevation="3dp"
+                android:orientation="vertical"
+                android:outlineAmbientShadowColor="@color/shadow"
+                android:outlineSpotShadowColor="@color/shadow"
+                android:padding="14dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="🏆"
+                    android:textSize="18sp" />
+
+                <TextView
+                    android:id="@+id/sRecord"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:fontFamily="sans-serif-black"
+                    android:textColor="@color/text_main"
+                    android:textSize="18sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="record en un jour"
+                    android:textColor="@color/text_soft"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/sRecordSub"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/brand"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="-5dp"
+        android:layout_marginEnd="-5dp"
+        android:baselineAligned="false"
+        android:orientation="horizontal">
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_margin="5dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_card_stroke"
+                android:elevation="3dp"
+                android:orientation="vertical"
+                android:outlineAmbientShadowColor="@color/shadow"
+                android:outlineSpotShadowColor="@color/shadow"
+                android:padding="14dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="📅"
+                    android:textSize="18sp" />
+
+                <TextView
+                    android:id="@+id/sDay"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:fontFamily="sans-serif-black"
+                    android:textColor="@color/text_main"
+                    android:textSize="18sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="jour préféré"
+                    android:textColor="@color/text_soft"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/sDaySub"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/brand"
+                    android:textSize="11sp" />
+            </LinearLayout>
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_margin="5dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_card_stroke"
+                android:elevation="3dp"
+                android:orientation="vertical"
+                android:outlineAmbientShadowColor="@color/shadow"
+                android:outlineSpotShadowColor="@color/shadow"
+                android:padding="14dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="🕒"
+                    android:textSize="18sp" />
+
+                <TextView
+                    android:id="@+id/sSlot"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:fontFamily="sans-serif-black"
+                    android:textColor="@color/text_main"
+                    android:textSize="18sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="moment préféré"
+                    android:textColor="@color/text_soft"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/sSlotSub"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/brand"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+    </LinearLayout>
+
+        <LinearLayout
+            style="@style/DetailCard">
+
+            <TextView
+                style="@style/CardTitle"
+                android:text="14 derniers jours" />
+
+            <com.lois.webtoontracker.BarChartView
+                android:id="@+id/chart14"
+                android:layout_width="match_parent"
+                android:layout_height="150dp"
+                android:layout_marginTop="12dp" />
+        </LinearLayout>
+
+        <LinearLayout
+            style="@style/DetailCard">
+
+            <TextView
+                style="@style/CardTitle"
+                android:text="Par jour de la semaine" />
+
+            <com.lois.webtoontracker.BarChartView
+                android:id="@+id/chartWeek"
+                android:layout_width="match_parent"
+                android:layout_height="150dp"
+                android:layout_marginTop="12dp" />
+        </LinearLayout>
+
+        <LinearLayout
+        android:id="@+id/aGenresCard"
+            style="@style/DetailCard">
+
+            <TextView
+                style="@style/CardTitle"
+                android:text="Genres préférés" />
+
+            <LinearLayout
+                android:id="@+id/aGenres"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:orientation="vertical" />
+        </LinearLayout>
+
+        <LinearLayout
+            style="@style/DetailCard">
+
+            <TextView
+                style="@style/CardTitle"
+                android:text="Tes séries les plus lues" />
+
+            <LinearLayout
+                android:id="@+id/topList"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:orientation="vertical" />
+        </LinearLayout>
+
+        <LinearLayout
+            style="@style/DetailCard">
+
+            <TextView
+                style="@style/CardTitle"
+                android:text="Activité récente" />
+
+            <LinearLayout
+                android:id="@+id/aRecent"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:orientation="vertical" />
+        </LinearLayout>
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="14dp"
+        android:gravity="center"
+        android:text="Temps estimé sur une base de ~5 min par chapitre"
+        android:textColor="@color/text_soft"
+        android:textSize="11sp" />
+</LinearLayout>

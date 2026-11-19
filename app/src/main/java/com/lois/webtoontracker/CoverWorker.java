@@ -56,6 +56,10 @@ public class CoverWorker extends Worker {
     }
 
     private static boolean needsCover(Context ctx, String title, SharedPreferences p, long now) {
+        // Ancienne couverture carrée → on retélécharge l'officielle en portrait (sauf image choisie par toi).
+        if (Covers.isCustom(ctx, title) && !Covers.isUserPick(ctx, title) && Covers.isSquare(ctx, title)) {
+            return now - p.getLong("portrait_" + key(title), 0) > RETRY_MS;
+        }
         if (Covers.isCustom(ctx, title)) return false;              // image perso ou officielle déjà là
         return now - p.getLong(key(title), 0) > RETRY_MS;
     }
@@ -111,7 +115,7 @@ public class CoverWorker extends Worker {
             boolean wantLink = needsLink(ctx, s, p, now);
             boolean wantInfo = needsInfo(ctx, s, p, now);
             if (!wantCover && !wantTags && !wantLink && !wantInfo) continue;
-            if (wantCover) p.edit().putLong(key(s.title), now).apply();
+            if (wantCover) p.edit().putLong(key(s.title), now).putLong("portrait_" + key(s.title), now).apply();
             if (wantTags) p.edit().putLong("tags_" + key(s.title), now).apply();
             if (wantLink) p.edit().putLong("link_" + key(s.title), now).apply();
             p.edit().putLong("info_" + key(s.title), now).apply();
@@ -150,7 +154,7 @@ public class CoverWorker extends Worker {
                     db.setTags(title, info.tags);
                     found++;
                 }
-                if (!wantCover || info.coverUrl == null || Covers.isCustom(ctx, title)) continue;
+                if (!wantCover || info.coverUrl == null || Covers.isUserPick(ctx, title)) continue;
                 Bitmap b = BitmapFactory.decodeStream(new java.io.ByteArrayInputStream(download(info.coverUrl)));
                 if (b == null) continue;
                 Covers.savePoster(ctx, title, b);

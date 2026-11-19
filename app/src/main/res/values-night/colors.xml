@@ -17,4 +17,9 @@
     <color name="card_shadow">#FF8C6BFF</color>
     <color name="rating_bg">#3A2E10</color>
     <color name="rating_text">#FFC93C</color>
+    <color name="nav_selected">#3A2F6E</color>
+    <color name="hero_start">#3A2A72</color>
+    <color name="hero_end">#1C1730</color>
+    <color name="hero_stroke">#336D4AFF</color>
+    <color name="online">#3DDC84</color>
 </resources>

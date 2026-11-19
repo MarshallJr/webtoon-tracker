@@ -3,13 +3,13 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginTop="7dp"
-    android:layout_marginBottom="11dp"
+    android:layout_marginTop="5dp"
+    android:layout_marginBottom="7dp"
     android:outlineAmbientShadowColor="@color/card_shadow"
     android:outlineSpotShadowColor="@color/card_shadow"
     app:cardBackgroundColor="@color/card_bg"
-    app:cardCornerRadius="22dp"
-    app:cardElevation="9dp"
+    app:cardCornerRadius="20dp"
+    app:cardElevation="5dp"
     app:strokeColor="@color/hairline"
     app:strokeWidth="1dp">
 
@@ -21,8 +21,8 @@
         android:padding="10dp">
 
         <FrameLayout
-            android:layout_width="68dp"
-            android:layout_height="68dp">
+            android:layout_width="70dp"
+            android:layout_height="100dp">
 
             <TextView
                 android:id="@+id/avatar"
@@ -32,7 +32,7 @@
                 android:fontFamily="sans-serif-black"
                 android:gravity="center"
                 android:textColor="#FFFFFF"
-                android:textSize="24sp" />
+                android:textSize="26sp" />
 
             <com.google.android.material.imageview.ShapeableImageView
                 android:id="@+id/cover"
@@ -48,108 +48,91 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginStart="14dp"
-            android:layout_marginEnd="8dp"
+            android:layout_marginEnd="10dp"
             android:layout_weight="1"
             android:orientation="vertical">
 
-            <LinearLayout
+            <TextView
+                android:id="@+id/title"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:gravity="center_vertical"
-                android:orientation="horizontal">
+                android:ellipsize="end"
+                android:fontFamily="sans-serif-medium"
+                android:lineSpacingExtra="1dp"
+                android:maxLines="2"
+                android:textColor="@color/text_main"
+                android:textSize="16sp" />
 
-                <TextView
-                    android:id="@+id/title"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:ellipsize="end"
-                    android:fontFamily="sans-serif-medium"
-                    android:maxLines="1"
-                    android:textColor="@color/text_main"
-                    android:textSize="16sp" />
-
-                <TextView
-                    android:id="@+id/rating"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="6dp"
-                    android:background="@drawable/bg_rating"
-                    android:fontFamily="sans-serif-black"
-                    android:paddingStart="7dp"
-                    android:paddingTop="1dp"
-                    android:paddingEnd="7dp"
-                    android:paddingBottom="1dp"
-                    android:textColor="@color/rating_text"
-                    android:textSize="11sp"
-                    android:visibility="gone" />
-            </LinearLayout>
+            <TextView
+                android:id="@+id/rating"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:fontFamily="sans-serif-black"
+                android:textColor="@color/accent"
+                android:textSize="13sp"
+                android:visibility="gone" />
 
             <TextView
                 android:id="@+id/subtitle"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="3dp"
+                android:layout_marginTop="2dp"
                 android:ellipsize="end"
                 android:maxLines="1"
                 android:textColor="@color/text_soft"
                 android:textSize="13sp" />
 
-            <TextView
-                android:id="@+id/newBadge"
+            <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="5dp"
-                android:background="@drawable/bg_new_badge"
-                android:fontFamily="sans-serif-black"
-                android:paddingStart="8dp"
-                android:paddingTop="2dp"
-                android:paddingEnd="8dp"
-                android:paddingBottom="2dp"
-                android:textColor="@color/on_accent"
-                android:textSize="11sp"
-                android:visibility="gone" />
+                android:layout_marginTop="6dp"
+                android:orientation="horizontal">
 
-            <TextView
-                android:id="@+id/tagLine"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:ellipsize="end"
-                android:fontFamily="sans-serif-medium"
-                android:maxLines="1"
-                android:textColor="@color/brand"
-                android:textSize="12sp"
-                android:visibility="gone" />
+                <TextView
+                    android:id="@+id/tagLine"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/bg_pill_soft"
+                    android:fontFamily="sans-serif-medium"
+                    android:paddingStart="10dp"
+                    android:paddingTop="3dp"
+                    android:paddingEnd="10dp"
+                    android:paddingBottom="3dp"
+                    android:textColor="@color/badge_text"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/newBadge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:background="@drawable/bg_new_badge"
+                    android:fontFamily="sans-serif-black"
+                    android:paddingStart="10dp"
+                    android:paddingTop="3dp"
+                    android:paddingEnd="10dp"
+                    android:paddingBottom="3dp"
+                    android:textColor="@color/on_accent"
+                    android:textSize="12sp"
+                    android:visibility="gone" />
+            </LinearLayout>
         </LinearLayout>
 
-        <LinearLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:background="@drawable/bg_badge"
-            android:gravity="center"
-            android:minWidth="58dp"
-            android:orientation="vertical"
-            android:paddingStart="10dp"
-            android:paddingTop="6dp"
-            android:paddingEnd="10dp"
-            android:paddingBottom="6dp">
+        <FrameLayout
+            android:id="@+id/play"
+            android:layout_width="46dp"
+            android:layout_height="46dp"
+            android:background="@drawable/bg_play"
+            android:contentDescription="Reprendre">
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:letterSpacing="0.1"
-                android:text="CH."
-                android:textColor="@color/badge_text"
-                android:textSize="9sp" />
-
-            <TextView
-                android:id="@+id/chapter"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:fontFamily="sans-serif-black"
-                android:textColor="@color/badge_text"
-                android:textSize="17sp" />
-        </LinearLayout>
+            <ImageView
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:layout_gravity="center"
+                android:contentDescription="@null"
+                android:src="@drawable/ic_play"
+                android:tint="@color/badge_text" />
+        </FrameLayout>
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>

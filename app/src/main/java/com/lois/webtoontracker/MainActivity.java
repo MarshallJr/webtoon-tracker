@@ -13,6 +13,7 @@ import android.os.Bundle;
 import android.provider.Settings;
 import android.text.Editable;
 import android.text.InputType;
+import android.text.format.DateUtils;
 import android.text.TextWatcher;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -74,18 +75,19 @@ public class MainActivity extends AppCompatActivity {
             v.setPadding(b.left, b.top, b.right, b.bottom);
             return WindowInsetsCompat.CONSUMED;
         });
+        setupNavigation();
 
         statusPill = findViewById(R.id.statusPill);
         statSeries = findViewById(R.id.statSeries);
         statChapters = findViewById(R.id.statChapters);
         statWeek = findViewById(R.id.statWeek);
         greeting = findViewById(R.id.greeting);
-        sectionTitle = findViewById(R.id.sectionTitle);
         emptyState = findViewById(R.id.emptyState);
 
         RecyclerView list = findViewById(R.id.seriesList);
         list.setLayoutManager(new LinearLayoutManager(this));
         adapter = new SeriesAdapter(s -> DetailActivity.open(this, s.title), this::confirmDeleteSeries);
+        adapter.setOnPlay(s -> Resume.open(this, s.title));
         list.setAdapter(adapter);
 
         statusPill.setOnClickListener(v -> {
@@ -105,11 +107,29 @@ public class MainActivity extends AppCompatActivity {
                 new ActivityResultContracts.OpenDocument(), this::onRestorePicked);
         findViewById(R.id.emptyRestoreButton).setOnClickListener(v ->
                 pickRestore.launch(new String[]{"application/json", "text/*", "application/octet-stream"}));
-        findViewById(R.id.noteButton).setOnClickListener(v -> onNoteButton());
         findViewById(R.id.settingsButton).setOnClickListener(v -> showSettings());
-        findViewById(R.id.infoButton).setOnClickListener(v -> showDiagnostic());
         findViewById(R.id.addButton).setOnClickListener(v -> showAddDialog(null));
-        findViewById(R.id.heroCard).setOnClickListener(v -> startActivity(new Intent(this, StatsActivity.class)));
+        findViewById(R.id.libAddIcon).setOnClickListener(v -> showAddDialog(null));
+        findViewById(R.id.homeStatsLink).setOnClickListener(v -> showPage(PAGE_ACTIVITY));
+        findViewById(R.id.libRhythm).setOnClickListener(v -> showPage(PAGE_ACTIVITY));
+        findViewById(R.id.homeSeeAll).setOnClickListener(v -> showPage(PAGE_LIBRARY));
+        findViewById(R.id.homeSearch).setOnClickListener(v -> {
+            showPage(PAGE_LIBRARY);
+            openSearch();
+        });
+        findViewById(R.id.homeFilter).setOnClickListener(v -> {
+            showPage(PAGE_LIBRARY);
+            showFilterDialog();
+        });
+        findViewById(R.id.libSearchButton).setOnClickListener(v -> {
+            View field = findViewById(R.id.searchInput);
+            if (field.getVisibility() == View.VISIBLE && ((EditText) field).getText().length() == 0) {
+                field.setVisibility(View.GONE);
+            } else {
+                openSearch();
+            }
+        });
+        findViewById(R.id.filterChip).setOnClickListener(v -> showFilterDialog());
         findViewById(R.id.dupButton).setOnClickListener(v -> showMergeSuggestions());
         notifPermission = registerForActivityResult(new ActivityResultContracts.RequestPermission(), granted -> {
             if (!granted) Toast.makeText(this, "Sans l'autorisation de notifications, impossible de t'alerter", Toast.LENGTH_LONG).show();
@@ -188,9 +208,15 @@ public class MainActivity extends AppCompatActivity {
             updateDuplicates(series);
             WidgetProvider.updateAll(this);
             CoverWorker.enqueueIfNeeded(this);
+            int week = db.countSince(System.currentTimeMillis() - 7L * 24 * 3600 * 1000);
             statSeries.setText(String.valueOf(series.size()));
             statChapters.setText(String.valueOf(db.totalChapters()));
-            statWeek.setText(String.valueOf(db.countSince(System.currentTimeMillis() - 7L * 24 * 3600 * 1000)));
+            statWeek.setText(String.valueOf(week));
+            bindHome(series);
+            ((TextView) findViewById(R.id.libCount)).setText(series.size() + (series.size() > 1 ? " séries" : " série")
+                    + " · " + db.totalChapters() + " chapitres");
+            ((TextView) findViewById(R.id.libRhythmSub)).setText(week + (week > 1 ? " chapitres" : " chapitre") + " cette semaine");
+            if (page == PAGE_ACTIVITY) StatsBinder.bind(this, findViewById(R.id.activityContent));
             updateEmpty();
         } catch (Throwable t) {
             App.saveError(this, "Affichage", t);
@@ -199,13 +225,211 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void updateEmpty() {
-        boolean empty = adapter.shownCount() == 0;
-        emptyState.setVisibility(empty ? View.VISIBLE : View.GONE);
-        sectionTitle.setVisibility(empty ? View.GONE : View.VISIBLE);
-        ((TextView) findViewById(R.id.emptyTitle)).setText(
-                adapter.isFiltering() ? "Aucun résultat" : "Aucune lecture pour l'instant");
-        findViewById(R.id.emptyText).setVisibility(adapter.isFiltering() ? View.GONE : View.VISIBLE);
-        findViewById(R.id.emptyRestoreButton).setVisibility(adapter.isFiltering() ? View.GONE : View.VISIBLE);
+        boolean none = adapter.totalCount() == 0;
+        emptyState.setVisibility(none ? View.VISIBLE : View.GONE);
+        for (int id : new int[]{R.id.resumeSection, R.id.resumeCard, R.id.homeRecentHeader, R.id.homeRecent}) {
+            if (none) findViewById(id).setVisibility(View.GONE);
+        }
+        findViewById(R.id.libEmpty).setVisibility(!none && adapter.shownCount() == 0 ? View.VISIBLE : View.GONE);
+        ((TextView) findViewById(R.id.libEmpty)).setText(none ? "" : "Aucune série ne correspond à ta recherche ou à tes filtres.");
+        updateFilterChip();
+    }
+
+    // ------------------------------------------------------------------ Navigation
+
+    private static final int PAGE_HOME = 0, PAGE_LIBRARY = 1, PAGE_ACTIVITY = 2;
+    private int page = PAGE_HOME;
+
+    private void setupNavigation() {
+        findViewById(R.id.navHome).setOnClickListener(v -> showPage(PAGE_HOME));
+        findViewById(R.id.navLibrary).setOnClickListener(v -> showPage(PAGE_LIBRARY));
+        findViewById(R.id.navActivity).setOnClickListener(v -> showPage(PAGE_ACTIVITY));
+        getOnBackPressedDispatcher().addCallback(this, new androidx.activity.OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                if (page != PAGE_HOME) {
+                    showPage(PAGE_HOME);
+                } else {
+                    setEnabled(false);
+                    getOnBackPressedDispatcher().onBackPressed();
+                }
+            }
+        });
+        styleNav();
+    }
+
+    private void showPage(int p) {
+        if (p == page) {
+            ((androidx.core.widget.NestedScrollView) pageView(p)).smoothScrollTo(0, 0);
+            return;
+        }
+        View from = pageView(page), to = pageView(p);
+        page = p;
+        from.setVisibility(View.GONE);
+        to.setAlpha(0f);
+        to.setTranslationY(24f);
+        to.setVisibility(View.VISIBLE);
+        to.animate().alpha(1f).translationY(0f).setDuration(220).start();
+        if (p == PAGE_ACTIVITY) StatsBinder.bind(this, findViewById(R.id.activityContent));
+        styleNav();
+    }
+
+    private View pageView(int p) {
+        return findViewById(p == PAGE_LIBRARY ? R.id.pageLibrary : p == PAGE_ACTIVITY ? R.id.pageActivity : R.id.pageHome);
+    }
+
+    private void styleNav() {
+        int[][] items = {
+                {R.id.navHome, R.id.navHomeIcon, R.id.navHomeLabel},
+                {R.id.navLibrary, R.id.navLibraryIcon, R.id.navLibraryLabel},
+                {R.id.navActivity, R.id.navActivityIcon, R.id.navActivityLabel}};
+        for (int i = 0; i < 3; i++) {
+            boolean on = i == page;
+            View item = findViewById(items[i][0]);
+            item.setBackgroundResource(on ? R.drawable.bg_nav_selected : 0);
+            int c = ContextCompat.getColor(this, on ? R.color.badge_text : R.color.text_soft);
+            ((android.widget.ImageView) findViewById(items[i][1])).setImageTintList(android.content.res.ColorStateList.valueOf(c));
+            TextView label = findViewById(items[i][2]);
+            label.setTextColor(c);
+        }
+    }
+
+    private void openSearch() {
+        EditText field = findViewById(R.id.searchInput);
+        field.setVisibility(View.VISIBLE);
+        field.requestFocus();
+        field.post(() -> {
+            android.view.inputmethod.InputMethodManager imm =
+                    (android.view.inputmethod.InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+            if (imm != null) imm.showSoftInput(field, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT);
+        });
+    }
+
+    // ------------------------------------------------------------------ Accueil
+
+    private void bindHome(List<DbHelper.Series> series) {
+        boolean any = !series.isEmpty();
+        findViewById(R.id.resumeSection).setVisibility(any ? View.VISIBLE : View.GONE);
+        findViewById(R.id.resumeCard).setVisibility(any ? View.VISIBLE : View.GONE);
+        findViewById(R.id.homeRecentHeader).setVisibility(series.size() > 1 ? View.VISIBLE : View.GONE);
+        LinearLayout recent = findViewById(R.id.homeRecent);
+        recent.removeAllViews();
+        recent.setVisibility(series.size() > 1 ? View.VISIBLE : View.GONE);
+        if (!any) return;
+
+        DbHelper.Series top = series.get(0);
+        ((TextView) findViewById(R.id.resumeTitle)).setText(top.title);
+        TextView rating = findViewById(R.id.resumeRating);
+        rating.setVisibility(top.score > 0 ? View.VISIBLE : View.GONE);
+        rating.setText("★ " + SeriesAdapter.formatScore(top.score));
+        Progress pr = Progress.forResume(this, top.title);
+        ((TextView) findViewById(R.id.resumeLast)).setText("Dernier chapitre lu : " + Detector.formatChapter(top.lastChapter)
+                + (pr != null && !pr.finished() ? " · " + pr.where() : ""));
+        String when = DateUtils.getRelativeTimeSpanString(top.lastReadAt, System.currentTimeMillis(),
+                DateUtils.MINUTE_IN_MILLIS).toString();
+        ((TextView) findViewById(R.id.resumeWhen)).setText(cap(when));
+        SeriesAdapter.paintAvatar(findViewById(R.id.resumeLetter), top.title);
+        android.graphics.Bitmap cover = Covers.get(this, top.title);
+        com.google.android.material.imageview.ShapeableImageView img = findViewById(R.id.resumeCover);
+        img.setVisibility(cover == null ? View.GONE : View.VISIBLE);
+        if (cover != null) img.setImageBitmap(cover);
+        findViewById(R.id.resumeButton).setOnClickListener(v -> Resume.open(this, top.title));
+        findViewById(R.id.resumeCard).setOnClickListener(v -> DetailActivity.open(this, top.title));
+
+        java.util.Map<String, Double> fresh = newChaptersMap();
+        for (int i = 1; i < Math.min(4, series.size()); i++) {
+            DbHelper.Series s = series.get(i);
+            View card = getLayoutInflater().inflate(R.layout.item_series, recent, false);
+            SeriesAdapter.bindCard(card, s, fresh.get(s.title.toLowerCase(Locale.ROOT)),
+                    x -> DetailActivity.open(this, x.title), this::confirmDeleteSeries, x -> Resume.open(this, x.title));
+            recent.addView(card);
+        }
+    }
+
+    private static String cap(String s) {
+        return s.isEmpty() ? s : Character.toUpperCase(s.charAt(0)) + s.substring(1);
+    }
+
+    private java.util.Map<String, Double> newChaptersMap() {
+        java.util.Map<String, Double> best = new java.util.HashMap<>();
+        for (java.util.Map.Entry<String, List<DbHelper.Release>> e : groupedUpdates(null).entrySet()) {
+            best.put(e.getKey(), e.getValue().get(0).chapter);
+        }
+        return best;
+    }
+
+    // ------------------------------------------------------------------ Filtres & tri (bibliothèque)
+
+    private void showFilterDialog() {
+        String[] sorts = {"recent", "score", "title", "count"};
+        String[] labels = {"Lus récemment", "Mieux notées", "Titre (A → Z)", "Plus de chapitres lus"};
+        int cur = java.util.Arrays.asList(sorts).indexOf(adapter.getSort());
+        final int[] choice = {Math.max(0, cur)};
+        final boolean[] flags = {adapter.isOnlyFollowed(), adapter.isOnlyNew()};
+
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        int pad = (int) (22 * getResources().getDisplayMetrics().density);
+        box.setPadding(pad, pad / 3, pad, 0);
+        TextView t1 = new TextView(this);
+        t1.setText("Trier par");
+        t1.setTextColor(ContextCompat.getColor(this, R.color.text_soft));
+        box.addView(t1);
+        android.widget.RadioGroup rg = new android.widget.RadioGroup(this);
+        for (int i = 0; i < labels.length; i++) {
+            com.google.android.material.radiobutton.MaterialRadioButton rb =
+                    new com.google.android.material.radiobutton.MaterialRadioButton(this);
+            rb.setId(View.generateViewId());
+            rb.setText(labels[i]);
+            final int idx = i;
+            rb.setOnCheckedChangeListener((b, c) -> {
+                if (c) choice[0] = idx;
+            });
+            rg.addView(rb);
+            if (i == choice[0]) rb.setChecked(true);
+        }
+        box.addView(rg);
+        TextView t2 = new TextView(this);
+        t2.setText("Afficher seulement");
+        t2.setPadding(0, pad / 2, 0, 0);
+        t2.setTextColor(ContextCompat.getColor(this, R.color.text_soft));
+        box.addView(t2);
+        com.google.android.material.checkbox.MaterialCheckBox cbF = new com.google.android.material.checkbox.MaterialCheckBox(this);
+        cbF.setText("🔔 Les séries suivies");
+        cbF.setChecked(flags[0]);
+        box.addView(cbF);
+        com.google.android.material.checkbox.MaterialCheckBox cbN = new com.google.android.material.checkbox.MaterialCheckBox(this);
+        cbN.setText("✨ Celles avec un nouveau chapitre");
+        cbN.setChecked(flags[1]);
+        box.addView(cbN);
+
+        new MaterialAlertDialogBuilder(this)
+                .setTitle("Filtres")
+                .setView(box)
+                .setPositiveButton("Appliquer", (d, w) -> {
+                    java.util.Set<String> followed = new java.util.HashSet<>();
+                    for (DbHelper.Meta m : DbHelper.get(this).getAllMeta()) {
+                        if (m.follow) followed.add(m.title.toLowerCase(Locale.ROOT));
+                    }
+                    adapter.setSort(sorts[choice[0]]);
+                    adapter.setFilters(cbF.isChecked(), cbN.isChecked(), followed);
+                    updateEmpty();
+                })
+                .setNeutralButton("Réinitialiser", (d, w) -> {
+                    adapter.setSort("recent");
+                    adapter.setFilters(false, false, new java.util.HashSet<>());
+                    updateEmpty();
+                })
+                .setNegativeButton("Annuler", null)
+                .show();
+    }
+
+    private void updateFilterChip() {
+        com.google.android.material.chip.Chip c = findViewById(R.id.filterChip);
+        boolean active = adapter.isOnlyFollowed() || adapter.isOnlyNew() || !"recent".equals(adapter.getSort());
+        c.setText(active ? "Filtres •" : "Filtres");
+        c.setChipStrokeColor(android.content.res.ColorStateList.valueOf(
+                ContextCompat.getColor(this, active ? R.color.brand : R.color.hairline)));
     }
 
     private boolean isServiceEnabled() {
@@ -334,7 +558,7 @@ public class MainActivity extends AppCompatActivity {
         v.findViewById(R.id.backupRestoreButton).setOnClickListener(b ->
                 pickRestore.launch(new String[]{"application/json", "text/*", "application/octet-stream"}));
 
-        new MaterialAlertDialogBuilder(this)
+        androidx.appcompat.app.AlertDialog dlg = new MaterialAlertDialogBuilder(this)
                 .setTitle("Réglages")
                 .setView(v)
                 .setPositiveButton("OK", null)
@@ -342,6 +566,14 @@ public class MainActivity extends AppCompatActivity {
                     backupStatusView = null;
                 })
                 .show();
+        v.findViewById(R.id.settingsNote).setOnClickListener(b -> {
+            dlg.dismiss();
+            onNoteButton();
+        });
+        v.findViewById(R.id.settingsDiag).setOnClickListener(b -> {
+            dlg.dismiss();
+            showDiagnostic();
+        });
     }
 
     // ------------------------------------------------------------------ Alertes nouveaux chapitres
@@ -387,14 +619,12 @@ public class MainActivity extends AppCompatActivity {
         card.setVisibility(map.isEmpty() ? View.GONE : View.VISIBLE);
         if (!map.isEmpty()) {
             int n = map.size();
-            ((TextView) findViewById(R.id.updatesTitle)).setText(n + (n > 1 ? " séries ont du nouveau" : " série a du nouveau"));
-            StringBuilder sb = new StringBuilder();
-            for (List<DbHelper.Release> l : map.values()) {
-                if (sb.length() > 40) break;
-                if (sb.length() > 0) sb.append(" · ");
-                sb.append(l.get(0).title).append(" ").append(Detector.formatChapter(l.get(0).chapter));
-            }
-            ((TextView) findViewById(R.id.updatesSub)).setText(sb);
+            ((TextView) findViewById(R.id.updatesTitle)).setText(n + (n > 1 ? " séries mises à jour" : " série mise à jour"));
+            ((TextView) findViewById(R.id.updatesCount)).setText(String.valueOf(n));
+            ((TextView) findViewById(R.id.updatesSub)).setText(n > 1
+                    ? "De nouveaux chapitres t'attendent"
+                    : map.values().iterator().next().get(0).title + " · ch. "
+                    + Detector.formatChapter(map.values().iterator().next().get(0).chapter));
         }
     }
 

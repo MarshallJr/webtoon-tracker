@@ -221,6 +221,16 @@ public class DbHelper extends SQLiteOpenHelper {
         return out;
     }
 
+    /** Dernières lectures, toutes séries confondues : {titre, chapitre, date}. */
+    public List<Object[]> recentReads(int limit) {
+        List<Object[]> out = new ArrayList<>();
+        try (Cursor c = getReadableDatabase().rawQuery(
+                "SELECT title, chapter, read_at FROM reads ORDER BY read_at DESC LIMIT " + limit, null)) {
+            while (c.moveToNext()) out.add(new Object[]{c.getString(0), c.getDouble(1), c.getLong(2)});
+        }
+        return out;
+    }
+
     public synchronized void deleteSeries(String title) {
         SQLiteDatabase db = getWritableDatabase();
         db.delete("releases", "title = ? COLLATE NOCASE", new String[]{title});

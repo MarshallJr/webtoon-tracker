@@ -103,7 +103,7 @@ public class DetailActivity extends AppCompatActivity {
             if (uri == null) return;
             io(() -> {
                 Covers.saveFromUri(this, title, uri);
-                Covers.setCustom(this, title, true);
+                Covers.markUserPick(this, title);
                 WidgetProvider.updateAll(this);
             }, "Miniature mise à jour 🖼");
         });

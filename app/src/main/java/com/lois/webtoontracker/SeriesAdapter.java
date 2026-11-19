@@ -28,16 +28,54 @@ public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.VH> {
 
     private final OnSeries onClick;
     private final OnSeries onLongClick;
+    private OnSeries onPlay;
+    private String sort = "recent";
+    private boolean onlyFollowed, onlyNew;
     private List<DbHelper.Series> all = new ArrayList<>();
     private final List<DbHelper.Series> shown = new ArrayList<>();
     private String query = "";
     private String tag = null; // null = toutes
     private java.util.Map<String, Double> newChapters = new java.util.HashMap<>();
 
+    public void setOnPlay(OnSeries l) {
+        onPlay = l;
+    }
+
+    /** Tri : "recent", "score", "title", "count". */
+    public void setSort(String s) {
+        sort = s;
+        applyFilter();
+    }
+
+    public void setFilters(boolean followedOnly, boolean newOnly, java.util.Set<String> followed) {
+        onlyFollowed = followedOnly;
+        onlyNew = newOnly;
+        this.followed = followed;
+        applyFilter();
+    }
+
+    private java.util.Set<String> followed = new java.util.HashSet<>();
+
+    public String getSort() {
+        return sort;
+    }
+
+    public boolean isOnlyFollowed() {
+        return onlyFollowed;
+    }
+
+    public boolean isOnlyNew() {
+        return onlyNew;
+    }
+
+    public int totalCount() {
+        return all.size();
+    }
+
     /** Séries pour lesquelles un chapitre plus récent que ton dernier lu est sorti. */
     public void setNewChapters(java.util.Map<String, Double> map) {
         newChapters = map;
-        notifyDataSetChanged();
+        applyFilter();
     }
 
     public SeriesAdapter(OnSeries onClick, OnSeries onLongClick) {
@@ -103,7 +141,7 @@ public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.VH> {
     }
 
     public boolean isFiltering() {
-        return !query.isEmpty() || tag != null;
+        return !query.isEmpty() || tag != null || onlyFollowed || onlyNew;
     }
 
     private void applyFilter() {
@@ -115,7 +153,23 @@ public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.VH> {
                 for (String t : Titles.splitTags(s.tags)) if (t.equalsIgnoreCase(tag)) has = true;
                 if (!has) continue;
             }
+            String k = s.title.toLowerCase(Locale.ROOT);
+            if (onlyNew && !newChapters.containsKey(k)) continue;
+            if (onlyFollowed && !followed.contains(k)) continue;
             shown.add(s);
+        }
+        switch (sort) {
+            case "score":
+                shown.sort((a, b) -> Integer.compare(b.score, a.score));
+                break;
+            case "title":
+                shown.sort((a, b) -> a.title.compareToIgnoreCase(b.title));
+                break;
+            case "count":
+                shown.sort((a, b) -> Integer.compare(b.count, a.count));
+                break;
+            default:
+                break; // déjà du plus récent au plus ancien
         }
         notifyDataSetChanged();
     }
@@ -130,28 +184,37 @@ public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.VH> {
     @Override
     public void onBindViewHolder(@NonNull VH h, int position) {
         DbHelper.Series s = shown.get(position);
-        h.title.setText(s.title);
-        h.rating.setVisibility(s.score > 0 ? View.VISIBLE : View.GONE);
-        if (s.score > 0) h.rating.setText("★ " + formatScore(s.score));
-        bindCover(h.avatar, h.cover, s.title);
-        h.chapter.setText(Detector.formatChapter(s.lastChapter));
-        CharSequence when = DateUtils.getRelativeTimeSpanString(
-                s.lastReadAt, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS);
-        h.subtitle.setText(s.count + (s.count > 1 ? " chapitres lus" : " chapitre lu") + " · " + when);
-        Double nw = newChapters.get(s.title.toLowerCase(Locale.ROOT));
-        h.newBadge.setVisibility(nw == null ? View.GONE : View.VISIBLE);
-        if (nw != null) h.newBadge.setText("NOUVEAU · CH. " + Detector.formatChapter(nw));
-        h.tagLine.setText(s.tags.replace(", ", "  ·  "));
-        h.tagLine.setVisibility(s.tags.isEmpty() ? View.GONE : View.VISIBLE);
+        bindCard(h.itemView, s, newChapters.get(s.title.toLowerCase(Locale.ROOT)), onClick, onLongClick, onPlay);
         // petite animation d'apparition
         h.itemView.setAlpha(0f);
         h.itemView.setTranslationY(18f);
         h.itemView.animate().alpha(1f).translationY(0f).setDuration(260)
                 .setStartDelay(Math.min(position, 8) * 30L).start();
-        h.itemView.setOnClickListener(v -> onClick.on(s));
-        h.itemView.setOnLongClickListener(v -> {
-            onLongClick.on(s);
+    }
+
+    /** Remplit une carte "série" (utilisée par la bibliothèque ET par l'accueil). */
+    public static void bindCard(View v, DbHelper.Series s, Double newChapter,
+                                OnSeries click, OnSeries longClick, OnSeries play) {
+        ((TextView) v.findViewById(R.id.title)).setText(s.title);
+        bindCover(v.findViewById(R.id.avatar), v.findViewById(R.id.cover), s.title);
+        TextView rating = v.findViewById(R.id.rating);
+        rating.setVisibility(s.score > 0 ? View.VISIBLE : View.GONE);
+        if (s.score > 0) rating.setText("★ " + formatScore(s.score));
+        CharSequence when = DateUtils.getRelativeTimeSpanString(
+                s.lastReadAt, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS);
+        ((TextView) v.findViewById(R.id.subtitle)).setText("Chapitre " + Detector.formatChapter(s.lastChapter) + " · " + when);
+        ((TextView) v.findViewById(R.id.tagLine)).setText(s.count + (s.count > 1 ? " chapitres lus" : " chapitre lu"));
+        TextView nw = v.findViewById(R.id.newBadge);
+        nw.setVisibility(newChapter == null ? View.GONE : View.VISIBLE);
+        if (newChapter != null) nw.setText("Nouveau · Ch. " + Detector.formatChapter(newChapter));
+        v.setOnClickListener(x -> click.on(s));
+        v.setOnLongClickListener(x -> {
+            if (longClick != null) longClick.on(s);
             return true;
+        });
+        View p = v.findViewById(R.id.play);
+        p.setOnClickListener(x -> {
+            if (play != null) play.on(s);
         });
     }
 
@@ -161,19 +224,8 @@ public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.VH> {
     }
 
     static class VH extends RecyclerView.ViewHolder {
-        final TextView title, subtitle, chapter, avatar, tagLine, newBadge, rating;
-        final android.widget.ImageView cover;
-
         VH(View v) {
             super(v);
-            title = v.findViewById(R.id.title);
-            subtitle = v.findViewById(R.id.subtitle);
-            chapter = v.findViewById(R.id.chapter);
-            avatar = v.findViewById(R.id.avatar);
-            tagLine = v.findViewById(R.id.tagLine);
-            newBadge = v.findViewById(R.id.newBadge);
-            rating = v.findViewById(R.id.rating);
-            cover = v.findViewById(R.id.cover);
         }
     }
 }
