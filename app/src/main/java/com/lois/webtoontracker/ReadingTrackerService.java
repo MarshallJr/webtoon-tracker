@@ -32,6 +32,9 @@ public class ReadingTrackerService extends AccessibilityService {
 
     public static final String ACTION_UPDATED = "com.lois.webtoontracker.UPDATED";
     public static final String ACTION_TEST_BANNER = "com.lois.webtoontracker.TEST_BANNER";
+    public static final String ACTION_RESUME_HINT = "com.lois.webtoontracker.RESUME_HINT";
+    public static final String EXTRA_HINT = "hint";
+    public static final String EXTRA_HINT_TITLE = "hint_title";
     public static final String PREFS_DEBUG = "debug";
 
     public static final String KEY_NOTIFY_MODE = "notify_mode";
@@ -61,18 +64,31 @@ public class ReadingTrackerService extends AccessibilityService {
         }
     };
 
+    private final BroadcastReceiver resumeReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (banner == null) return;
+            // On laisse au chapitre le temps de s'ouvrir, puis la bannière reste ~5 s.
+            banner.show(NotifyPolicy.Kind.RESUME, intent.getStringExtra(EXTRA_HINT),
+                    intent.getStringExtra(EXTRA_HINT_TITLE), 5200, 1800);
+        }
+    };
+
     @Override
     protected void onServiceConnected() {
         super.onServiceConnected();
         banner = new Banner(this);
         ContextCompat.registerReceiver(this, testReceiver,
                 new IntentFilter(ACTION_TEST_BANNER), ContextCompat.RECEIVER_NOT_EXPORTED);
+        ContextCompat.registerReceiver(this, resumeReceiver,
+                new IntentFilter(ACTION_RESUME_HINT), ContextCompat.RECEIVER_NOT_EXPORTED);
     }
 
     @Override
     public void onDestroy() {
         try {
             unregisterReceiver(testReceiver);
+            unregisterReceiver(resumeReceiver);
         } catch (Throwable ignored) {
         }
         if (banner != null) banner.release();
@@ -93,6 +109,7 @@ public class ReadingTrackerService extends AccessibilityService {
         if (event == null || event.getPackageName() == null) return;
         String pkg = event.getPackageName().toString();
         if (!Detector.isWatched(pkg)) return;
+        if (event.getEventType() == AccessibilityEvent.TYPE_VIEW_SCROLLED) trackScroll(event);
 
         long now = SystemClock.uptimeMillis();
         if (now - lastScan < MIN_SCAN_INTERVAL_MS) return;
@@ -113,6 +130,7 @@ public class ReadingTrackerService extends AccessibilityService {
         if (pendingCommit != null) handler.removeCallbacks(pendingCommit);
         if (pendingAlready != null) handler.removeCallbacks(pendingAlready);
         pending = r;
+        lastPct = -1;
         final Detector.Result target = r;
 
         pendingAlready = () -> io.execute(() -> safe("Déjà lu", () -> checkAlreadyRead(target)));
@@ -120,6 +138,38 @@ public class ReadingTrackerService extends AccessibilityService {
 
         pendingCommit = () -> io.execute(() -> safe("Enregistrement", () -> record(target)));
         handler.postDelayed(pendingCommit, DWELL_MS);
+    }
+
+    // ------------------------------------------------------------------ Position dans le chapitre
+
+    private float lastPct = -1;
+    private long lastPctSave;
+
+    /**
+     * Relève où tu en es dans le chapitre en cours (approximatif) :
+     *  - pages web / lecteurs "un seul long défilement" : scrollY / scrollY max
+     *  - lecteurs en liste d'images (WEBTOON, Mihon…) : dernière image visible / nombre d'images
+     * On ignore les petits défilements (carrousels, menus) qui ne sont pas la page du chapitre.
+     */
+    private void trackScroll(AccessibilityEvent e) {
+        if (pending == null) return;
+        int screenH = getResources().getDisplayMetrics().heightPixels;
+        float pct = -1;
+        if (e.getMaxScrollY() > screenH * 2 && e.getScrollY() >= 0) {
+            pct = Math.min(1f, e.getScrollY() / (float) e.getMaxScrollY());
+        } else if (e.getItemCount() >= 5 && e.getToIndex() >= 0) {
+            pct = Math.min(1f, (e.getToIndex() + 1) / (float) e.getItemCount());
+        }
+        if (pct < 0) return;
+        long now = SystemClock.uptimeMillis();
+        if (Math.abs(pct - lastPct) < 0.02f) return;
+        if (now - lastPctSave < 1500 && Math.abs(pct - lastPct) < 0.15f) return;
+        lastPct = pct;
+        lastPctSave = now;
+        final Detector.Result r = pending;
+        final float p = pct;
+        io.execute(() -> safe("Position", () ->
+                Progress.save(this, DbHelper.get(this).resolveTitle(r.title), r.chapter, p)));
     }
 
     private void collect(AccessibilityNodeInfo node, List<Detector.TextNode> out, int depth) {

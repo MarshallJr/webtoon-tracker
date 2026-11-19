@@ -74,7 +74,7 @@ public class WidgetProvider extends AppWidgetProvider {
                 v.setViewVisibility(R.id.wAvatarBg, View.VISIBLE);
             }
             v.setViewVisibility(R.id.wResume, View.VISIBLE);
-            PendingIntent resume = pending(ctx, 10, Resume.intentFor(ctx, s.title));
+            PendingIntent resume = pending(ctx, 10, resumeIntent(ctx, s.title));
             v.setOnClickPendingIntent(R.id.wResume, resume);
             v.setOnClickPendingIntent(R.id.wMain, resume);
 
@@ -95,7 +95,13 @@ public class WidgetProvider extends AppWidgetProvider {
         v.setViewVisibility(rowId, View.VISIBLE);
         v.setTextViewText(titleId, s.title);
         v.setTextViewText(chId, "Ch. " + Detector.formatChapter(s.lastChapter) + " · " + when(s.lastReadAt));
-        v.setOnClickPendingIntent(rowId, pending(ctx, 10 + i, Resume.intentFor(ctx, s.title)));
+        v.setOnClickPendingIntent(rowId, pending(ctx, 10 + i, resumeIntent(ctx, s.title)));
+    }
+
+    private static Intent resumeIntent(Context ctx, String title) {
+        return new Intent(ctx, ResumeActivity.class)
+                .putExtra(ResumeActivity.EXTRA_TITLE, title)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
     }
 
     private static PendingIntent pending(Context ctx, int code, Intent i) {

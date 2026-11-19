@@ -31,6 +31,14 @@
             android:name=".DetailActivity"
             android:exported="false" />
 
+        <activity
+            android:name=".ResumeActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
         <receiver
             android:name=".WidgetProvider"
             android:exported="false">

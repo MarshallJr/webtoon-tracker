@@ -25,7 +25,7 @@ public final class NotifyPolicy {
     public static final long SESSION_GAP_MS = 30L * 60 * 1000;
     public static final int STREAK_STEP = 10;
 
-    public enum Kind { NEW_SERIES, ADDED, STREAK, ALREADY_READ }
+    public enum Kind { NEW_SERIES, ADDED, STREAK, ALREADY_READ, RESUME }
 
     public static final class Decision {
         public final Kind kind;

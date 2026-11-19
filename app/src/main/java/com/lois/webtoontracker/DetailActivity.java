@@ -116,6 +116,12 @@ public class DetailActivity extends AppCompatActivity {
     }
 
     @Override
+    protected void onResume() {
+        super.onResume();
+        if (title != null && db != null && findViewById(R.id.dTitle) != null) bindAll(); // retour de lecture : progression à jour
+    }
+
+    @Override
     protected void onPause() {
         super.onPause();
         if (title == null) return;
@@ -145,6 +151,11 @@ public class DetailActivity extends AppCompatActivity {
         ((TextView) findViewById(R.id.dTitle)).setText(s.title);
         SeriesAdapter.bindCover(findViewById(R.id.dAvatar), findViewById(R.id.dCover), s.title);
         bindHeader();
+        Progress pr = Progress.forResume(this, s.title);
+        ((MaterialButton) findViewById(R.id.dResume)).setText(pr == null
+                ? "▶  Reprendre la lecture"
+                : pr.finished() ? "▶  Chapitre suivant"
+                : "▶  Reprendre · ch. " + Detector.formatChapter(pr.chapter) + " · " + pr.percent() + " %");
         bindTags(s);
         bindBell();
         bindProgress(s);
@@ -229,23 +240,27 @@ public class DetailActivity extends AppCompatActivity {
 
         TextView value = findViewById(R.id.dProgValue);
         TextView sub = findViewById(R.id.dProgSub);
+        Progress pr = Progress.forResume(this, title);
+        String where = pr == null ? "" : "\n📍 " + (pr.finished()
+                ? "Chapitre " + Detector.formatChapter(pr.chapter) + " terminé"
+                : "Arrêté vers " + pr.percent() + " % du ch. " + Detector.formatChapter(pr.chapter));
         LinearProgressIndicator bar = findViewById(R.id.dProgress);
         if (latest > last) {
             int behind = (int) Math.ceil(latest - last);
             value.setText(Detector.formatChapter(last) + " / " + Detector.formatChapter(latest));
             bar.setProgressCompat((int) (1000 * last / latest), true);
             sub.setText(behind + (behind > 1 ? " chapitres" : " chapitre") + " de retard · ≈ "
-                    + StatsCalc.formatDuration((long) behind * StatsCalc.MINUTES_PER_CHAPTER) + " de lecture");
+                    + StatsCalc.formatDuration((long) behind * StatsCalc.MINUTES_PER_CHAPTER) + " de lecture" + where);
         } else if (latest > 0) {
             value.setText("À jour ✓");
             bar.setProgressCompat(1000, true);
-            sub.setText("Tu as lu le dernier chapitre connu (ch. " + Detector.formatChapter(last) + ").");
+            sub.setText("Tu as lu le dernier chapitre connu (ch. " + Detector.formatChapter(last) + ")." + where);
         } else {
             value.setText("Ch. " + Detector.formatChapter(last));
             bar.setProgressCompat(1000, true);
-            sub.setText(db.isFollowed(title)
+            sub.setText((db.isFollowed(title)
                     ? "Dernière sortie en cours de recherche…"
-                    : "Active la cloche 🔔 pour connaître la dernière sortie.");
+                    : "Active la cloche 🔔 pour connaître la dernière sortie.") + where);
         }
     }
 

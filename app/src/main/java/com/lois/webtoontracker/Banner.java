@@ -37,16 +37,21 @@ public final class Banner {
     }
 
     public void show(NotifyPolicy.Kind kind, String title, String subtitle) {
-        handler.post(() -> {
+        show(kind, title, subtitle, VISIBLE_MS, 0);
+    }
+
+    /** @param delayMs attendre avant d'afficher (ex : le temps que le chapitre s'ouvre) */
+    public void show(NotifyPolicy.Kind kind, String title, String subtitle, long visibleMs, long delayMs) {
+        handler.postDelayed(() -> {
             try {
-                showNow(kind, title, subtitle);
+                showNow(kind, title, subtitle, visibleMs);
             } catch (Throwable t) {
                 App.saveError(service, "Bannière", t);
             }
-        });
+        }, delayMs);
     }
 
-    private void showNow(NotifyPolicy.Kind kind, String title, String subtitle) {
+    private void showNow(NotifyPolicy.Kind kind, String title, String subtitle, long visibleMs) {
         removeNow();
 
         View root = LayoutInflater.from(service).inflate(R.layout.overlay_banner, null);
@@ -65,6 +70,8 @@ public final class Banner {
                 color = 0xFFF5A524; iconRes = R.drawable.ic_fire; break;
             case ALREADY_READ:
                 color = 0xFF5B6CFF; iconRes = R.drawable.ic_eye; break;
+            case RESUME:
+                color = 0xFF6D4AFF; iconRes = R.drawable.ic_bookmark; break;
             case ADDED:
             default:
                 color = 0xFF00B26A; iconRes = R.drawable.ic_check; break;
@@ -109,7 +116,7 @@ public final class Banner {
                 .withEndAction(() -> {
                     if (current == shown) removeNow();
                 }).start();
-        handler.postDelayed(hideTask, VISIBLE_MS);
+        handler.postDelayed(hideTask, visibleMs);
     }
 
     private void removeNow() {
