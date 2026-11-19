@@ -159,6 +159,7 @@ public class MainActivity extends AppCompatActivity {
         handleIntent(getIntent());
         new Thread(() -> {
             if (Repair.run(this) > 0) runOnUiThread(this::refresh); // titres incohérents corrigés
+            CoverWorker.cleanupBadImages(this);                       // images prises sur l'écran de veille
         }).start();
         Anim.pressAll(root);
     }

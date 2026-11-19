@@ -58,6 +58,9 @@ public final class ResumeOverlay {
     }
 
     private void show(String title, Progress p, Actions actions) {
+        // Jamais par-dessus Webtoon Tracker lui-même (ex. le lien n'a pas ouvert d'autre appli).
+        android.view.accessibility.AccessibilityNodeInfo top = svc.getRootInActiveWindow();
+        if (top != null && top.getPackageName() != null && svc.getPackageName().contentEquals(top.getPackageName())) return;
         dismissNow();
         running = false;
         root = LayoutInflater.from(svc).inflate(R.layout.overlay_resume, null);

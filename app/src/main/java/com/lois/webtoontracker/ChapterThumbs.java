@@ -68,14 +68,10 @@ public final class ChapterThumbs {
      * Capture d'écran → bande centrale (la case lue, sans barres du haut et du bas), au format vignette.
      * @return false si l'image est inutilisable (écran noir : appli qui protège ses pages, etc.)
      */
-    public static boolean saveFromScreenshot(Context ctx, String title, double chapter, Bitmap screen) {
+    public static boolean saveFromScreenshot(Context ctx, String title, double chapter, Bitmap screen, Rect panel) {
         try {
-            int w = screen.getWidth(), h = screen.getHeight();
-            int bandH = Math.min(h, Math.round(w * H / (float) W));
-            int top = Math.max(0, Math.min(h - bandH, Math.round(h * 0.46f - bandH / 2f)));
-            Bitmap band = Bitmap.createBitmap(screen, 0, top, w, bandH);
-            Bitmap out = Bitmap.createScaledBitmap(band, W, H, true);
-            if (isBlank(out)) return false;
+            Bitmap out = crop(screen, panel);
+            if (out == null || looksBad(out)) return false;
             File d = dir(ctx, title);
             if (!d.exists() && !d.mkdirs()) return false;
             File f = file(ctx, title, chapter);
@@ -89,43 +85,109 @@ public final class ChapterThumbs {
         }
     }
 
-    /** Presque uniforme (noir d'une page protégée, blanc d'un chargement) → on ne garde pas. */
-    private static boolean isBlank(Bitmap b) {
+    /**
+     * Bande de la case affichée au centre (sans barres du site, sans marges), au format vignette.
+     * @param panel bornes de la case au centre de l'écran, ou null si inconnues (bande centrale de l'écran)
+     */
+    static Bitmap crop(Bitmap screen, Rect panel) {
+        int w = screen.getWidth(), h = screen.getHeight();
+        Rect area = new Rect(0, 0, w, h);
+        if (panel != null && !area.intersect(panel)) return null;
+        if (panel == null) area.set(0, Math.round(h * 0.12f), w, Math.round(h * 0.88f));
+        int aw = area.width();
+        int bandH = Math.min(area.height(), Math.round(aw * H / (float) W));
+        if (aw < w * 0.4f || bandH < h * 0.08f) return null;
+        // bande centrée sur le centre de l'écran, gardée dans la case
+        int top = Math.round(h * 0.5f - bandH / 2f);
+        top = Math.max(area.top, Math.min(area.bottom - bandH, top));
+        int bw = Math.min(aw, Math.round(bandH * W / (float) H));
+        int left = area.left + (aw - bw) / 2;
+        Bitmap band = Bitmap.createBitmap(screen, left, top, bw, bandH);
+        return Bitmap.createScaledBitmap(band, W, H, true);
+    }
+
+    /**
+     * Image inutilisable : presque uniforme (page protégée, chargement) ou presque toute noire
+     * avec quelques chiffres (écran de veille « Always On », écran éteint).
+     */
+    public static boolean looksBad(Bitmap b) {
         long sum = 0, sum2 = 0;
-        int n = 0;
-        for (int y = 4; y < b.getHeight(); y += 12) {
-            for (int x = 4; x < b.getWidth(); x += 12) {
+        int n = 0, dark = 0;
+        int step = Math.max(4, Math.min(b.getWidth(), b.getHeight()) / 40);
+        for (int y = step / 2; y < b.getHeight(); y += step) {
+            for (int x = step / 2; x < b.getWidth(); x += step) {
                 int c = b.getPixel(x, y);
-                int l = ((c >> 16) & 0xFF) * 3 + ((c >> 8) & 0xFF) * 6 + (c & 0xFF);
-                l /= 10;
+                int l = (((c >> 16) & 0xFF) * 3 + ((c >> 8) & 0xFF) * 6 + (c & 0xFF)) / 10;
                 sum += l;
                 sum2 += (long) l * l;
+                if (l < 26) dark++;
                 n++;
             }
         }
         if (n == 0) return true;
         double mean = sum / (double) n, var = sum2 / (double) n - mean * mean;
-        return var < 60;   // écart-type < ~8 niveaux de gris
+        return var < 60 || dark > n * 0.80;
     }
 
-    /** Couverture recadrée au format vignette, assombrie en bas (pour les chapitres sans capture). */
-    public static Bitmap coverStrip(Context ctx, String title) {
-        Bitmap cover = Covers.get(ctx, title);
+    /** Ancien fichier inutilisable ? (décodé en petit pour aller vite) */
+    static boolean fileLooksBad(File f) {
+        BitmapFactory.Options o = new BitmapFactory.Options();
+        o.inSampleSize = 4;
+        Bitmap b = BitmapFactory.decodeFile(f.getAbsolutePath(), o);
+        return b != null && looksBad(b);
+    }
+
+    /** Ménage : supprime les vignettes prises sur l'écran de veille / écran noir (versions ≤ 4.4). */
+    public static int cleanupBad(Context ctx) {
+        int removed = 0;
+        File root = new File(ctx.getFilesDir(), "chapters");
+        File[] series = root.listFiles();
+        if (series == null) return 0;
+        for (File d : series) {
+            File[] files = d.listFiles();
+            if (files == null) continue;
+            for (File f : files) {
+                try {
+                    if (f.getName().endsWith(".jpg") && fileLooksBad(f) && f.delete()) removed++;
+                } catch (Throwable ignored) {
+                }
+            }
+        }
+        CACHE.evictAll();
+        return removed;
+    }
+
+    /**
+     * Fond des chapitres sans capture : la couverture très floutée et assombrie (une ambiance
+     * aux couleurs de la série, pas la même image répétée), sur laquelle on écrit le numéro.
+     */
+    public static Bitmap placeholder(Context ctx, String title) {
         Bitmap out = Bitmap.createBitmap(W, H, Bitmap.Config.ARGB_8888);
         Canvas c = new Canvas(out);
-        if (cover != null) {
+        Bitmap cover = Covers.get(ctx, title);
+        if (cover != null && !looksBad(cover)) {
             int cw = cover.getWidth();
             int ch = Math.round(cw * H / (float) W);
-            int top = Math.max(0, Math.min(cover.getHeight() - ch, Math.round(cover.getHeight() * 0.18f)));
-            c.drawBitmap(cover, new Rect(0, top, cw, Math.min(cover.getHeight(), top + ch)), new Rect(0, 0, W, H),
-                    new Paint(Paint.FILTER_BITMAP_FLAG));
+            int top = Math.max(0, Math.min(cover.getHeight() - ch, Math.round(cover.getHeight() * 0.25f)));
+            Bitmap part = Bitmap.createBitmap(cover, 0, top, cw, Math.min(ch, cover.getHeight() - top));
+            Bitmap tiny = Bitmap.createScaledBitmap(part, 10, 7, true);          // flou : on réduit beaucoup…
+            Bitmap mid = Bitmap.createScaledBitmap(tiny, 40, 28, true);          // …puis on agrandit en deux temps
+            c.drawBitmap(mid, null, new Rect(0, 0, W, H), new Paint(Paint.FILTER_BITMAP_FLAG));
         } else {
-            c.drawColor(SeriesAdapter.colorFor(title));
+            int base = SeriesAdapter.colorFor(title);
+            Paint g = new Paint();
+            g.setShader(new LinearGradient(0, 0, W, H, base, darker(base), Shader.TileMode.CLAMP));
+            c.drawRect(0, 0, W, H, g);
         }
         Paint shade = new Paint();
-        shade.setShader(new LinearGradient(0, H * 0.35f, 0, H, 0x00000000, 0xB0000000, Shader.TileMode.CLAMP));
+        shade.setShader(new LinearGradient(0, 0, 0, H, 0x59000000, 0xA6000000, Shader.TileMode.CLAMP));
         c.drawRect(0, 0, W, H, shade);
         return out;
+    }
+
+    private static int darker(int c) {
+        int r = ((c >> 16) & 0xFF) * 55 / 100, g = ((c >> 8) & 0xFF) * 55 / 100, b = (c & 0xFF) * 55 / 100;
+        return 0xFF000000 | (r << 16) | (g << 8) | b;
     }
 
     /** Fusion / renommage de série : les vignettes suivent. */

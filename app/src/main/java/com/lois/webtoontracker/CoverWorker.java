@@ -43,6 +43,16 @@ public class CoverWorker extends Worker {
     }
 
     /** À appeler librement (ouverture de l'appli, nouvelle série) : ne lance rien s'il n'y a rien à faire. */
+    /** Une fois : retire les couvertures et vignettes prises sur l'écran de veille, puis relance la recherche. */
+    public static void cleanupBadImages(Context ctx) {
+        SharedPreferences flags = ctx.getSharedPreferences("repairs", Context.MODE_PRIVATE);
+        if (flags.getBoolean("dark_images_v1", false)) return;
+        int covers = Covers.cleanupBad(ctx, ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE));
+        ChapterThumbs.cleanupBad(ctx);
+        flags.edit().putBoolean("dark_images_v1", true).apply();
+        if (covers > 0) enqueueIfNeeded(ctx);
+    }
+
     public static void enqueueIfNeeded(Context ctx) {
         try {
             if (!hasWork(ctx)) return;

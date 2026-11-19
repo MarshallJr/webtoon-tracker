@@ -26,6 +26,8 @@ public final class Panels {
         public int count;            // nombre de cases
         public int current = -1;     // case au centre de l'écran (0…count-1)
         public float frac = 0.5f;    // où est le centre de l'écran DANS cette case (0 = haut, 1 = bas)
+        /** Case qui passe au centre de l'écran (bornes à l'écran), ou null si le centre n'est pas sur une case. */
+        public Rect centerRect;
         public String pkg;
 
         /** Position continue dans le chapitre (0 → 1), même au milieu d'une très longue image. */
@@ -69,6 +71,7 @@ public final class Panels {
                     if (r.top <= center && r.bottom >= center) {
                         best = it.getRowIndex();
                         s.frac = fracOf(r, center);
+                        s.centerRect = new Rect(r);
                     }
                 }
                 s.current = best >= 0 ? best : firstVisible;
@@ -92,6 +95,7 @@ public final class Panels {
             if (r.top <= center && r.bottom >= center) {
                 best = i;
                 s.frac = fracOf(r, center);
+                s.centerRect = new Rect(r);
             }
         }
         s.current = best >= 0 ? best : firstVisible;

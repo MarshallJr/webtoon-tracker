@@ -89,11 +89,50 @@ public final class Covers {
         save(ctx, title, poster, 0.15f);
     }
 
-    /** Capture d'écran → la zone centrale (la case lue), sans barres du haut et du bas. */
-    public static void saveFromScreenshot(Context ctx, String title, Bitmap screen) throws Exception {
+    /**
+     * Capture d'écran → la case lue (sinon la zone centrale), sans barres du haut et du bas.
+     * Refusée si l'image est inutilisable (écran de veille, page noire…).
+     */
+    public static boolean saveFromScreenshot(Context ctx, String title, Bitmap screen, android.graphics.Rect panel) throws Exception {
         int w = screen.getWidth(), h = screen.getHeight();
-        int top = (int) (h * 0.15f), height = (int) (h * 0.70f);
-        save(ctx, title, Bitmap.createBitmap(screen, 0, top, w, height), 0.5f);
+        android.graphics.Rect area = new android.graphics.Rect(0, (int) (h * 0.15f), w, (int) (h * 0.85f));
+        if (panel != null) {
+            android.graphics.Rect p = new android.graphics.Rect(panel);
+            if (p.intersect(0, 0, w, h) && p.width() > w * 0.4f && p.height() > h * 0.2f) area = p;
+        }
+        Bitmap part = Bitmap.createBitmap(screen, area.left, area.top, area.width(), area.height());
+        if (ChapterThumbs.looksBad(part)) return false;
+        save(ctx, title, part, 0.5f);
+        return true;
+    }
+
+    /**
+     * Ménage : supprime les couvertures capturées sur l'écran de veille / un écran noir (≤ v4.4)
+     * pour que la couverture officielle soit recherchée à nouveau. Jamais une image choisie par toi.
+     */
+    public static int cleanupBad(Context ctx, android.content.SharedPreferences coverPrefs) {
+        File dir = new File(ctx.getFilesDir(), "covers");
+        File[] files = dir.listFiles();
+        if (files == null) return 0;
+        int removed = 0;
+        for (File f : files) {
+            try {
+                if (!f.getName().endsWith(".jpg")) continue;
+                if (new File(f.getAbsolutePath() + ".user").exists()) continue;
+                if (!ChapterThumbs.fileLooksBad(f)) continue;
+                new File(f.getAbsolutePath() + ".custom").delete();
+                if (f.delete()) removed++;
+                String stem = f.getName().substring(0, f.getName().length() - 4);
+                android.content.SharedPreferences.Editor ed = coverPrefs.edit();
+                for (String k : coverPrefs.getAll().keySet()) {
+                    if (k.startsWith("try_") && Titles.key(k.substring(4)).equals(stem)) ed.remove(k);
+                }
+                ed.apply();
+            } catch (Throwable ignored) {
+            }
+        }
+        CACHE.evictAll();
+        return removed;
     }
 
     /** Ancienne miniature carrée (avant le format portrait) ? */

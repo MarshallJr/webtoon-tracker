@@ -145,7 +145,7 @@ final class EpisodesTab {
         LinearLayout list = act.findViewById(R.id.eList);
         list.removeAllViews();
         Progress progress = Progress.get(act, title);
-        Bitmap strip = ChapterThumbs.coverStrip(act, title);
+        Bitmap strip = ChapterThumbs.placeholder(act, title);
         int n = Math.min(shown, rows.size());
         for (int i = 0; i < n; i++) {
             View v = rowView(list, rows.get(i), furthest, progress, meta, entries, strip);

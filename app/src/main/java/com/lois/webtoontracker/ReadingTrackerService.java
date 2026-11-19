@@ -175,6 +175,11 @@ public class ReadingTrackerService extends AccessibilityService {
     private void handle(AccessibilityEvent event) {
         if (event == null || event.getPackageName() == null) return;
         String pkg = event.getPackageName().toString();
+        // Retour dans Webtoon Tracker : la carte « Reprendre » n'a plus rien à faire à l'écran.
+        if (event.getEventType() == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED && pkg.equals(getPackageName())
+                && resumeCard != null && (scroller == null || !scroller.isRunning())) {
+            resumeCard.hide();
+        }
         if (!Detector.isWatched(pkg)) return;
         if (event.getEventType() == AccessibilityEvent.TYPE_VIEW_SCROLLED) trackScroll(event);
 
@@ -336,48 +341,17 @@ public class ReadingTrackerService extends AccessibilityService {
 
     private final java.util.Map<String, Long> lastCapture = new java.util.HashMap<>();
 
-    /** Une capture si la série n'a pas encore de miniature, sinon une par session de lecture (30 min). */
+    /**
+     * Couverture capturée seulement si la série n'en a AUCUNE (la couverture officielle la remplace
+     * dès qu'elle est trouvée). La vignette du chapitre est prise dans la même capture.
+     */
     private void captureCoverIfNeeded(String title, double chapter, Runnable then) {
-        long now = System.currentTimeMillis();
-        String k = title.toLowerCase(Locale.ROOT);
-        Long last = lastCapture.get(k);
-        boolean need = android.os.Build.VERSION.SDK_INT >= 30
-                && !Covers.isCustom(this, title)
-                && (!Covers.has(this, title) || last == null || now - last > NotifyPolicy.SESSION_GAP_MS);
+        boolean need = android.os.Build.VERSION.SDK_INT >= 30 && !Covers.isCustom(this, title) && !Covers.has(this, title);
         if (!need) {
             captureChapterThumb(title, chapter, then);   // la vignette du chapitre, elle, est toujours prise
             return;
         }
-        lastCapture.put(k, now);
-        handler.post(() -> {
-            try {
-                takeScreenshot(android.view.Display.DEFAULT_DISPLAY, io, new TakeScreenshotCallback() {
-                    @Override
-                    public void onSuccess(ScreenshotResult res) {
-                        try {
-                            android.hardware.HardwareBuffer hb = res.getHardwareBuffer();
-                            android.graphics.Bitmap hw = android.graphics.Bitmap.wrapHardwareBuffer(hb, res.getColorSpace());
-                            if (hw != null) {
-                                android.graphics.Bitmap sw = hw.copy(android.graphics.Bitmap.Config.ARGB_8888, false);
-                                Covers.saveFromScreenshot(ReadingTrackerService.this, title, sw);
-                                if (chapter >= 0) ChapterThumbs.saveFromScreenshot(ReadingTrackerService.this, title, chapter, sw);
-                            }
-                            hb.close();
-                        } catch (Throwable t) {
-                            App.saveError(ReadingTrackerService.this, "Miniature", t);
-                        }
-                        then.run();
-                    }
-
-                    @Override
-                    public void onFailure(int errorCode) {
-                        then.run();
-                    }
-                });
-            } catch (Throwable t) {
-                io.execute(then);
-            }
-        });
+        shoot(title, chapter, true, then);
     }
 
     // ------------------------------------------------------------------ Vignettes de chapitres
@@ -386,27 +360,52 @@ public class ReadingTrackerService extends AccessibilityService {
     private final java.util.Set<String> betterThumb = new java.util.HashSet<>();
     private long lastThumbShot;
 
-    /**
-     * Vignette du chapitre pour la liste d'épisodes : un extrait de la page affichée.
-     * Écart minimum entre deux captures (limite d'Android, et économie de batterie).
-     */
     private void captureChapterThumb(String title, double chapter) {
         captureChapterThumb(title, chapter, null);
     }
 
     /** @param after lancé (sur le fil IO) une fois la capture faite — ou tout de suite si on s'en passe. */
     private void captureChapterThumb(String title, double chapter, Runnable after) {
+        shoot(title, chapter, false, after);
+    }
+
+    /**
+     * Écran allumé, déverrouillé, et l'appli de lecture au premier plan ?
+     * Sinon la capture montrerait l'écran de veille (« Always On »), l'écran de verrouillage ou une autre appli.
+     */
+    private boolean screenShowsReading() {
+        android.os.PowerManager pm = getSystemService(android.os.PowerManager.class);
+        if (pm != null && !pm.isInteractive()) return false;
+        android.app.KeyguardManager km = getSystemService(android.app.KeyguardManager.class);
+        if (km != null && km.isKeyguardLocked()) return false;
+        AccessibilityNodeInfo root = getRootInActiveWindow();
+        String p = root == null || root.getPackageName() == null ? null : root.getPackageName().toString();
+        return p != null && Detector.isWatched(p);
+    }
+
+    /**
+     * Une capture d'écran (fil IO) → vignette du chapitre (+ couverture si withCover).
+     * Seulement si une case de webtoon est bien au centre de l'écran (pas les boutons « Suivant »,
+     * pas un écran de veille), et au plus une toutes les 1,5 s.
+     */
+    private void shoot(String title, double chapter, boolean withCover, Runnable after) {
         Runnable done = () -> {
             if (after != null) io.execute(after);
         };
         long now = SystemClock.uptimeMillis();
-        if (android.os.Build.VERSION.SDK_INT < 30 || now - lastThumbShot < 1500) {
+        if (android.os.Build.VERSION.SDK_INT < 30 || now - lastThumbShot < 1500 || !screenShowsReading()) {
             done.run();
             return;
         }
+        Panels.Snapshot snap = Panels.take(this);
+        if (snap != null && snap.centerRect == null) {   // on voit des cases, mais pas au centre (bas de page…)
+            done.run();
+            return;
+        }
+        final android.graphics.Rect panel = snap == null ? null : snap.centerRect;
         lastThumbShot = now;
         handler.post(() -> {
-            if (banner != null && banner.isShowing()) { // pas de bannière dans la vignette
+            if ((banner != null && banner.isShowing()) || !screenShowsReading()) { // ni bannière, ni écran éteint
                 done.run();
                 return;
             }
@@ -419,7 +418,8 @@ public class ReadingTrackerService extends AccessibilityService {
                             android.graphics.Bitmap hw = android.graphics.Bitmap.wrapHardwareBuffer(hb, res.getColorSpace());
                             if (hw != null) {
                                 android.graphics.Bitmap sw = hw.copy(android.graphics.Bitmap.Config.ARGB_8888, false);
-                                ChapterThumbs.saveFromScreenshot(ReadingTrackerService.this, title, chapter, sw);
+                                if (withCover) Covers.saveFromScreenshot(ReadingTrackerService.this, title, sw, panel);
+                                if (chapter >= 0) ChapterThumbs.saveFromScreenshot(ReadingTrackerService.this, title, chapter, sw, panel);
                             }
                             hb.close();
                         } catch (Throwable t) {
