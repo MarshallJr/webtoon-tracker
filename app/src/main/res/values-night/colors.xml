@@ -23,4 +23,6 @@
     <color name="hero_stroke">#336D4AFF</color>
     <color name="online">#3DDC84</color>
     <color name="hairline_strong">#40FFFFFF</color>
+    <color name="episode_current">#1C1A2A</color>
+    <color name="episode_fold">#4A4370</color>
 </resources>

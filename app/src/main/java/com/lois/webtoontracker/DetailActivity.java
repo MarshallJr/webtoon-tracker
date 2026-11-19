@@ -59,11 +59,10 @@ import java.util.TreeSet;
 public class DetailActivity extends AppCompatActivity {
 
     public static final String EXTRA_TITLE = "title";
-    private static final int HISTORY_PREVIEW = 6;
 
     private String title;
     private DbHelper db;
-    private boolean historyExpanded = false;
+    private EpisodesTab episodes;
     private boolean summaryExpanded = false;
     private boolean altExpanded = false;
     private ActivityResultLauncher<PickVisualMediaRequest> pickCover;
@@ -114,12 +113,25 @@ public class DetailActivity extends AppCompatActivity {
         findViewById(R.id.dResume).setOnClickListener(v -> Resume.open(this, title));
         findViewById(R.id.dStickyResume).setOnClickListener(v -> Resume.open(this, title));
         findViewById(R.id.dBellRow).setOnClickListener(v -> toggleBell(!db.isFollowed(title)));
-        findViewById(R.id.dAdd).setOnClickListener(v -> showAddDialog());
         findViewById(R.id.dSummary).setOnClickListener(v -> toggleSummary());
         findViewById(R.id.dSummaryMore).setOnClickListener(v -> toggleSummary());
-        findViewById(R.id.dHistoryMore).setOnClickListener(v -> {
-            historyExpanded = !historyExpanded;
-            bindHistory();
+        episodes = new EpisodesTab(this, new EpisodesTab.Host() {
+            @Override
+            public void onEpisodesChanged() {
+                NoteWriter.writeAsync(DetailActivity.this);
+                WidgetProvider.updateAll(DetailActivity.this);
+                bindAll();
+            }
+
+            @Override
+            public void confirmDelete(DbHelper.Entry e) {
+                confirmDeleteEntry(e);
+            }
+
+            @Override
+            public void showAddDialog() {
+                DetailActivity.this.showAddDialog();
+            }
         });
         findViewById(R.id.dAltHeader).setOnClickListener(v -> {
             altExpanded = !altExpanded;
@@ -129,6 +141,7 @@ public class DetailActivity extends AppCompatActivity {
 
         TabLayout tabs = findViewById(R.id.dTabs);
         tabs.addTab(tabs.newTab().setText("Aperçu"));
+        tabs.addTab(tabs.newTab().setText("Épisodes"));
         tabs.addTab(tabs.newTab().setText("Mon suivi"));
         tabs.addTab(tabs.newTab().setText("Détails"));
         tabs.addOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
@@ -204,7 +217,11 @@ public class DetailActivity extends AppCompatActivity {
     // ------------------------------------------------------------------ Onglets & défilement
 
     private void showTab(int i) {
-        int[] ids = {R.id.tabOverview, R.id.tabTracking, R.id.tabDetails};
+        int[] ids = {R.id.tabOverview, R.id.tabEpisodes, R.id.tabTracking, R.id.tabDetails};
+        if (i == 1 && currentTab != 1) {   // les épisodes arrivent en cascade
+            episodes.animateNextBind();
+            episodes.bind(title);
+        }
         int dir = i >= currentTab ? 1 : -1;   // glisse dans le sens de l'onglet choisi
         currentTab = i;
         for (int k = 0; k < ids.length; k++) {
@@ -273,7 +290,7 @@ public class DetailActivity extends AppCompatActivity {
         bindProgress(s);
         bindWhere();
         bindStars();
-        bindHistory();
+        episodes.bind(title);
         DbHelper.Meta m = db.getMeta(title);
         EditText note = findViewById(R.id.dNote);
         if (note.getText().length() == 0 && m != null && m.note != null) note.setText(m.note);
@@ -453,49 +470,11 @@ public class DetailActivity extends AppCompatActivity {
         }
     }
 
-    private void bindHistory() {
-        LinearLayout box = findViewById(R.id.dHistory);
-        box.removeAllViews();
-        List<DbHelper.Entry> entries = db.getHistory(title);
-        DbHelper.Meta m = db.getMeta(title);
-        SimpleDateFormat fmt = new SimpleDateFormat("d MMM yyyy · HH:mm", Locale.FRANCE);
-        int n = historyExpanded ? entries.size() : Math.min(HISTORY_PREVIEW, entries.size());
-        for (int i = 0; i < n; i++) {
-            DbHelper.Entry e = entries.get(i);
-            View row = LayoutInflater.from(this).inflate(R.layout.item_timeline, box, false);
-            ((TextView) row.findViewById(R.id.tChapter)).setText("Chapitre " + Detector.formatChapter(e.chapter));
-            ((TextView) row.findViewById(R.id.tDate)).setText(fmt.format(new Date(e.readAt)));
-            TextView src = row.findViewById(R.id.tSource);
-            String source = e.source == null ? "" : e.source;
-            boolean site = source.contains(".");
-            src.setText(source.isEmpty() ? "" : site ? source + "  ↗" : sourceLabel(source));
-            src.setVisibility(source.isEmpty() ? View.GONE : View.VISIBLE);
-            if (site) {
-                String url = m != null && m.lastUrl != null && m.lastUrl.contains(source) ? m.lastUrl : "https://" + source;
-                src.setOnClickListener(v -> openUrl(url));
-            }
-            row.findViewById(R.id.tLine).setVisibility(i == n - 1 ? View.INVISIBLE : View.VISIBLE);
-            if (i > 0) row.findViewById(R.id.tDot).setAlpha(0.45f);
-            row.findViewById(R.id.tMore).setOnClickListener(v -> {
-                PopupMenu pm = new PopupMenu(this, v);
-                pm.getMenu().add("Retirer de l'historique");
-                pm.setOnMenuItemClickListener(it -> {
-                    confirmDeleteEntry(e);
-                    return true;
-                });
-                pm.show();
-            });
-            box.addView(row);
-        }
-        TextView more = findViewById(R.id.dHistoryMore);
-        more.setVisibility(entries.size() > HISTORY_PREVIEW ? View.VISIBLE : View.GONE);
-        more.setText(historyExpanded ? "Réduire" : "Voir les " + entries.size() + " chapitres");
-    }
-
     private static String sourceLabel(String s) {
         switch (s) {
             case "app": return "Appli de lecture";
             case "manuel": return "Ajouté à la main";
+            case DbHelper.SOURCE_BEFORE: return "Lu avant l'appli";
             case "sauvegarde": return "Restauré";
             default: return s;
         }
@@ -936,18 +915,27 @@ public class DetailActivity extends AppCompatActivity {
 
     private void showAddDialog() {
         EditText chapter = new EditText(this);
-        chapter.setHint("Chapitre (ex : 42)");
-        chapter.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        chapter.setHint("Chapitre (ex : 42) ou plage (ex : 1-37)");
+        chapter.setInputType(InputType.TYPE_CLASS_TEXT);
         LinearLayout box = new LinearLayout(this);
         box.setPadding(dp(24), dp(8), dp(24), 0);
         box.addView(chapter, new LinearLayout.LayoutParams(-1, -2));
         new MaterialAlertDialogBuilder(this)
-                .setTitle("Ajouter un chapitre lu")
+                .setTitle("Ajouter des chapitres lus")
                 .setView(box)
                 .setPositiveButton("Ajouter", (d, w) -> {
                     try {
-                        double c = Double.parseDouble(chapter.getText().toString().trim().replace(',', '.'));
-                        db.insertRead(title, c, System.currentTimeMillis(), "manuel");
+                        String txt = chapter.getText().toString().trim().replace(',', '.').replace('→', '-');
+                        java.util.regex.Matcher range = java.util.regex.Pattern
+                                .compile("^(\\d+)\\s*(?:-|à|a)\\s*(\\d+)$").matcher(txt);
+                        if (range.find()) {
+                            int a = Integer.parseInt(range.group(1)), b = Integer.parseInt(range.group(2));
+                            if (b < a || b - a > 3000) throw new NumberFormatException();
+                            int added = db.markRangeRead(title, a, b, System.currentTimeMillis());
+                            Toast.makeText(this, added + " chapitres ajoutés", Toast.LENGTH_SHORT).show();
+                        } else {
+                            db.insertRead(title, Double.parseDouble(txt), System.currentTimeMillis(), "manuel");
+                        }
                         NoteWriter.writeAsync(this);
                         WidgetProvider.updateAll(this);
                         bindAll();
@@ -964,6 +952,7 @@ public class DetailActivity extends AppCompatActivity {
                 .setMessage("Retirer le chapitre " + Detector.formatChapter(e.chapter) + " de l'historique ?")
                 .setPositiveButton("Retirer", (d, w) -> {
                     db.deleteEntry(e.id);
+                    ChapterThumbs.delete(this, title, e.chapter);
                     NoteWriter.writeAsync(this);
                     WidgetProvider.updateAll(this);
                     bindAll();

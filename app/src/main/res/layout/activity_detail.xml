@@ -354,6 +354,126 @@
                     </HorizontalScrollView>
                 </LinearLayout>
 
+                <!-- ═════════ Onglet : Épisodes ═════════ -->
+                <LinearLayout
+                    android:id="@+id/tabEpisodes"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:clipChildren="false"
+                    android:orientation="vertical"
+                    android:visibility="gone">
+
+                    <!-- « J'avais lu les premiers chapitres avant l'appli » -->
+                    <LinearLayout
+                        android:id="@+id/eBackfill"
+                        style="@style/DetailCard"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:visibility="gone">
+
+                        <TextView
+                            android:id="@+id/eBackfillText"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:textColor="@color/text_main"
+                            android:textSize="13.5sp" />
+
+                        <TextView
+                            android:id="@+id/eBackfillBtn"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="10dp"
+                            android:fontFamily="sans-serif-medium"
+                            android:padding="8dp"
+                            android:text="Marquer"
+                            android:textColor="@color/brand"
+                            android:textSize="14sp" />
+
+                        <TextView
+                            android:id="@+id/eBackfillClose"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:padding="8dp"
+                            android:text="✕"
+                            android:textColor="@color/text_soft"
+                            android:textSize="14sp" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:paddingTop="16dp"
+                        android:paddingBottom="8dp">
+
+                        <TextView
+                            android:id="@+id/eCount"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:ellipsize="end"
+                            android:maxLines="1"
+                            android:fontFamily="sans-serif-medium"
+                            android:textColor="@color/text_main"
+                            android:textSize="16sp" />
+
+                        <TextView
+                            android:id="@+id/eAdd"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="sans-serif-medium"
+                            android:padding="6dp"
+                            android:text="＋ Ajouter"
+                            android:textColor="@color/brand"
+                            android:textSize="14sp" />
+
+                        <TextView
+                            android:id="@+id/eSort"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="8dp"
+                            android:drawableEnd="@drawable/ic_sort"
+                            android:drawablePadding="2dp"
+                            android:drawableTint="@color/text_soft"
+                            android:gravity="center_vertical"
+                            android:padding="6dp"
+                            android:textColor="@color/text_soft"
+                            android:textSize="14sp" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/eList"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="-20dp"
+                        android:layout_marginEnd="-20dp"
+                        android:animateLayoutChanges="false"
+                        android:orientation="vertical" />
+
+                    <TextView
+                        android:id="@+id/eMore"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="sans-serif-medium"
+                        android:gravity="center"
+                        android:padding="14dp"
+                        android:textColor="@color/brand"
+                        android:textSize="14sp"
+                        android:visibility="gone" />
+
+                    <TextView
+                        android:id="@+id/eHint"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:gravity="center"
+                        android:text="Appui long sur un épisode pour le retirer"
+                        android:textColor="@color/text_soft"
+                        android:textSize="12sp" />
+                </LinearLayout>
+
                 <!-- ═════════ Onglet : Mon suivi ═════════ -->
                 <LinearLayout
                     android:id="@+id/tabTracking"
@@ -623,51 +743,6 @@
                             android:text="Visible uniquement par toi"
                             android:textColor="@color/text_soft"
                             android:textSize="12sp" />
-                    </LinearLayout>
-
-                    <!-- Historique -->
-                    <LinearLayout style="@style/DetailCard">
-
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:gravity="center_vertical"
-                            android:orientation="horizontal">
-
-                            <TextView
-                                style="@style/CardTitle"
-                                android:layout_width="0dp"
-                                android:layout_weight="1"
-                                android:text="Historique"
-                                android:textSize="18sp" />
-
-                            <TextView
-                                android:id="@+id/dAdd"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:fontFamily="sans-serif-medium"
-                                android:padding="6dp"
-                                android:text="＋ Ajouter"
-                                android:textColor="@color/brand"
-                                android:textSize="14sp" />
-                        </LinearLayout>
-
-                        <LinearLayout
-                            android:id="@+id/dHistory"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="6dp"
-                            android:orientation="vertical" />
-
-                        <TextView
-                            android:id="@+id/dHistoryMore"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:fontFamily="sans-serif-medium"
-                            android:paddingTop="8dp"
-                            android:textColor="@color/brand"
-                            android:textSize="13sp"
-                            android:visibility="gone" />
                     </LinearLayout>
 
                     <!-- Suivre les sorties -->

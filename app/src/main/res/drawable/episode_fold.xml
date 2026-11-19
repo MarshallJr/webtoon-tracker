@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Coin replié : marque du chapitre où tu en es (comme WEBTOON) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="16dp" android:height="16dp" android:viewportWidth="16" android:viewportHeight="16">
+    <path android:fillColor="@color/episode_fold" android:pathData="M0,0 L16,0 L16,16 Z" />
+</vector>

@@ -44,6 +44,9 @@ public final class BackupManager {
                 o.put("chapter", e.chapter);
                 o.put("readAt", e.readAt);
                 o.put("source", e.source == null ? "" : e.source);
+                if (e.url != null) o.put("url", e.url);
+                if (e.times > 1) o.put("times", e.times);
+                if (e.lastAt > 0) o.put("lastAt", e.lastAt);
                 reads.put(o);
             }
         }
@@ -118,9 +121,15 @@ public final class BackupManager {
         int added = 0;
         for (int i = 0; i < reads.length(); i++) {
             JSONObject o = reads.getJSONObject(i);
+            String url = o.optString("url", "");
             if (db.insertRead(o.getString("title"), o.getDouble("chapter"),
-                    o.optLong("readAt", System.currentTimeMillis()), o.optString("source", "sauvegarde"))) {
+                    o.optLong("readAt", System.currentTimeMillis()), o.optString("source", "sauvegarde"),
+                    url.isEmpty() ? null : url)) {
                 added++;
+                if (o.has("times") || o.has("lastAt")) {
+                    db.restoreReadStats(o.getString("title"), o.getDouble("chapter"),
+                            o.optInt("times", 1), o.optLong("lastAt", 0));
+                }
             }
         }
         JSONArray metas = root.optJSONArray("meta");

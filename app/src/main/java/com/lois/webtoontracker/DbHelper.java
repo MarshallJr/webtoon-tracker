@@ -16,7 +16,7 @@ import java.util.TreeSet;
 public class DbHelper extends SQLiteOpenHelper {
 
     private static final String DB_NAME = "webtoons.db";
-    private static final int DB_VERSION = 5;
+    private static final int DB_VERSION = 6;
     private static DbHelper instance;
 
     public static synchronized DbHelper get(Context ctx) {
@@ -24,8 +24,11 @@ public class DbHelper extends SQLiteOpenHelper {
         return instance;
     }
 
+    private final Context appCtx;
+
     private DbHelper(Context ctx) {
         super(ctx, DB_NAME, null, DB_VERSION);
+        appCtx = ctx;
     }
 
     @Override
@@ -41,6 +44,14 @@ public class DbHelper extends SQLiteOpenHelper {
         upgradeTo3(db);
         upgradeTo4(db);
         upgradeTo5(db);
+        upgradeTo6(db);
+    }
+
+    /** v6 : lien de chaque chapitre (pour le rouvrir), nombre de lectures et dernière visite. */
+    private void upgradeTo6(SQLiteDatabase db) {
+        db.execSQL("ALTER TABLE reads ADD COLUMN url TEXT");
+        db.execSQL("ALTER TABLE reads ADD COLUMN last_at INTEGER DEFAULT 0");
+        db.execSQL("ALTER TABLE reads ADD COLUMN times INTEGER DEFAULT 1");
     }
 
     /** v5 : alias (tous les noms d'une série → un seul titre) + note publique (AniList). */
@@ -91,6 +102,7 @@ public class DbHelper extends SQLiteOpenHelper {
         if (oldV < 3) upgradeTo3(db);
         if (oldV < 4) upgradeTo4(db);
         if (oldV < 5) upgradeTo5(db);
+        if (oldV < 6) upgradeTo6(db);
     }
 
     // ------------------------------------------------------------------ Modèles
@@ -117,6 +129,12 @@ public class DbHelper extends SQLiteOpenHelper {
         public final double chapter;
         public final long readAt;
         public final String source;
+        /** Lien exact du chapitre (null si lu avant la v4.3 ou dans une appli sans lien). */
+        public String url;
+        /** Dernière fois que tu l'as ouvert (0 = jamais rouvert). */
+        public long lastAt;
+        /** Nombre de lectures (1 = lu une fois). */
+        public int times = 1;
 
         Entry(long id, double chapter, long readAt, String source) {
             this.id = id;
@@ -148,13 +166,74 @@ public class DbHelper extends SQLiteOpenHelper {
 
     /** @return true si c'est un nouveau chapitre (pas déjà enregistré). */
     public synchronized boolean insertRead(String title, double chapter, long readAt, String source) {
+        return insertRead(title, chapter, readAt, source, null);
+    }
+
+    public synchronized boolean insertRead(String title, double chapter, long readAt, String source, String url) {
         ContentValues v = new ContentValues();
         v.put("title", title);
         v.put("chapter", chapter);
         v.put("read_at", readAt);
         v.put("source", source);
+        if (url != null) v.put("url", url);
+        v.put("last_at", readAt);
         long id = getWritableDatabase().insertWithOnConflict("reads", null, v, SQLiteDatabase.CONFLICT_IGNORE);
         return id != -1;
+    }
+
+    /**
+     * Chapitre déjà lu, rouvert : compte une relecture (au plus une par demi-heure, pour ne pas
+     * compter chaque aller-retour) et complète son lien s'il manquait.
+     */
+    public synchronized void markReopened(String title, double chapter, long now, String url, long gapMs) {
+        SQLiteDatabase db = getWritableDatabase();
+        db.execSQL("UPDATE reads SET times = IFNULL(times, 1) + 1 WHERE title = ? COLLATE NOCASE AND chapter = ? " +
+                        "AND MAX(IFNULL(last_at, 0), read_at) < ?",
+                new Object[]{title, chapter, now - gapMs});
+        db.execSQL("UPDATE reads SET last_at = ? WHERE title = ? COLLATE NOCASE AND chapter = ?",
+                new Object[]{now, title, chapter});
+        if (url != null) {
+            db.execSQL("UPDATE reads SET url = ? WHERE title = ? COLLATE NOCASE AND chapter = ? AND url IS NULL",
+                    new Object[]{url, title, chapter});
+        }
+    }
+
+    /** Chapitres lus avant l'appli : comptés comme lus, mais hors des statistiques datées. */
+    public static final String SOURCE_BEFORE = "avant";
+    private static final String NOT_BEFORE = " IFNULL(source, '') != '" + SOURCE_BEFORE + "' ";
+
+    /** « J'avais déjà lu ces chapitres avant l'appli » : marque from → to comme lus (entiers). */
+    public synchronized int markRangeRead(String title, int from, int to, long readAt) {
+        SQLiteDatabase db = getWritableDatabase();
+        int added = 0;
+        db.beginTransaction();
+        try {
+            for (int c = from; c <= to; c++) {
+                ContentValues v = new ContentValues();
+                v.put("title", title);
+                v.put("chapter", (double) c);
+                v.put("read_at", readAt);
+                v.put("source", SOURCE_BEFORE);
+                if (db.insertWithOnConflict("reads", null, v, SQLiteDatabase.CONFLICT_IGNORE) != -1) added++;
+            }
+            db.setTransactionSuccessful();
+        } finally {
+            db.endTransaction();
+        }
+        return added;
+    }
+
+    public synchronized void restoreReadStats(String title, double chapter, int times, long lastAt) {
+        getWritableDatabase().execSQL("UPDATE reads SET times = ?, last_at = ? WHERE title = ? COLLATE NOCASE AND chapter = ?",
+                new Object[]{Math.max(1, times), lastAt, title, chapter});
+    }
+
+    /** Plus petit chapitre lu (0 si aucun). */
+    public double firstRead(String title) {
+        try (Cursor c = getReadableDatabase().rawQuery(
+                "SELECT MIN(chapter) FROM reads WHERE title = ? COLLATE NOCASE", new String[]{title})) {
+            return c.moveToFirst() ? c.getDouble(0) : 0;
+        }
     }
 
     public List<Series> getSeries() {
@@ -175,10 +254,14 @@ public class DbHelper extends SQLiteOpenHelper {
     public List<Entry> getHistory(String title) {
         List<Entry> out = new ArrayList<>();
         try (Cursor c = getReadableDatabase().rawQuery(
-                "SELECT id, chapter, read_at, source FROM reads WHERE title = ? COLLATE NOCASE " +
+                "SELECT id, chapter, read_at, source, url, last_at, times FROM reads WHERE title = ? COLLATE NOCASE " +
                         "ORDER BY chapter DESC", new String[]{title})) {
             while (c.moveToNext()) {
-                out.add(new Entry(c.getLong(0), c.getDouble(1), c.getLong(2), c.getString(3)));
+                Entry e = new Entry(c.getLong(0), c.getDouble(1), c.getLong(2), c.getString(3));
+                e.url = c.isNull(4) ? null : c.getString(4);
+                e.lastAt = c.isNull(5) ? 0 : c.getLong(5);
+                e.times = c.isNull(6) ? 1 : Math.max(1, c.getInt(6));
+                out.add(e);
             }
         }
         return out;
@@ -190,6 +273,15 @@ public class DbHelper extends SQLiteOpenHelper {
                 "SELECT read_at FROM reads WHERE title = ? COLLATE NOCASE AND chapter = ? LIMIT 1",
                 new String[]{title, String.valueOf(chapter)})) {
             return c.moveToFirst() ? c.getLong(0) : -1;
+        }
+    }
+
+    /** Source d'un chapitre lu (« avant » = lu avant l'appli), ou null. */
+    public String getSource(String title, double chapter) {
+        try (Cursor c = getReadableDatabase().rawQuery(
+                "SELECT source FROM reads WHERE title = ? COLLATE NOCASE AND chapter = ? LIMIT 1",
+                new String[]{title, String.valueOf(chapter)})) {
+            return c.moveToFirst() ? c.getString(0) : null;
         }
     }
 
@@ -208,14 +300,14 @@ public class DbHelper extends SQLiteOpenHelper {
 
     public int countSince(long since) {
         try (Cursor c = getReadableDatabase().rawQuery(
-                "SELECT COUNT(*) FROM reads WHERE read_at >= ?", new String[]{String.valueOf(since)})) {
+                "SELECT COUNT(*) FROM reads WHERE read_at >= ? AND" + NOT_BEFORE, new String[]{String.valueOf(since)})) {
             return c.moveToFirst() ? c.getInt(0) : 0;
         }
     }
 
     public List<Long> allReadTimes() {
         List<Long> out = new ArrayList<>();
-        try (Cursor c = getReadableDatabase().rawQuery("SELECT read_at FROM reads ORDER BY read_at", null)) {
+        try (Cursor c = getReadableDatabase().rawQuery("SELECT read_at FROM reads WHERE" + NOT_BEFORE + "ORDER BY read_at", null)) {
             while (c.moveToNext()) out.add(c.getLong(0));
         }
         return out;
@@ -225,13 +317,14 @@ public class DbHelper extends SQLiteOpenHelper {
     public List<Object[]> recentReads(int limit) {
         List<Object[]> out = new ArrayList<>();
         try (Cursor c = getReadableDatabase().rawQuery(
-                "SELECT title, chapter, read_at FROM reads ORDER BY read_at DESC LIMIT " + limit, null)) {
+                "SELECT title, chapter, read_at FROM reads WHERE" + NOT_BEFORE + "ORDER BY read_at DESC LIMIT " + limit, null)) {
             while (c.moveToNext()) out.add(new Object[]{c.getString(0), c.getDouble(1), c.getLong(2)});
         }
         return out;
     }
 
     public synchronized void deleteSeries(String title) {
+        ChapterThumbs.deleteAll(appCtx, title);
         SQLiteDatabase db = getWritableDatabase();
         db.delete("releases", "title = ? COLLATE NOCASE", new String[]{title});
         db.delete("reads", "title = ? COLLATE NOCASE", new String[]{title});
@@ -245,6 +338,7 @@ public class DbHelper extends SQLiteOpenHelper {
     /** Fusionne la série "from" dans "into" (chapitres, tags, liens). Les doublons disparaissent. */
     public synchronized void mergeSeries(String from, String into) {
         if (from.equalsIgnoreCase(into)) return;
+        ChapterThumbs.move(appCtx, from, into);
         SQLiteDatabase db = getWritableDatabase();
         db.beginTransaction();
         try {
@@ -360,8 +454,10 @@ public class DbHelper extends SQLiteOpenHelper {
     /** Mémorise où le chapitre a été lu (pour "Reprendre") et l'identifiant webtoons.com. */
     public synchronized void rememberSource(Detector.Result r) {
         Meta m = metaOrNew(r.title);
-        if (r.url != null) m.lastUrl = r.url;
-        if (r.pkg != null) m.lastPkg = r.pkg;
+        // « Reprendre » vise le chapitre le plus avancé : relire un vieux chapitre ne le déplace pas.
+        boolean furthest = r.chapter >= lastRead(r.title);
+        if (r.url != null && (furthest || m.lastUrl == null)) m.lastUrl = r.url;
+        if (r.pkg != null && (furthest || m.lastPkg == null)) m.lastPkg = r.pkg;
         if (r.titleNo != null && !r.titleNo.equals(m.titleNo)) {
             m.titleNo = r.titleNo;
             m.rssBase = r.rssBase;

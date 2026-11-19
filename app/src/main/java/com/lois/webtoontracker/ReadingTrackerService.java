@@ -242,11 +242,21 @@ public class ReadingTrackerService extends AccessibilityService {
         io.execute(() -> safe("Position", () -> {
             String title = DbHelper.get(this).resolveTitle(r.title);
             Panels.Snapshot s = Panels.take(this);
+            float at = -1;
             if (s != null && s.current >= 0) {
-                Progress.save(this, title, r.chapter, s.pct(), s.current, s.count);
+                at = s.pct();
+                Progress.save(this, title, r.chapter, at, s.current, s.count);
             } else if (fallback >= 0 && Math.abs(fallback - lastPct) >= 0.02f) {
                 lastPct = fallback;
+                at = fallback;
                 Progress.save(this, title, r.chapter, fallback);
+            }
+            // Vignette plus parlante : reprise une fois qu'on est entré dans le chapitre (~20 %),
+            // pour éviter l'en-tête ou la page de titre du début.
+            String key = title.toLowerCase(Locale.ROOT) + "#" + r.chapter;
+            if (at >= 0.18f && at <= 0.7f && !betterThumb.contains(key) && DbHelper.get(this).getReadAt(title, r.chapter) >= 0) {
+                betterThumb.add(key);
+                captureChapterThumb(title, r.chapter);
             }
         }));
     }
@@ -276,25 +286,37 @@ public class ReadingTrackerService extends AccessibilityService {
     }
 
     private void checkAlreadyRead(Detector.Result r) {
-        r.title = DbHelper.get(this).resolveTitle(r.title); // même série vue sous un autre nom / sur un autre site
-        long readAt = DbHelper.get(this).getReadAt(r.title, r.chapter);
+        DbHelper db = DbHelper.get(this);
+        r.title = db.resolveTitle(r.title); // même série vue sous un autre nom / sur un autre site
+        long readAt = db.getReadAt(r.title, r.chapter);
         if (readAt < 0) return;
+        double furthest = db.lastRead(r.title);
         SharedPreferences s = settings();
-        NotifyPolicy.Decision d = policy.onAlreadyRead(r.title, readAt, System.currentTimeMillis(),
+        NotifyPolicy.Decision d = policy.onAlreadyRead(r.title, r.chapter, furthest, System.currentTimeMillis(),
                 s.getInt(KEY_NOTIFY_MODE, NotifyPolicy.MODE_SMART), s.getBoolean(KEY_NOTIFY_ALREADY, true));
         if (d == null || banner == null) return;
         String when = new SimpleDateFormat("d MMM yyyy", Locale.FRANCE).format(new Date(readAt));
-        banner.show(NotifyPolicy.Kind.ALREADY_READ, "Déjà lu",
-                r.title + " · Ch. " + Detector.formatChapter(r.chapter) + " · le " + when);
+        String ch = Detector.formatChapter(r.chapter), last = Detector.formatChapter(furthest);
+        final String title = r.title;
+        // Plus ancien que ton dernier chapitre : on le dit, avec un raccourci pour revenir où tu en étais.
+        String lu = DbHelper.SOURCE_BEFORE.equals(db.getSource(r.title, r.chapter)) ? "Lu avant l'appli" : "Lu le " + when;
+        banner.show(NotifyPolicy.Kind.ALREADY_READ, "Déjà lu · Ch. " + ch,
+                lu + " · tu en es au ch. " + last,
+                7000, 0, "Ch. " + last, () -> Resume.open(this, title));
     }
 
     private void record(Detector.Result r) {
         DbHelper db = DbHelper.get(this);
         r.title = db.resolveTitle(r.title);
         boolean newSeries = !db.seriesExists(r.title);
-        boolean isNew = db.insertRead(r.title, r.chapter, System.currentTimeMillis(), r.source);
+        long now = System.currentTimeMillis();
+        boolean isNew = db.insertRead(r.title, r.chapter, now, r.source, r.url);
         db.rememberSource(r); // pour "Reprendre" et les alertes, même si le chapitre était déjà lu
-        if (!isNew) return;
+        if (!isNew) {
+            db.markReopened(r.title, r.chapter, now, r.url, NotifyPolicy.SESSION_GAP_MS); // relecture
+            if (!ChapterThumbs.has(this, r.title, r.chapter)) captureChapterThumb(r.title, r.chapter);
+            return;
+        }
 
         NoteWriter.write(this);
 
@@ -303,7 +325,7 @@ public class ReadingTrackerService extends AccessibilityService {
 
         // Miniature : capture de la case lue, AVANT d'afficher la bannière (pour ne pas la capturer).
         if (newSeries) CoverWorker.enqueueIfNeeded(this); // couverture officielle, en arrière-plan
-        captureCoverIfNeeded(r.title, () -> {
+        captureCoverIfNeeded(r.title, r.chapter, () -> {
             WidgetProvider.updateAll(this);
             sendBroadcast(new Intent(ACTION_UPDATED).setPackage(getPackageName()));
             showBannerFor(d, r);
@@ -315,7 +337,7 @@ public class ReadingTrackerService extends AccessibilityService {
     private final java.util.Map<String, Long> lastCapture = new java.util.HashMap<>();
 
     /** Une capture si la série n'a pas encore de miniature, sinon une par session de lecture (30 min). */
-    private void captureCoverIfNeeded(String title, Runnable then) {
+    private void captureCoverIfNeeded(String title, double chapter, Runnable then) {
         long now = System.currentTimeMillis();
         String k = title.toLowerCase(Locale.ROOT);
         Long last = lastCapture.get(k);
@@ -323,7 +345,7 @@ public class ReadingTrackerService extends AccessibilityService {
                 && !Covers.isCustom(this, title)
                 && (!Covers.has(this, title) || last == null || now - last > NotifyPolicy.SESSION_GAP_MS);
         if (!need) {
-            then.run();
+            captureChapterThumb(title, chapter, then);   // la vignette du chapitre, elle, est toujours prise
             return;
         }
         lastCapture.put(k, now);
@@ -338,6 +360,7 @@ public class ReadingTrackerService extends AccessibilityService {
                             if (hw != null) {
                                 android.graphics.Bitmap sw = hw.copy(android.graphics.Bitmap.Config.ARGB_8888, false);
                                 Covers.saveFromScreenshot(ReadingTrackerService.this, title, sw);
+                                if (chapter >= 0) ChapterThumbs.saveFromScreenshot(ReadingTrackerService.this, title, chapter, sw);
                             }
                             hb.close();
                         } catch (Throwable t) {
@@ -353,6 +376,65 @@ public class ReadingTrackerService extends AccessibilityService {
                 });
             } catch (Throwable t) {
                 io.execute(then);
+            }
+        });
+    }
+
+    // ------------------------------------------------------------------ Vignettes de chapitres
+
+    /** Chapitres dont la vignette a été reprise plus loin dans la lecture (une fois chacun). */
+    private final java.util.Set<String> betterThumb = new java.util.HashSet<>();
+    private long lastThumbShot;
+
+    /**
+     * Vignette du chapitre pour la liste d'épisodes : un extrait de la page affichée.
+     * Écart minimum entre deux captures (limite d'Android, et économie de batterie).
+     */
+    private void captureChapterThumb(String title, double chapter) {
+        captureChapterThumb(title, chapter, null);
+    }
+
+    /** @param after lancé (sur le fil IO) une fois la capture faite — ou tout de suite si on s'en passe. */
+    private void captureChapterThumb(String title, double chapter, Runnable after) {
+        Runnable done = () -> {
+            if (after != null) io.execute(after);
+        };
+        long now = SystemClock.uptimeMillis();
+        if (android.os.Build.VERSION.SDK_INT < 30 || now - lastThumbShot < 1500) {
+            done.run();
+            return;
+        }
+        lastThumbShot = now;
+        handler.post(() -> {
+            if (banner != null && banner.isShowing()) { // pas de bannière dans la vignette
+                done.run();
+                return;
+            }
+            try {
+                takeScreenshot(android.view.Display.DEFAULT_DISPLAY, io, new TakeScreenshotCallback() {
+                    @Override
+                    public void onSuccess(ScreenshotResult res) {
+                        try {
+                            android.hardware.HardwareBuffer hb = res.getHardwareBuffer();
+                            android.graphics.Bitmap hw = android.graphics.Bitmap.wrapHardwareBuffer(hb, res.getColorSpace());
+                            if (hw != null) {
+                                android.graphics.Bitmap sw = hw.copy(android.graphics.Bitmap.Config.ARGB_8888, false);
+                                ChapterThumbs.saveFromScreenshot(ReadingTrackerService.this, title, chapter, sw);
+                            }
+                            hb.close();
+                        } catch (Throwable t) {
+                            App.saveError(ReadingTrackerService.this, "Vignette", t);
+                        }
+                        done.run();
+                    }
+
+                    @Override
+                    public void onFailure(int errorCode) {
+                        done.run();
+                    }
+                });
+            } catch (Throwable t) {
+                done.run();
             }
         });
     }

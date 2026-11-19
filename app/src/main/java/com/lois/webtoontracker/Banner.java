@@ -36,6 +36,11 @@ public final class Banner {
         this.wm = (WindowManager) service.getSystemService(AccessibilityService.WINDOW_SERVICE);
     }
 
+    /** Une bannière est-elle à l'écran ? (fil principal) */
+    public boolean isShowing() {
+        return current != null;
+    }
+
     public void show(NotifyPolicy.Kind kind, String title, String subtitle) {
         show(kind, title, subtitle, VISIBLE_MS, 0);
     }

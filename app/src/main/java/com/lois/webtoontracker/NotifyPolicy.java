@@ -13,8 +13,10 @@ import java.util.Map;
  *  - 1er chapitre d'une session → bannière "Ajouté à ta collection".
  *    (une session = lecture d'une même série sans pause de plus de 30 min)
  *  - Chapitres suivants         → silencieux… sauf un palier tous les 10 chapitres ("🔥 10 d'affilée").
- *  - Déjà lu                    → une seule fois par série et par session, et jamais pour un
- *                                 chapitre lu pendant la session en cours (tu le sais déjà).
+ *  - Déjà lu (chapitre PLUS ANCIEN que ton dernier) → toujours prévenu quand tu y arrives.
+ *    Seule exception : si tu relis à la suite (ch. 3 puis 4 puis 5…), on ne te le répète pas
+ *    à chaque chapitre — tu le sais déjà. Rouvrir ton chapitre en cours n'affiche rien
+ *    (c'est la carte « Reprendre » qui s'en occupe).
  */
 public final class NotifyPolicy {
 
@@ -41,6 +43,8 @@ public final class NotifyPolicy {
         long lastNewAt = Long.MIN_VALUE / 2;
         int sessionCount = 0;
         long lastAlreadyShownAt = Long.MIN_VALUE / 2;
+        long lastAlreadySeenAt = Long.MIN_VALUE / 2;
+        double lastAlreadyCh = -10;
     }
 
     private final Map<String, State> states = new HashMap<>();
@@ -70,12 +74,19 @@ public final class NotifyPolicy {
         return null;
     }
 
-    /** Un chapitre déjà présent dans la collection vient d'être ouvert. */
-    public Decision onAlreadyRead(String title, long readAt, long now, int mode, boolean enabled) {
+    /**
+     * Un chapitre déjà présent dans la collection vient d'être ouvert.
+     * @param furthest ton chapitre le plus avancé dans cette série
+     */
+    public Decision onAlreadyRead(String title, double chapter, double furthest, long now, int mode, boolean enabled) {
         if (!enabled || mode == MODE_OFF) return null;
-        if (now - readAt < SESSION_GAP_MS) return null;          // lu il y a peu : inutile de le rappeler
+        if (chapter >= furthest) return null;                   // ton chapitre en cours : rien à signaler
         State s = state(title);
-        if (mode == MODE_SMART && now - s.lastAlreadyShownAt < SESSION_GAP_MS) return null;
+        boolean recent = now - s.lastAlreadySeenAt < SESSION_GAP_MS;
+        boolean sameOrNext = Math.abs(chapter - s.lastAlreadyCh) <= 1.01;
+        s.lastAlreadySeenAt = now;
+        s.lastAlreadyCh = chapter;
+        if (mode == MODE_SMART && recent && sameOrNext) return null;   // relecture à la suite : déjà prévenu
         s.lastAlreadyShownAt = now;
         return new Decision(Kind.ALREADY_READ, 0);
     }
