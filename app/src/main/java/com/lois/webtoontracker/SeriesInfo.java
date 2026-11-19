@@ -18,9 +18,72 @@ public final class SeriesInfo {
 
     public static final long MAX_AGE_MS = 7L * 24 * 3600 * 1000;
 
+    /** Tous les champs AniList utiles (couverture, tags, fiche, recommandations…), en une requête. */
+    static final String MEDIA_FIELDS = "siteUrl title{romaji english native} synonyms description(asHtml:false)"
+            + " status startDate{year} chapters averageScore genres countryOfOrigin coverImage{extraLarge large}"
+            + " tags{name rank isMediaSpoiler} externalLinks{url site}"
+            + " staff(perPage:4){edges{role node{name{full}}}}"
+            + " recommendations(perPage:10,sort:RATING_DESC){nodes{mediaRecommendation{siteUrl averageScore"
+            + " countryOfOrigin title{romaji english} coverImage{large} externalLinks{url site}}}}";
+
+    /** Une recommandation : titre, couverture, note publique, liens où la lire. */
+    public static final class Reco {
+        public String title, cover, siteUrl, country;
+        public int score;
+        public final List<String[]> links = new ArrayList<>(); // {nom du site, url}
+    }
+
+    /**
+     * Cherche la série sur AniList et ne garde QUE un résultat dont un des noms
+     * (anglais, romanisé, original, synonymes) correspond vraiment au titre. Sinon null.
+     */
+    public static JSONObject searchMedia(String title) throws Exception {
+        String q = "query($s:String){Page(perPage:5){media(search:$s,type:MANGA,sort:SEARCH_MATCH){" + MEDIA_FIELDS + "}}}";
+        String res = ReleaseSources.post("https://graphql.anilist.co", new JSONObject().put("query", q)
+                .put("variables", new JSONObject().put("s", title)).toString());
+        JSONObject data = new JSONObject(res).optJSONObject("data");
+        JSONObject page = data == null ? null : data.optJSONObject("Page");
+        JSONArray list = page == null ? null : page.optJSONArray("media");
+        if (list == null) return null;
+        for (int i = 0; i < list.length(); i++) {
+            JSONObject m = list.optJSONObject(i);
+            if (m != null && matches(title, m)) return m;
+        }
+        return null;
+    }
+
+    public static boolean matches(String title, JSONObject media) {
+        for (String n : names(media)) if (ReleaseSources.sameTitle(title, n)) return true;
+        return false;
+    }
+
+    /** Tous les noms officiels d'une série AniList. */
+    public static List<String> names(JSONObject media) {
+        List<String> out = new ArrayList<>();
+        JSONObject t = media.optJSONObject("title");
+        if (t != null) for (String k : new String[]{"english", "romaji", "native"}) {
+            String v = nn(t.optString(k, ""));
+            if (v != null) out.add(v);
+        }
+        JSONArray syn = media.optJSONArray("synonyms");
+        if (syn != null) for (int i = 0; i < syn.length(); i++) {
+            String v = nn(syn.optString(i, ""));
+            if (v != null) out.add(v);
+        }
+        return out;
+    }
+
+    /** Titre "propre" à afficher : l'anglais officiel, sinon le romanisé. */
+    public static String preferredTitle(JSONObject media) {
+        JSONObject t = media.optJSONObject("title");
+        if (t == null) return null;
+        String en = nn(t.optString("english", ""));
+        return en != null ? en : nn(t.optString("romaji", ""));
+    }
+
     public String altTitle, summary, summarySource, status, country, authors, siteUrl;
     public int year, chapters, score;
-    public final List<String[]> recos = new ArrayList<>(); // {titre, url de couverture}
+    public final List<Reco> recos = new ArrayList<>();
     public final List<String> genres = new ArrayList<>();
 
     // ------------------------------------------------------------------ Téléchargement
@@ -29,17 +92,15 @@ public final class SeriesInfo {
     public static SeriesInfo fetch(Context ctx, String title) throws Exception {
         JSONObject store = new JSONObject();
 
-        JSONObject vars = new JSONObject().put("s", title);
-        String q = "query($s:String){Media(search:$s,type:MANGA){siteUrl title{romaji english native}"
-                + " description(asHtml:false) status startDate{year} chapters averageScore genres countryOfOrigin"
-                + " staff(perPage:4){edges{role node{name{full}}}}"
-                + " recommendations(perPage:8,sort:RATING_DESC){nodes{mediaRecommendation{title{romaji english} coverImage{large}}}}}}";
         try {
-            String res = ReleaseSources.post("https://graphql.anilist.co",
-                    new JSONObject().put("query", q).put("variables", vars).toString());
-            JSONObject data = new JSONObject(res).optJSONObject("data");
-            JSONObject media = data == null ? null : data.optJSONObject("Media");
-            if (media != null) store.put("anilist", media);
+            JSONObject media = searchMedia(title);
+            if (media != null) {
+                store.put("anilist", media);
+                int sc = media.optInt("averageScore", 0);
+                if (sc > 0) DbHelper.get(ctx).setScore(title, sc);
+                List<String> names = names(media);
+                DbHelper.get(ctx).addAliases(title, names);
+            }
         } catch (Exception ignored) {
         }
 
@@ -130,12 +191,22 @@ public final class SeriesInfo {
                         JSONObject mr = nodes.optJSONObject(k) == null ? null
                                 : nodes.optJSONObject(k).optJSONObject("mediaRecommendation");
                         if (mr == null) continue;
-                        JSONObject rt = mr.optJSONObject("title");
-                        String name = rt == null ? "" : nn(rt.optString("english", ""));
-                        if (name == null || name.isEmpty()) name = rt == null ? "" : rt.optString("romaji", "");
-                        String cover = mr.optJSONObject("coverImage") == null ? null
-                                : mr.optJSONObject("coverImage").optString("large", null);
-                        if (!name.isEmpty()) i.recos.add(new String[]{name, cover});
+                        Reco r = new Reco();
+                        r.title = preferredTitle(mr);
+                        if (r.title == null) continue;
+                        r.cover = mr.optJSONObject("coverImage") == null ? null
+                                : nn(mr.optJSONObject("coverImage").optString("large", ""));
+                        r.score = mr.optInt("averageScore", 0);
+                        r.siteUrl = nn(mr.optString("siteUrl", ""));
+                        r.country = country(mr.optString("countryOfOrigin"));
+                        JSONArray links = mr.optJSONArray("externalLinks");
+                        if (links != null) for (int x = 0; x < links.length(); x++) {
+                            JSONObject l = links.optJSONObject(x);
+                            if (l == null) continue;
+                            String site = l.optString("site", ""), url = l.optString("url", "");
+                            if (!url.isEmpty() && isReadingSite(site)) r.links.add(new String[]{site, url});
+                        }
+                        i.recos.add(r);
                     }
                 }
             }
@@ -158,7 +229,16 @@ public final class SeriesInfo {
         return s.trim();
     }
 
-    private static String nn(String s) {
+    /** On garde les plateformes de lecture, pas les réseaux sociaux. */
+    static boolean isReadingSite(String site) {
+        String s = site.toLowerCase();
+        for (String bad : new String[]{"twitter", "instagram", "youtube", "tiktok", "facebook", "x.com", "weibo", "discord", "reddit"}) {
+            if (s.contains(bad)) return false;
+        }
+        return true;
+    }
+
+    static String nn(String s) {
         return s == null || s.isEmpty() || "null".equals(s) ? null : s;
     }
 
@@ -179,7 +259,7 @@ public final class SeriesInfo {
         }
     }
 
-    private static String country(String c) {
+    static String country(String c) {
         switch (c == null ? "" : c) {
             case "KR": return "🇰🇷 Manhwa";
             case "CN": return "🇨🇳 Manhua";

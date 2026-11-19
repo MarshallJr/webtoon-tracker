@@ -423,7 +423,7 @@ public class DetailActivity extends AppCompatActivity {
 
         LinearLayout recos = findViewById(R.id.dRecos);
         recos.removeAllViews();
-        for (String[] r : i.recos) recos.addView(recoCard(r[0], r[1]));
+        for (SeriesInfo.Reco r : i.recos) recos.addView(recoCard(r));
         int vis = i.recos.isEmpty() ? View.GONE : View.VISIBLE;
         findViewById(R.id.dRecoTitle).setVisibility(vis);
         findViewById(R.id.dRecoScroll).setVisibility(vis);
@@ -447,33 +447,100 @@ public class DetailActivity extends AppCompatActivity {
         box.addView(row);
     }
 
-    private View recoCard(String name, String coverUrl) {
+    private View recoCard(SeriesInfo.Reco r) {
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(104), -2);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(108), -2);
         lp.rightMargin = dp(12);
         card.setLayoutParams(lp);
 
+        android.widget.FrameLayout frame = new android.widget.FrameLayout(this);
+        frame.setElevation(dp(5));
+        if (Build.VERSION.SDK_INT >= 28) {
+            frame.setOutlineSpotShadowColor(ContextCompat.getColor(this, R.color.card_shadow));
+            frame.setOutlineAmbientShadowColor(ContextCompat.getColor(this, R.color.card_shadow));
+        }
+        frame.setBackgroundResource(R.drawable.bg_card);
         ShapeableImageView img = new ShapeableImageView(this);
         img.setScaleType(ImageView.ScaleType.CENTER_CROP);
         img.setShapeAppearanceModel(img.getShapeAppearanceModel().toBuilder().setAllCornerSizes(dp(16)).build());
         img.setBackgroundColor(ContextCompat.getColor(this, R.color.badge_bg));
-        img.setElevation(dp(4));
-        if (Build.VERSION.SDK_INT >= 28) img.setOutlineSpotShadowColor(ContextCompat.getColor(this, R.color.shadow));
-        card.addView(img, new LinearLayout.LayoutParams(dp(104), dp(146)));
-        ImageLoader.load(coverUrl, img);
+        frame.addView(img, new android.widget.FrameLayout.LayoutParams(-1, -1));
+        ImageLoader.load(r.cover, img);
+        if (r.score > 0) {
+            TextView score = new TextView(this);
+            score.setText("★ " + SeriesAdapter.formatScore(r.score));
+            score.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
+            score.setTypeface(android.graphics.Typeface.create("sans-serif-black", android.graphics.Typeface.NORMAL));
+            score.setTextColor(0xFF1A1203);
+            score.setBackgroundResource(R.drawable.bg_new_badge);
+            score.setPadding(dp(7), dp(2), dp(7), dp(2));
+            android.widget.FrameLayout.LayoutParams sp = new android.widget.FrameLayout.LayoutParams(-2, -2);
+            sp.leftMargin = dp(6);
+            sp.topMargin = dp(6);
+            frame.addView(score, sp);
+        }
+        card.addView(frame, new LinearLayout.LayoutParams(dp(108), dp(152)));
 
         TextView t = new TextView(this);
-        t.setText(name);
+        t.setText(r.title);
         t.setMaxLines(2);
         t.setEllipsize(android.text.TextUtils.TruncateAt.END);
         t.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+        t.setTypeface(android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL));
         t.setTextColor(ContextCompat.getColor(this, R.color.text_main));
-        t.setPadding(0, dp(6), 0, 0);
+        t.setPadding(0, dp(7), 0, 0);
         card.addView(t);
 
-        card.setOnClickListener(v -> openUrl("https://www.webtoons.com/fr/search?keyword=" + Uri.encode(name)));
+        List<String> hint = new ArrayList<>();
+        if (r.country != null) hint.add(r.country);
+        if (!r.links.isEmpty()) hint.add(r.links.get(0)[0]);
+        if (!hint.isEmpty()) {
+            TextView h = new TextView(this);
+            h.setText(String.join(" · ", hint));
+            h.setMaxLines(1);
+            h.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            h.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
+            h.setTextColor(ContextCompat.getColor(this, R.color.text_soft));
+            card.addView(h);
+        }
+        card.setOnClickListener(v -> showRecoSites(r));
         return card;
+    }
+
+    /** Où lire / découvrir une recommandation : sites officiels connus + bases de recherche. */
+    private void showRecoSites(SeriesInfo.Reco r) {
+        List<String> labels = new ArrayList<>();
+        List<String> urls = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
+        for (String[] l : r.links) {
+            if (!seen.add(l[0].toLowerCase(Locale.ROOT))) continue;
+            labels.add("📖  Lire sur " + l[0]);
+            urls.add(l[1]);
+        }
+        String q = Uri.encode(r.title);
+        if (r.siteUrl != null) {
+            labels.add("ℹ️  Fiche, avis et note (AniList)");
+            urls.add(r.siteUrl);
+        }
+        labels.add("🔎  Chercher sur MangaDex (scans EN / FR)");
+        urls.add("https://mangadex.org/search?q=" + q);
+        labels.add("🔎  Chercher sur MangaUpdates (toutes les sorties)");
+        urls.add("https://www.mangaupdates.com/search.html?search=" + q);
+        if (!seen.contains("webtoon")) {
+            labels.add("🔎  Chercher sur WEBTOON");
+            urls.add("https://www.webtoons.com/fr/search?keyword=" + q);
+        }
+        labels.add("🌐  Rechercher sur le web");
+        urls.add("https://www.google.com/search?q=" + Uri.encode(r.title + " webtoon"));
+
+        String sub = (r.score > 0 ? "★ " + SeriesAdapter.formatScore(r.score) + " / 10" : "")
+                + (r.country != null ? (r.score > 0 ? "  ·  " : "") + r.country : "");
+        new MaterialAlertDialogBuilder(this)
+                .setTitle(sub.isEmpty() ? r.title : r.title + "\n" + sub)
+                .setItems(labels.toArray(new String[0]), (d, w) -> openUrl(urls.get(w)))
+                .setNegativeButton("Fermer", null)
+                .show();
     }
 
     private void toggleSummary() {

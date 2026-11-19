@@ -15,4 +15,6 @@
     <color name="shadow">#806D4AFF</color>
     <color name="shadow_strong">#CC7B5CFF</color>
     <color name="card_shadow">#FF8C6BFF</color>
+    <color name="rating_bg">#3A2E10</color>
+    <color name="rating_text">#FFC93C</color>
 </resources>

@@ -32,7 +32,7 @@ public final class Detector {
 
     /** Résultat d'une détection. */
     public static final class Result {
-        public final String title;
+        public String title;
         public final double chapter;
         public final String source;
         /** URL du chapitre (si lue dans un navigateur), sinon null. */
@@ -129,11 +129,26 @@ public final class Detector {
 
     public static Result detect(String pkg, List<TextNode> nodes, int screenHeight) {
         Result r = null;
+        UrlTitle.Hit noTitle = null;
         for (TextNode n : nodes) {
             r = fromUrl(n.text);
             if (r != null) break;
+            if (noTitle == null) noTitle = chapterWithoutTitle(n.text);
         }
         if (r == null && !BROWSERS.contains(pkg)) r = fromScreen(nodes, screenHeight);
+        if (r == null && noTitle != null) {
+            // Page de chapitre sans titre dans l'URL : on lit le titre affiché sur la page.
+            Result s = fromScreen(nodes, (int) (screenHeight * 2.4)); // zone élargie (~60 % de l'écran)
+            if (s != null) {
+                r = new Result(s.title, s.chapter, noTitle.host);
+                for (TextNode n : nodes) {
+                    if (chapterWithoutTitle(n.text) != null) {
+                        r.url = n.text.startsWith("http") ? n.text.trim() : "https://" + n.text.trim();
+                        break;
+                    }
+                }
+            }
+        }
         if (r != null) r.pkg = pkg;
         return r;
     }
@@ -167,31 +182,20 @@ public final class Detector {
             return r;
         }
 
-        String noScheme = text.replaceFirst("^[a-zA-Z]+://", "");
-        int cut = indexOfAny(noScheme, '?', '#');
-        if (cut >= 0) noScheme = noScheme.substring(0, cut);
-        String[] segs = noScheme.split("/");
-        if (segs.length < 2 || !segs[0].contains(".")) return null;
+        UrlTitle.Hit h = UrlTitle.extract(text);
+        if (h == null || h.title == null) return null;
+        Result r = new Result(h.title, h.chapter, h.host);
+        r.url = text.startsWith("http") ? text : "https://" + text;
+        return r;
+    }
 
-        for (int i = segs.length - 1; i >= 1; i--) {
-            Matcher m = URL_CHAPTER_SEGMENT.matcher(segs[i]);
-            if (!m.matches()) continue;
-            String slug = m.group(1);
-            if (slug == null || slug.isEmpty()) {
-                for (int j = i - 1; j >= 1; j--) {
-                    String s = segs[j].toLowerCase(Locale.ROOT);
-                    if (!GENERIC_SEGMENTS.contains(s) && !s.matches("\\d+")) {
-                        slug = segs[j];
-                        break;
-                    }
-                }
-            }
-            if (slug == null || slug.isEmpty()) return null;
-            Result r = new Result(slugToTitle(slug), parseChapter(m.group(2)), host(segs[0]));
-            r.url = text.startsWith("http") ? text : "https://" + text;
-            return r;
-        }
-        return null;
+    /** L'URL est-elle celle d'un chapitre dont le titre n'est pas dans l'URL ? (mangadex.org/chapter/uuid…) */
+    static UrlTitle.Hit chapterWithoutTitle(String raw) {
+        if (raw == null || raw.contains(" ") || !raw.contains("/")) return null;
+        UrlTitle.Hit h = UrlTitle.extract(raw.trim());
+        if (h != null) return h.title == null ? h : null;
+        String host = UrlTitle.readerPageHost(raw);
+        return host == null ? null : new UrlTitle.Hit(null, -1, host);
     }
 
     /** Détection depuis le texte affiché en haut de l'écran (barre de titre du lecteur). */
@@ -230,6 +234,7 @@ public final class Detector {
                 if (t.length() < 2 || t.length() > 80) continue;
                 if (EPISODE.matcher(t).find()) continue;
                 if (t.matches("(?i)(?:saison|season)\\s*\\d+")) continue;
+                if (t.contains("://") || t.startsWith("www.") || (!t.contains(" ") && t.contains("/"))) continue; // une adresse web
                 if (isUiWord(t) || t.matches("[\\d\\s.,:/%]+")) continue;
                 title = t;
                 break;

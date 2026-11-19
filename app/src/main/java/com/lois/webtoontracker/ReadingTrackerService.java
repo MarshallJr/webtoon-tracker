@@ -143,6 +143,7 @@ public class ReadingTrackerService extends AccessibilityService {
     }
 
     private void checkAlreadyRead(Detector.Result r) {
+        r.title = DbHelper.get(this).resolveTitle(r.title); // même série vue sous un autre nom / sur un autre site
         long readAt = DbHelper.get(this).getReadAt(r.title, r.chapter);
         if (readAt < 0) return;
         SharedPreferences s = settings();
@@ -156,6 +157,7 @@ public class ReadingTrackerService extends AccessibilityService {
 
     private void record(Detector.Result r) {
         DbHelper db = DbHelper.get(this);
+        r.title = db.resolveTitle(r.title);
         boolean newSeries = !db.seriesExists(r.title);
         boolean isNew = db.insertRead(r.title, r.chapter, System.currentTimeMillis(), r.source);
         db.rememberSource(r); // pour "Reprendre" et les alertes, même si le chapitre était déjà lu

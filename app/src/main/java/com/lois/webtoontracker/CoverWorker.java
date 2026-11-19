@@ -74,11 +74,19 @@ public class CoverWorker extends Worker {
         return now - p.getLong("link_" + key(s.title), 0) > RETRY_MS;
     }
 
+    /** Fiche officielle (note publique, alias, résumé) pas encore récupérée. */
+    private static boolean needsInfo(Context ctx, DbHelper.Series s, SharedPreferences p, long now) {
+        DbHelper.Meta m = DbHelper.get(ctx).getMeta(s.title);
+        if (m != null && m.detailsJson != null && m.score > 0) return false;
+        return now - p.getLong("info_" + key(s.title), 0) > RETRY_MS;
+    }
+
     private static boolean hasWork(Context ctx) {
         SharedPreferences p = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         long now = System.currentTimeMillis();
         for (DbHelper.Series s : DbHelper.get(ctx).getSeries()) {
-            if (needsCover(ctx, s.title, p, now) || needsTags(s, p, now) || needsLink(ctx, s, p, now)) return true;
+            if (needsCover(ctx, s.title, p, now) || needsTags(s, p, now) || needsLink(ctx, s, p, now)
+                    || needsInfo(ctx, s, p, now)) return true;
         }
         return false;
     }
@@ -93,30 +101,60 @@ public class CoverWorker extends Worker {
         Context ctx = getApplicationContext();
         SharedPreferences p = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         int found = 0;
-        for (DbHelper.Series s : DbHelper.get(ctx).getSeries()) {
+        DbHelper db = DbHelper.get(ctx);
+        found += Repair.run(ctx); // titres incohérents (ex : "2879576") corrigés grâce à l'URL
+        for (DbHelper.Series s : db.getSeries()) {
             if (isStopped()) break;
             long now = System.currentTimeMillis();
             boolean wantCover = needsCover(ctx, s.title, p, now);
             boolean wantTags = needsTags(s, p, now);
             boolean wantLink = needsLink(ctx, s, p, now);
-            if (!wantCover && !wantTags && !wantLink) continue;
+            boolean wantInfo = needsInfo(ctx, s, p, now);
+            if (!wantCover && !wantTags && !wantLink && !wantInfo) continue;
             if (wantCover) p.edit().putLong(key(s.title), now).apply();
             if (wantTags) p.edit().putLong("tags_" + key(s.title), now).apply();
             if (wantLink) p.edit().putLong("link_" + key(s.title), now).apply();
+            p.edit().putLong("info_" + key(s.title), now).apply();
+            String title = s.title;
             try {
-                AniInfo info = (wantCover || wantTags || wantLink) ? lookup(s.title) : null;
+                AniInfo info = lookup(title);
                 Thread.sleep(800); // reste poli avec les sites (AniList : ~90 requêtes/min)
-                if (wantLink && autoLink(ctx, s.title, info)) found++;
-                if (info == null) continue;
-                if (wantTags && !info.tags.isEmpty()) {
-                    DbHelper.get(ctx).setTags(s.title, info.tags);
+
+                if (info != null) {
+                    // 1. Titre officiel : si le nom vient d'une URL ("the-jobless-guy…"), on prend le vrai nom.
+                    String official = SeriesInfo.preferredTitle(info.media);
+                    if (official != null && !official.equals(title) && db.isUrlDerived(title)) {
+                        db.renameSeries(title, official);
+                        Covers.merge(ctx, title, official);
+                        title = official;
+                        found++;
+                    }
+                    // 2. Tous les autres noms → même série (lue ailleurs, sous un autre nom).
+                    java.util.List<String> names = SeriesInfo.names(info.media);
+                    names.add(s.title);
+                    db.addAliases(title, names);
+                    // 3. Note publique + fiche (résumé…) pour la page Détails.
+                    if (info.score > 0) db.setScore(title, info.score);
+                    DbHelper.Meta m = db.getMeta(title);
+                    org.json.JSONObject store = m != null && m.detailsJson != null
+                            ? new org.json.JSONObject(m.detailsJson) : new org.json.JSONObject();
+                    store.put("anilist", info.media);
+                    db.setDetails(title, store.toString());
                     found++;
                 }
-                if (!wantCover || info.coverUrl == null) continue;
+
+                if (wantLink && autoLink(ctx, title, info)) found++;
+                if (info == null) continue;
+                if (wantTags && !info.tags.isEmpty() && db.getMeta(title) != null
+                        && (db.getMeta(title).tags == null || db.getMeta(title).tags.isEmpty())) {
+                    db.setTags(title, info.tags);
+                    found++;
+                }
+                if (!wantCover || info.coverUrl == null || Covers.isCustom(ctx, title)) continue;
                 Bitmap b = BitmapFactory.decodeStream(new java.io.ByteArrayInputStream(download(info.coverUrl)));
                 if (b == null) continue;
-                Covers.savePoster(ctx, s.title, b);
-                Covers.setCustom(ctx, s.title, true); // la couverture officielle n'est plus remplacée par une capture
+                Covers.savePoster(ctx, title, b);
+                Covers.setCustom(ctx, title, true); // la couverture officielle n'est plus remplacée par une capture
                 found++;
             } catch (InterruptedException e) {
                 break;
@@ -139,6 +177,8 @@ public class CoverWorker extends Worker {
         String coverUrl;
         String tags = "";
         String webtoonsUrl; // lien officiel webtoons.com fourni par AniList (souvent en anglais)
+        org.json.JSONObject media;
+        int score;
     }
 
     // ------------------------------------------------------------------ Lien webtoons.com automatique
@@ -177,55 +217,31 @@ public class CoverWorker extends Worker {
         return false;
     }
 
-    /** Recherche AniList (GraphQL public, sans clé) : couverture + genres + tags + statut. */
+    /** Recherche AniList avec contrôle du titre (voir SeriesInfo.searchMedia). */
     static AniInfo lookup(String title) throws Exception {
-        JSONObject vars = new JSONObject().put("s", title);
-        JSONObject body = new JSONObject()
-                .put("query", "query($s:String){Media(search:$s,type:MANGA){coverImage{extraLarge large}"
-                        + " genres status tags{name rank isMediaSpoiler} externalLinks{url site}}}")
-                .put("variables", vars);
-
-        HttpURLConnection c = (HttpURLConnection) new URL("https://graphql.anilist.co").openConnection();
-        c.setConnectTimeout(10000);
-        c.setReadTimeout(10000);
-        c.setRequestMethod("POST");
-        c.setDoOutput(true);
-        c.setRequestProperty("Content-Type", "application/json");
-        c.setRequestProperty("Accept", "application/json");
-        try (OutputStream out = c.getOutputStream()) {
-            out.write(body.toString().getBytes(StandardCharsets.UTF_8));
+        org.json.JSONObject media = SeriesInfo.searchMedia(title);
+        if (media == null) return null;
+        AniInfo info = new AniInfo();
+        info.media = media;
+        info.score = media.optInt("averageScore", 0);
+        JSONObject img = media.optJSONObject("coverImage");
+        if (img != null) {
+            String u = img.optString("extraLarge", "");
+            if (u.isEmpty() || "null".equals(u)) u = img.optString("large", "");
+            info.coverUrl = u.isEmpty() || "null".equals(u) ? null : u;
         }
-        try {
-            if (c.getResponseCode() != 200) return null;
-            String json;
-            try (InputStream in = c.getInputStream()) {
-                json = new String(readAll(in), StandardCharsets.UTF_8);
-            }
-            JSONObject media = new JSONObject(json).optJSONObject("data");
-            media = media == null ? null : media.optJSONObject("Media");
-            if (media == null) return null;
-            AniInfo info = new AniInfo();
-            JSONObject img = media.optJSONObject("coverImage");
-            if (img != null) {
-                String u = img.optString("extraLarge", "");
-                if (u.isEmpty() || "null".equals(u)) u = img.optString("large", "");
-                info.coverUrl = u.isEmpty() || "null".equals(u) ? null : u;
-            }
-            info.tags = AutoTags.build(media);
-            org.json.JSONArray links = media.optJSONArray("externalLinks");
-            if (links != null) {
-                for (int i = 0; i < links.length(); i++) {
-                    String u = links.optJSONObject(i) == null ? "" : links.optJSONObject(i).optString("url");
-                    if (u.contains("webtoons.com") && u.contains("title_no=")) {
-                        info.webtoonsUrl = u;
-                        break;
-                    }
+        info.tags = AutoTags.build(media);
+        org.json.JSONArray links = media.optJSONArray("externalLinks");
+        if (links != null) {
+            for (int i = 0; i < links.length(); i++) {
+                String u = links.optJSONObject(i) == null ? "" : links.optJSONObject(i).optString("url");
+                if (u.contains("webtoons.com") && u.contains("title_no=")) {
+                    info.webtoonsUrl = u;
+                    break;
                 }
             }
-            return info;
-        } finally {
-            c.disconnect();
         }
+        return info;
     }
 
     private static byte[] download(String url) throws Exception {

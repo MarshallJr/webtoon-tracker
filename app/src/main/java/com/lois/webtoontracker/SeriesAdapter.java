@@ -63,6 +63,11 @@ public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.VH> {
         bg.setColor(colorFor(title));
     }
 
+    /** Note publique /100 → "8,4" */
+    public static String formatScore(int score) {
+        return String.format(Locale.FRANCE, "%.1f", score / 10.0);
+    }
+
     /** Affiche la miniature si elle existe, sinon la pastille avec l'initiale. */
     public static void bindCover(TextView avatar, android.widget.ImageView cover, String title) {
         paintAvatar(avatar, title);
@@ -126,6 +131,8 @@ public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.VH> {
     public void onBindViewHolder(@NonNull VH h, int position) {
         DbHelper.Series s = shown.get(position);
         h.title.setText(s.title);
+        h.rating.setVisibility(s.score > 0 ? View.VISIBLE : View.GONE);
+        if (s.score > 0) h.rating.setText("★ " + formatScore(s.score));
         bindCover(h.avatar, h.cover, s.title);
         h.chapter.setText(Detector.formatChapter(s.lastChapter));
         CharSequence when = DateUtils.getRelativeTimeSpanString(
@@ -154,7 +161,7 @@ public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.VH> {
     }
 
     static class VH extends RecyclerView.ViewHolder {
-        final TextView title, subtitle, chapter, avatar, tagLine, newBadge;
+        final TextView title, subtitle, chapter, avatar, tagLine, newBadge, rating;
         final android.widget.ImageView cover;
 
         VH(View v) {
@@ -165,6 +172,7 @@ public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.VH> {
             avatar = v.findViewById(R.id.avatar);
             tagLine = v.findViewById(R.id.tagLine);
             newBadge = v.findViewById(R.id.newBadge);
+            rating = v.findViewById(R.id.rating);
             cover = v.findViewById(R.id.cover);
         }
     }

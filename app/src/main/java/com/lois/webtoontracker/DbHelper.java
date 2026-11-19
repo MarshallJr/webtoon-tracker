@@ -16,7 +16,7 @@ import java.util.TreeSet;
 public class DbHelper extends SQLiteOpenHelper {
 
     private static final String DB_NAME = "webtoons.db";
-    private static final int DB_VERSION = 4;
+    private static final int DB_VERSION = 5;
     private static DbHelper instance;
 
     public static synchronized DbHelper get(Context ctx) {
@@ -40,6 +40,13 @@ public class DbHelper extends SQLiteOpenHelper {
         createMeta(db);
         upgradeTo3(db);
         upgradeTo4(db);
+        upgradeTo5(db);
+    }
+
+    /** v5 : alias (tous les noms d'une série → un seul titre) + note publique (AniList). */
+    private void upgradeTo5(SQLiteDatabase db) {
+        db.execSQL("ALTER TABLE series_meta ADD COLUMN score INTEGER DEFAULT 0");
+        db.execSQL("CREATE TABLE IF NOT EXISTS aliases (alias_key TEXT PRIMARY KEY, title TEXT NOT NULL)");
     }
 
     /** v4 : cloche (suivi des nouveaux chapitres), note perso, fiche détaillée en cache. */
@@ -83,6 +90,7 @@ public class DbHelper extends SQLiteOpenHelper {
         if (oldV < 2) createMeta(db); // v1 → v2 : on garde toutes les lectures
         if (oldV < 3) upgradeTo3(db);
         if (oldV < 4) upgradeTo4(db);
+        if (oldV < 5) upgradeTo5(db);
     }
 
     // ------------------------------------------------------------------ Modèles
@@ -93,6 +101,7 @@ public class DbHelper extends SQLiteOpenHelper {
         public final int count;
         public final long lastReadAt;
         public final String tags;
+        public int score; // note publique /100 (AniList), 0 = inconnue
 
         Series(String title, double lastChapter, int count, long lastReadAt, String tags) {
             this.title = title;
@@ -125,6 +134,7 @@ public class DbHelper extends SQLiteOpenHelper {
         public int rating;
         public String note, detailsJson;
         public long detailsAt;
+        public int score;
     }
 
     /** Un chapitre disponible quelque part (site + langue). */
@@ -150,11 +160,13 @@ public class DbHelper extends SQLiteOpenHelper {
     public List<Series> getSeries() {
         List<Series> out = new ArrayList<>();
         try (Cursor c = getReadableDatabase().rawQuery(
-                "SELECT r.title, MAX(r.chapter), COUNT(*), MAX(r.read_at) AS last, m.tags FROM reads r " +
+                "SELECT r.title, MAX(r.chapter), COUNT(*), MAX(r.read_at) AS last, m.tags, m.score FROM reads r " +
                         "LEFT JOIN series_meta m ON m.title = r.title COLLATE NOCASE " +
                         "GROUP BY r.title COLLATE NOCASE ORDER BY last DESC", null)) {
             while (c.moveToNext()) {
-                out.add(new Series(c.getString(0), c.getDouble(1), c.getInt(2), c.getLong(3), c.getString(4)));
+                Series se = new Series(c.getString(0), c.getDouble(1), c.getInt(2), c.getLong(3), c.getString(4));
+                se.score = c.isNull(5) ? 0 : c.getInt(5);
+                out.add(se);
             }
         }
         return out;
@@ -242,6 +254,16 @@ public class DbHelper extends SQLiteOpenHelper {
                     m.rssBase = a.rssBase;
                     m.rssLastEp = a.rssLastEp;
                 }
+                m.follow = m.follow || a.follow;
+                if (m.rating == 0) m.rating = a.rating;
+                if (m.note == null) m.note = a.note;
+                if (m.detailsJson == null) {
+                    m.detailsJson = a.detailsJson;
+                    m.detailsAt = a.detailsAt;
+                }
+                if (m.score == 0) m.score = a.score;
+                if (m.mdxId == null) m.mdxId = a.mdxId;
+                if (m.muId == null) m.muId = a.muId;
                 saveMeta(db, m);
                 db.delete("series_meta", "title = ? COLLATE NOCASE", new String[]{from});
             }
@@ -256,7 +278,7 @@ public class DbHelper extends SQLiteOpenHelper {
     public Meta getMeta(String title) {
         try (Cursor c = getReadableDatabase().rawQuery(
                 "SELECT title, tags, last_url, last_pkg, title_no, rss_base, rss_last_ep, mdx_id, mu_id, notified_ch, " +
-                        "follow, rating, note, details_json, details_at FROM series_meta " +
+                        "follow, rating, note, details_json, details_at, score FROM series_meta " +
                         "WHERE title = ? COLLATE NOCASE", new String[]{title})) {
             if (!c.moveToFirst()) return null;
             Meta m = new Meta();
@@ -275,6 +297,7 @@ public class DbHelper extends SQLiteOpenHelper {
             m.note = c.getString(12);
             m.detailsJson = c.getString(13);
             m.detailsAt = c.getLong(14);
+            m.score = c.getInt(15);
             return m;
         }
     }
@@ -307,6 +330,7 @@ public class DbHelper extends SQLiteOpenHelper {
         v.put("note", m.note);
         v.put("details_json", m.detailsJson);
         v.put("details_at", m.detailsAt);
+        v.put("score", m.score);
         db.insertWithOnConflict("series_meta", null, v, SQLiteDatabase.CONFLICT_REPLACE);
     }
 
@@ -445,6 +469,68 @@ public class DbHelper extends SQLiteOpenHelper {
         m.detailsJson = json;
         m.detailsAt = System.currentTimeMillis();
         saveMeta(m);
+    }
+
+    // ------------------------------------------------------------------ Alias & titre officiel
+
+    public synchronized void setScore(String title, int score) {
+        Meta m = metaOrNew(title);
+        m.score = score;
+        saveMeta(m);
+    }
+
+    /** Enregistre d'autres noms (anglais, romanisé, synonymes…) qui désignent la série "title". */
+    public synchronized void addAliases(String title, List<String> names) {
+        SQLiteDatabase db = getWritableDatabase();
+        for (String n : names) {
+            String k = Titles.key(n == null ? "" : n);
+            if (k.length() < 3) continue;
+            ContentValues v = new ContentValues();
+            v.put("alias_key", k);
+            v.put("title", title);
+            db.insertWithOnConflict("aliases", null, v, SQLiteDatabase.CONFLICT_REPLACE);
+        }
+    }
+
+    /**
+     * Titre sous lequel ranger une lecture : alias connu, sinon série existante au nom équivalent
+     * ("Tower Of God" = "Tower of God (S3)"), sinon le titre tel quel.
+     */
+    public String resolveTitle(String title) {
+        String k = Titles.key(title);
+        if (k.isEmpty()) return title;
+        try (Cursor c = getReadableDatabase().rawQuery("SELECT title FROM aliases WHERE alias_key = ?", new String[]{k})) {
+            if (c.moveToFirst()) return c.getString(0);
+        }
+        for (Series s : getSeries()) if (Titles.key(s.title).equals(k)) return s.title;
+        return title;
+    }
+
+    /** Le titre vient-il uniquement d'URL (slug) ? Alors on peut le remplacer par le titre officiel. */
+    public boolean isUrlDerived(String title) {
+        try (Cursor c = getReadableDatabase().rawQuery(
+                "SELECT COUNT(*) FROM reads WHERE title = ? COLLATE NOCASE AND (source IS NULL OR source NOT LIKE '%.%')",
+                new String[]{title})) {
+            return c.moveToFirst() && c.getInt(0) == 0;
+        }
+    }
+
+    /** Renomme une série (fusionne si le nouveau titre existe déjà) et garde l'ancien nom en alias. */
+    public synchronized void renameSeries(String from, String to) {
+        if (from.equals(to)) return;
+        if (from.equalsIgnoreCase(to)) {
+            SQLiteDatabase db = getWritableDatabase();
+            db.execSQL("UPDATE reads SET title = ? WHERE title = ? COLLATE NOCASE", new Object[]{to, from});
+            db.execSQL("UPDATE series_meta SET title = ? WHERE title = ? COLLATE NOCASE", new Object[]{to, from});
+            db.execSQL("UPDATE releases SET title = ? WHERE title = ? COLLATE NOCASE", new Object[]{to, from});
+        } else {
+            mergeSeries(from, to);
+        }
+        getWritableDatabase().execSQL("UPDATE aliases SET title = ? WHERE title = ? COLLATE NOCASE", new Object[]{to, from});
+        List<String> one = new ArrayList<>();
+        one.add(from);
+        one.add(to);
+        addAliases(to, one);
     }
 
     public synchronized void setNotified(String title, double ch) {

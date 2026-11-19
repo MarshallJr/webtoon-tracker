@@ -128,6 +128,9 @@ public class MainActivity extends AppCompatActivity {
         findViewById(R.id.updatesCard).setOnClickListener(v -> showUpdates(null));
         showPendingCrash();
         handleIntent(getIntent());
+        new Thread(() -> {
+            if (Repair.run(this) > 0) runOnUiThread(this::refresh); // titres incohérents corrigés
+        }).start();
     }
 
     @Override
