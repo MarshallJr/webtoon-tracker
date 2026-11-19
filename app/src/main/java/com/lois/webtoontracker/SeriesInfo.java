@@ -84,6 +84,9 @@ public final class SeriesInfo {
     public String altTitle, summary, summarySource, status, country, authors, siteUrl;
     public int year, chapters, score;
     public final List<Reco> recos = new ArrayList<>();
+    public final List<String[]> credits = new ArrayList<>();   // {nom, rôle}
+    public final List<String> altTitles = new ArrayList<>();
+    public String format, origin;                               // "Manhua", "Chine"
     public final List<String> genres = new ArrayList<>();
 
     // ------------------------------------------------------------------ Téléchargement
@@ -165,9 +168,14 @@ public final class SeriesInfo {
                 i.chapters = a.optInt("chapters", 0);
                 i.score = a.optInt("averageScore", 0);
                 i.country = country(a.optString("countryOfOrigin"));
+                String cc = a.optString("countryOfOrigin");
+                i.format = "KR".equals(cc) ? "Manhwa" : "CN".equals(cc) || "TW".equals(cc) ? "Manhua" : "JP".equals(cc) ? "Manga" : null;
+                i.origin = "KR".equals(cc) ? "Corée du Sud" : "CN".equals(cc) ? "Chine" : "TW".equals(cc) ? "Taïwan"
+                        : "JP".equals(cc) ? "Japon" : null;
+                for (String n : names(a)) if (!n.equalsIgnoreCase(preferredTitle(a) == null ? "" : preferredTitle(a))) i.altTitles.add(n);
                 i.siteUrl = nn(a.optString("siteUrl", ""));
                 JSONArray g = a.optJSONArray("genres");
-                if (g != null) for (int k = 0; k < g.length(); k++) i.genres.add(g.optString(k));
+                if (g != null) for (int k = 0; k < g.length(); k++) i.genres.add(AutoTags.genreFr(g.optString(k)));
 
                 JSONObject staff = a.optJSONObject("staff");
                 JSONArray edges = staff == null ? null : staff.optJSONArray("edges");
@@ -179,7 +187,11 @@ public final class SeriesInfo {
                         String name = e.optJSONObject("node") == null ? "" :
                                 e.optJSONObject("node").optJSONObject("name").optString("full", "");
                         String role = roleFr(e.optString("role", ""));
-                        if (!name.isEmpty() && !names.contains(name + role)) names.add(name + role);
+                        if (!name.isEmpty() && !names.contains(name + role)) {
+                            names.add(name + role);
+                            String r = role.replace(" (", "").replace(")", "").trim();
+                            i.credits.add(new String[]{name, r.isEmpty() ? "Auteur" : cap(r)});
+                        }
                     }
                     i.authors = String.join(", ", names);
                 }
@@ -236,6 +248,10 @@ public final class SeriesInfo {
             if (s.contains(bad)) return false;
         }
         return true;
+    }
+
+    private static String cap(String s) {
+        return s.isEmpty() ? s : Character.toUpperCase(s.charAt(0)) + s.substring(1);
     }
 
     static String nn(String s) {

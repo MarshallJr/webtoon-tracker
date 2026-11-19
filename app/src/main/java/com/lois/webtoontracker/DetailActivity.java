@@ -5,6 +5,7 @@ import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.content.res.ColorStateList;
 import android.graphics.Bitmap;
 import android.graphics.RenderEffect;
 import android.graphics.Shader;
@@ -16,7 +17,6 @@ import android.text.format.DateUtils;
 import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.View;
-import android.view.ViewGroup;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -29,16 +29,20 @@ import androidx.activity.result.PickVisualMediaRequest;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
+import androidx.core.graphics.ColorUtils;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
+import androidx.core.widget.NestedScrollView;
 
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.imageview.ShapeableImageView;
+import com.google.android.material.materialswitch.MaterialSwitch;
 import com.google.android.material.progressindicator.LinearProgressIndicator;
+import com.google.android.material.tabs.TabLayout;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -50,16 +54,17 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.TreeSet;
 
-/** Page "Détails" d'une série. */
+/** Fiche série immersive : hero + onglets Aperçu / Mon suivi / Détails. */
 public class DetailActivity extends AppCompatActivity {
 
     public static final String EXTRA_TITLE = "title";
-    private static final int HISTORY_PREVIEW = 8;
+    private static final int HISTORY_PREVIEW = 6;
 
     private String title;
     private DbHelper db;
     private boolean historyExpanded = false;
     private boolean summaryExpanded = false;
+    private boolean altExpanded = false;
     private ActivityResultLauncher<PickVisualMediaRequest> pickCover;
     private ActivityResultLauncher<String> notifPermission;
 
@@ -79,18 +84,19 @@ public class DetailActivity extends AppCompatActivity {
         }
 
         View topBar = findViewById(R.id.dTopBar);
-        View content = findViewById(R.id.dContent);
+        View sticky = findViewById(R.id.dSticky);
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.dRoot), (v, insets) -> {
             Insets b = insets.getInsets(WindowInsetsCompat.Type.systemBars());
-            topBar.setPadding(topBar.getPaddingLeft(), b.top + dp(8), topBar.getPaddingRight(), 0);
-            content.setPadding(content.getPaddingLeft(), content.getPaddingTop(), content.getPaddingRight(), b.bottom + dp(32));
+            topBar.setPadding(topBar.getPaddingLeft(), b.top + dp(8), topBar.getPaddingRight(), dp(8));
+            sticky.setPadding(sticky.getPaddingLeft(), dp(14), sticky.getPaddingRight(), b.bottom + dp(14));
             return WindowInsetsCompat.CONSUMED;
         });
 
         findViewById(R.id.dBack).setOnClickListener(v -> finish());
         findViewById(R.id.dMore).setOnClickListener(this::showMoreMenu);
         findViewById(R.id.dResume).setOnClickListener(v -> Resume.open(this, title));
-        findViewById(R.id.dBell).setOnClickListener(v -> toggleBell());
+        findViewById(R.id.dStickyResume).setOnClickListener(v -> Resume.open(this, title));
+        findViewById(R.id.dBellRow).setOnClickListener(v -> toggleBell(!db.isFollowed(title)));
         findViewById(R.id.dAdd).setOnClickListener(v -> showAddDialog());
         findViewById(R.id.dSummary).setOnClickListener(v -> toggleSummary());
         findViewById(R.id.dSummaryMore).setOnClickListener(v -> toggleSummary());
@@ -98,6 +104,33 @@ public class DetailActivity extends AppCompatActivity {
             historyExpanded = !historyExpanded;
             bindHistory();
         });
+        findViewById(R.id.dAltHeader).setOnClickListener(v -> {
+            altExpanded = !altExpanded;
+            findViewById(R.id.dAltList).setVisibility(altExpanded ? View.VISIBLE : View.GONE);
+            findViewById(R.id.dAltIcon).animate().rotation(altExpanded ? 180 : 0).setDuration(200).start();
+        });
+
+        TabLayout tabs = findViewById(R.id.dTabs);
+        tabs.addTab(tabs.newTab().setText("Aperçu"));
+        tabs.addTab(tabs.newTab().setText("Mon suivi"));
+        tabs.addTab(tabs.newTab().setText("Détails"));
+        tabs.addOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
+            @Override
+            public void onTabSelected(TabLayout.Tab tab) {
+                showTab(tab.getPosition());
+            }
+
+            @Override
+            public void onTabUnselected(TabLayout.Tab tab) {
+            }
+
+            @Override
+            public void onTabReselected(TabLayout.Tab tab) {
+            }
+        });
+
+        ((NestedScrollView) findViewById(R.id.dScroll)).setOnScrollChangeListener(
+                (NestedScrollView.OnScrollChangeListener) (v, x, y, ox, oy) -> onScrolled(y));
 
         pickCover = registerForActivityResult(new ActivityResultContracts.PickVisualMedia(), uri -> {
             if (uri == null) return;
@@ -134,6 +167,48 @@ public class DetailActivity extends AppCompatActivity {
         }
     }
 
+    // ------------------------------------------------------------------ Onglets & défilement
+
+    private void showTab(int i) {
+        int[] ids = {R.id.tabOverview, R.id.tabTracking, R.id.tabDetails};
+        for (int k = 0; k < ids.length; k++) {
+            View v = findViewById(ids[k]);
+            if (k == i) {
+                v.setAlpha(0f);
+                v.setVisibility(View.VISIBLE);
+                v.animate().alpha(1f).setDuration(180).start();
+            } else {
+                v.setVisibility(View.GONE);
+            }
+        }
+    }
+
+    /** Barre du haut : se remplit et affiche miniature + titre ; bouton Reprendre collant. */
+    private void onScrolled(int y) {
+        View hero = findViewById(R.id.dHero);
+        View topBar = findViewById(R.id.dTopBar);
+        float t = Math.max(0f, Math.min(1f, (y - hero.getHeight() * 0.35f) / (hero.getHeight() * 0.4f)));
+        topBar.setBackgroundColor(ColorUtils.setAlphaComponent(ContextCompat.getColor(this, R.color.screen_bg), (int) (245 * t)));
+        topBar.setElevation(t * dp(4));
+        float tt = Math.max(0f, (t - 0.6f) / 0.4f);
+        findViewById(R.id.dBarThumb).setAlpha(tt);
+        findViewById(R.id.dBarTitle).setAlpha(tt);
+
+        View resume = findViewById(R.id.dResume);
+        View content = findViewById(R.id.dContent);
+        int resumeBottom = content.getTop() + resume.getBottom();
+        boolean showSticky = y + topBar.getHeight() > resumeBottom;
+        View sticky = findViewById(R.id.dSticky);
+        if (showSticky && sticky.getVisibility() != View.VISIBLE) {
+            sticky.setVisibility(View.VISIBLE);
+            sticky.setAlpha(0f);
+            sticky.setTranslationY(dp(30));
+            sticky.animate().alpha(1f).translationY(0).setDuration(180).start();
+        } else if (!showSticky && sticky.getVisibility() == View.VISIBLE) {
+            sticky.setVisibility(View.GONE);
+        }
+    }
+
     // ------------------------------------------------------------------ Affichage
 
     private DbHelper.Series series() {
@@ -149,24 +224,25 @@ public class DetailActivity extends AppCompatActivity {
         }
         title = s.title;
         ((TextView) findViewById(R.id.dTitle)).setText(s.title);
+        ((TextView) findViewById(R.id.dBarTitle)).setText(s.title);
         SeriesAdapter.bindCover(findViewById(R.id.dAvatar), findViewById(R.id.dCover), s.title);
+        Bitmap cover = Covers.get(this, s.title);
+        ShapeableImageView thumb = findViewById(R.id.dBarThumb);
+        if (cover != null) thumb.setImageBitmap(cover);
+        else thumb.setBackgroundColor(SeriesAdapter.colorFor(s.title));
         bindHeader();
-        Progress pr = Progress.forResume(this, s.title);
-        ((MaterialButton) findViewById(R.id.dResume)).setText(pr == null
-                ? "▶  Reprendre la lecture"
-                : pr.finished() ? "▶  Chapitre suivant"
-                : "▶  Reprendre · " + pr.hint());
         bindTags(s);
         bindBell();
+        bindResume(s);
+        bindTracking(s);
         bindProgress(s);
         bindWhere();
         bindStars();
-        bindStats(s);
         bindHistory();
         DbHelper.Meta m = db.getMeta(title);
         EditText note = findViewById(R.id.dNote);
         if (note.getText().length() == 0 && m != null && m.note != null) note.setText(m.note);
-        bindInfo(m == null ? null : SeriesInfo.parse(m.detailsJson));
+        bindInfo(m == null ? null : SeriesInfo.parse(m.detailsJson), s);
     }
 
     private void bindHeader() {
@@ -178,57 +254,88 @@ public class DetailActivity extends AppCompatActivity {
             return;
         }
         bg.setImageBitmap(cover);
+        // Léger flou : la couverture agrandie reste belle, sans pixels visibles.
         if (Build.VERSION.SDK_INT >= 31) {
-            bg.setRenderEffect(RenderEffect.createBlurEffect(dp(28), dp(28), Shader.TileMode.CLAMP));
-            bg.setAlpha(0.85f);
-        } else {
-            bg.setAlpha(0.45f); // pas de flou avant Android 12 : on atténue simplement
+            bg.setRenderEffect(RenderEffect.createBlurEffect(dp(5), dp(5), Shader.TileMode.CLAMP));
         }
+        bg.setAlpha(0.9f);
     }
 
     private void bindTags(DbHelper.Series s) {
         ChipGroup g = findViewById(R.id.dTags);
         g.removeAllViews();
-        for (String t : Titles.splitTags(s.tags)) {
+        List<String> tags = Titles.splitTags(s.tags);
+        int shown = Math.min(3, tags.size());
+        for (int i = 0; i < shown; i++) {
             Chip c = (Chip) getLayoutInflater().inflate(R.layout.chip_site, g, false);
-            c.setText(t);
+            c.setText(tags.get(i));
             c.setChipIcon(null);
             c.setOnClickListener(v -> showTagEditor());
             g.addView(c);
         }
-        Chip edit = (Chip) getLayoutInflater().inflate(R.layout.chip_site, g, false);
-        edit.setText(s.tags.isEmpty() ? "＋ Ajouter des tags" : "＋");
-        edit.setChipIcon(null);
-        edit.setOnClickListener(v -> showTagEditor());
-        g.addView(edit);
+        Chip more = (Chip) getLayoutInflater().inflate(R.layout.chip_site, g, false);
+        more.setChipIcon(null);
+        more.setText(tags.size() > shown ? "+" + (tags.size() - shown) : tags.isEmpty() ? "＋ Ajouter des tags" : "＋");
+        more.setOnClickListener(v -> showTagEditor());
+        g.addView(more);
     }
 
     private void bindBell() {
         boolean on = db.isFollowed(title);
-        MaterialButton bell = findViewById(R.id.dBell);
-        bell.setIconResource(on ? R.drawable.ic_bell_on : R.drawable.ic_bell);
-        bell.setIconTint(android.content.res.ColorStateList.valueOf(
-                on ? ContextCompat.getColor(this, R.color.on_accent) : ContextCompat.getColor(this, R.color.badge_text)));
-        bell.setBackgroundTintList(android.content.res.ColorStateList.valueOf(
-                ContextCompat.getColor(this, on ? R.color.accent : R.color.badge_bg)));
-        ((TextView) findViewById(R.id.dBellHint)).setText(on
-                ? "🔔 Surveillée : tu seras prévenu dès qu'un nouveau chapitre sort (EN / FR)."
-                : "Active la cloche pour être prévenu des nouveaux chapitres de cette série.");
+        ImageView icon = findViewById(R.id.dBellIcon);
+        icon.setImageResource(on ? R.drawable.ic_bell_on : R.drawable.ic_bell);
+        icon.setImageTintList(ColorStateList.valueOf(ContextCompat.getColor(this, on ? R.color.accent : R.color.text_main)));
+        TextView label = findViewById(R.id.dBellLabel);
+        label.setText(on ? "Alertes activées" : "Alertes");
+        label.setTextColor(ContextCompat.getColor(this, on ? R.color.accent : R.color.text_main));
+        MaterialSwitch sw = findViewById(R.id.dFollowSwitch);
+        sw.setOnCheckedChangeListener(null);
+        sw.setChecked(on);
+        sw.setOnCheckedChangeListener((b, checked) -> toggleBell(checked));
+        ((TextView) findViewById(R.id.dFollowSub)).setText(on
+                ? "Tu seras prévenu dès qu'un chapitre sort (EN / FR)"
+                : "Une notification à chaque nouveau chapitre");
     }
 
-    private void toggleBell() {
-        boolean on = !db.isFollowed(title);
+    private void toggleBell(boolean on) {
+        if (on == db.isFollowed(title)) return;
         if (on && Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(this,
                 Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             notifPermission.launch(Manifest.permission.POST_NOTIFICATIONS);
         }
         Follow.set(this, title, on);
         bindBell();
-        View bell = findViewById(R.id.dBell);
-        bell.animate().scaleX(1.15f).scaleY(1.15f).setDuration(120)
-                .withEndAction(() -> bell.animate().scaleX(1f).scaleY(1f).setDuration(160).start()).start();
+        View bell = findViewById(R.id.dBellIcon);
+        bell.animate().rotation(on ? 18 : 0).scaleX(1.2f).scaleY(1.2f).setDuration(120)
+                .withEndAction(() -> bell.animate().rotation(0).scaleX(1f).scaleY(1f).setDuration(180).start()).start();
         bell.performHapticFeedback(android.view.HapticFeedbackConstants.CONFIRM);
         Toast.makeText(this, on ? "🔔 Alertes activées pour « " + title + " »" : "Alertes désactivées", Toast.LENGTH_SHORT).show();
+    }
+
+    private void bindResume(DbHelper.Series s) {
+        Progress pr = Progress.forResume(this, s.title);
+        String label = pr != null && pr.finished() ? "Chapitre suivant" : "Reprendre la lecture";
+        ((MaterialButton) findViewById(R.id.dResume)).setText(label);
+        ((MaterialButton) findViewById(R.id.dStickyResume)).setText(label);
+        ((TextView) findViewById(R.id.dResumeHint)).setText("Dernier chapitre lu : " + Detector.formatChapter(s.lastChapter)
+                + (pr != null && !pr.finished() ? " · " + pr.where() : ""));
+    }
+
+    private void bindTracking(DbHelper.Series s) {
+        List<DbHelper.Entry> h = db.getHistory(title);
+        long first = Long.MAX_VALUE;
+        for (DbHelper.Entry e : h) first = Math.min(first, e.readAt);
+        ((TextView) findViewById(R.id.dTrackLast)).setText("Chapitre " + Detector.formatChapter(s.lastChapter));
+        ((TextView) findViewById(R.id.dTrackWhen)).setText("Repris " + DateUtils.getRelativeTimeSpanString(
+                s.lastReadAt, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS).toString().toLowerCase(Locale.FRANCE));
+        ((TextView) findViewById(R.id.dTrackCount)).setText(String.valueOf(s.count));
+        ((TextView) findViewById(R.id.dTrackCountLabel)).setText(s.count > 1 ? "chapitres lus" : "chapitre lu");
+        ((TextView) findViewById(R.id.dTrackTime)).setText("≈ " + StatsCalc.formatDuration((long) s.count * StatsCalc.MINUTES_PER_CHAPTER));
+        long weeks = first == Long.MAX_VALUE ? 1 : Math.max(1, (System.currentTimeMillis() - first) / (7L * 24 * 3600 * 1000));
+        ((TextView) findViewById(R.id.dTrackPace)).setText(h.size() < 2 ? "—"
+                : String.format(Locale.FRANCE, "%.1f", h.size() / (double) weeks));
+        ((TextView) findViewById(R.id.dTrackFirst)).setText(first == Long.MAX_VALUE ? "—"
+                : new SimpleDateFormat("d MMM yyyy", Locale.FRANCE).format(new Date(first)));
     }
 
     private void bindProgress(DbHelper.Series s) {
@@ -304,72 +411,52 @@ public class DetailActivity extends AppCompatActivity {
         }
     }
 
-    private void bindStats(DbHelper.Series s) {
-        List<DbHelper.Entry> h = db.getHistory(title);
-        long first = Long.MAX_VALUE;
-        for (DbHelper.Entry e : h) first = Math.min(first, e.readAt);
-        long weeks = Math.max(1, (System.currentTimeMillis() - first) / (7L * 24 * 3600 * 1000));
-        String pace = h.size() < 2 ? "—" : String.format(Locale.FRANCE, "%.1f", h.size() / (double) weeks) + " / sem.";
-        SimpleDateFormat fmt = new SimpleDateFormat("d MMM yyyy", Locale.FRANCE);
-
-        LinearLayout box = findViewById(R.id.dStats);
-        box.removeAllViews();
-        addStatRow(box,
-                new String[]{String.valueOf(s.count), s.count > 1 ? "chapitres lus" : "chapitre lu"},
-                new String[]{"≈ " + StatsCalc.formatDuration((long) s.count * StatsCalc.MINUTES_PER_CHAPTER), "de lecture"});
-        addStatRow(box,
-                new String[]{first == Long.MAX_VALUE ? "—" : fmt.format(new Date(first)), "première lecture"},
-                new String[]{pace, "rythme"});
-        addStatRow(box,
-                new String[]{DateUtils.getRelativeTimeSpanString(s.lastReadAt, System.currentTimeMillis(),
-                        DateUtils.MINUTE_IN_MILLIS).toString(), "dernière lecture"},
-                new String[]{"Ch. " + Detector.formatChapter(s.lastChapter), "dernier chapitre lu"});
-    }
-
-    private void addStatRow(LinearLayout box, String[] a, String[] b) {
-        LinearLayout row = new LinearLayout(this);
-        row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setPadding(0, dp(6), 0, dp(6));
-        row.addView(statBlock(a), new LinearLayout.LayoutParams(0, -2, 1));
-        row.addView(statBlock(b), new LinearLayout.LayoutParams(0, -2, 1));
-        box.addView(row);
-    }
-
-    private View statBlock(String[] v) {
-        LinearLayout l = new LinearLayout(this);
-        l.setOrientation(LinearLayout.VERTICAL);
-        TextView big = new TextView(this);
-        big.setText(v[0]);
-        big.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17);
-        big.setTypeface(android.graphics.Typeface.create("sans-serif-black", android.graphics.Typeface.NORMAL));
-        big.setTextColor(ContextCompat.getColor(this, R.color.text_main));
-        TextView small = new TextView(this);
-        small.setText(v[1]);
-        small.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
-        small.setTextColor(ContextCompat.getColor(this, R.color.text_soft));
-        l.addView(big);
-        l.addView(small);
-        return l;
-    }
-
     private void bindHistory() {
         LinearLayout box = findViewById(R.id.dHistory);
         box.removeAllViews();
         List<DbHelper.Entry> entries = db.getHistory(title);
-        SimpleDateFormat fmt = new SimpleDateFormat("EEE d MMM yyyy · HH:mm", Locale.FRANCE);
+        DbHelper.Meta m = db.getMeta(title);
+        SimpleDateFormat fmt = new SimpleDateFormat("d MMM yyyy · HH:mm", Locale.FRANCE);
         int n = historyExpanded ? entries.size() : Math.min(HISTORY_PREVIEW, entries.size());
         for (int i = 0; i < n; i++) {
             DbHelper.Entry e = entries.get(i);
-            View row = LayoutInflater.from(this).inflate(R.layout.item_history, box, false);
-            ((TextView) row.findViewById(R.id.hChapter)).setText("Ch. " + Detector.formatChapter(e.chapter));
-            ((TextView) row.findViewById(R.id.hDate)).setText(fmt.format(new Date(e.readAt)));
-            ((TextView) row.findViewById(R.id.hSource)).setText(e.source == null ? "" : e.source);
-            row.setOnClickListener(v -> confirmDeleteEntry(e));
+            View row = LayoutInflater.from(this).inflate(R.layout.item_timeline, box, false);
+            ((TextView) row.findViewById(R.id.tChapter)).setText("Chapitre " + Detector.formatChapter(e.chapter));
+            ((TextView) row.findViewById(R.id.tDate)).setText(fmt.format(new Date(e.readAt)));
+            TextView src = row.findViewById(R.id.tSource);
+            String source = e.source == null ? "" : e.source;
+            boolean site = source.contains(".");
+            src.setText(source.isEmpty() ? "" : site ? source + "  ↗" : sourceLabel(source));
+            src.setVisibility(source.isEmpty() ? View.GONE : View.VISIBLE);
+            if (site) {
+                String url = m != null && m.lastUrl != null && m.lastUrl.contains(source) ? m.lastUrl : "https://" + source;
+                src.setOnClickListener(v -> openUrl(url));
+            }
+            row.findViewById(R.id.tLine).setVisibility(i == n - 1 ? View.INVISIBLE : View.VISIBLE);
+            if (i > 0) row.findViewById(R.id.tDot).setAlpha(0.45f);
+            row.findViewById(R.id.tMore).setOnClickListener(v -> {
+                PopupMenu pm = new PopupMenu(this, v);
+                pm.getMenu().add("Retirer de l'historique");
+                pm.setOnMenuItemClickListener(it -> {
+                    confirmDeleteEntry(e);
+                    return true;
+                });
+                pm.show();
+            });
             box.addView(row);
         }
         TextView more = findViewById(R.id.dHistoryMore);
         more.setVisibility(entries.size() > HISTORY_PREVIEW ? View.VISIBLE : View.GONE);
         more.setText(historyExpanded ? "Réduire" : "Voir les " + entries.size() + " chapitres");
+    }
+
+    private static String sourceLabel(String s) {
+        switch (s) {
+            case "app": return "Appli de lecture";
+            case "manuel": return "Ajouté à la main";
+            case "sauvegarde": return "Restauré";
+            default: return s;
+        }
     }
 
     // ------------------------------------------------------------------ Infos en ligne (résumé…)
@@ -389,8 +476,8 @@ public class DetailActivity extends AppCompatActivity {
             runOnUiThread(() -> {
                 if (isFinishing()) return;
                 if (i != null) {
-                    bindInfo(i);
                     DbHelper.Series s = series();
+                    bindInfo(i, s);
                     if (s != null) bindProgress(s);
                 } else if (db.getMeta(title) == null || db.getMeta(title).detailsJson == null) {
                     ((TextView) findViewById(R.id.dSummary)).setText(
@@ -400,41 +487,99 @@ public class DetailActivity extends AppCompatActivity {
         }).start();
     }
 
-    private void bindInfo(SeriesInfo i) {
+    private void bindInfo(SeriesInfo i, DbHelper.Series s) {
         TextView meta = findViewById(R.id.dMeta);
+        TextView format = findViewById(R.id.dFormat);
+        TextView year = findViewById(R.id.dYear);
         if (i == null) {
-            meta.setText("");
+            meta.setText(s != null && s.score > 0 ? "★ " + SeriesAdapter.formatScore(s.score) + " / 10" : "");
+            format.setVisibility(View.GONE);
+            year.setText("");
+            findViewById(R.id.dGenresTitle).setVisibility(View.GONE);
+            findViewById(R.id.dCreditsTitle).setVisibility(View.GONE);
+            findViewById(R.id.dCredits).setVisibility(View.GONE);
             return;
         }
+        format.setVisibility(i.format == null ? View.GONE : View.VISIBLE);
+        if (i.format != null) format.setText(i.format.toUpperCase(Locale.FRANCE));
+        year.setText(i.year > 0 ? String.valueOf(i.year) : "");
         List<String> parts = new ArrayList<>();
-        if (i.country != null) parts.add(i.country);
-        if (i.year > 0) parts.add(String.valueOf(i.year));
-        if (i.status != null) parts.add(i.status);
-        if (i.score > 0) parts.add("★ " + String.format(Locale.FRANCE, "%.1f", i.score / 10.0));
-        meta.setText(String.join("  ·  ", parts));
-        ((TextView) findViewById(R.id.dAlt)).setText(i.altTitle == null ? "" : i.altTitle);
+        if (i.status != null) parts.add("● " + i.status);
+        if (i.score > 0) parts.add("★ " + String.format(Locale.FRANCE, "%.1f", i.score / 10.0) + " / 10");
+        meta.setText(String.join("   |   ", parts));
 
         TextView sum = findViewById(R.id.dSummary);
         sum.setText(i.summary == null ? "Pas de résumé disponible pour cette série." : i.summary);
         ((TextView) findViewById(R.id.dSummarySrc)).setText(i.summarySource == null ? "" : i.summarySource);
         sum.post(() -> {
-            boolean longText = sum.getLayout() != null && sum.getLayout().getEllipsisCount(sum.getLineCount() - 1) > 0;
+            boolean longText = sum.getLayout() != null && sum.getLineCount() > 0
+                    && sum.getLayout().getEllipsisCount(sum.getLineCount() - 1) > 0;
             findViewById(R.id.dSummaryMore).setVisibility(longText || summaryExpanded ? View.VISIBLE : View.GONE);
         });
 
+        // À propos de la série
         LinearLayout infos = findViewById(R.id.dInfos);
         infos.removeAllViews();
-        addInfo(infos, "Auteurs", i.authors);
-        addInfo(infos, "Origine", i.country);
-        addInfo(infos, "Début", i.year > 0 ? String.valueOf(i.year) : null);
-        addInfo(infos, "Statut", i.status);
+        addInfo(infos, "Format", i.format);
+        addInfo(infos, "Origine", i.origin);
+        addInfo(infos, "Publication", i.year > 0 ? "Depuis " + i.year : null);
+        addInfo(infos, "Statut", i.status == null ? null : "● " + i.status);
         addInfo(infos, "Chapitres", i.chapters > 0 ? String.valueOf(i.chapters) : null);
-        addInfo(infos, "Note", i.score > 0 ? i.score + " / 100 (AniList)" : null);
-        addInfo(infos, "Genres", i.genres.isEmpty() ? null : String.join(", ", i.genres));
+        addInfo(infos, "Note AniList", i.score > 0 ? "★ " + String.format(Locale.FRANCE, "%.1f", i.score / 10.0) + " / 10" : null);
         findViewById(R.id.dInfoCard).setVisibility(infos.getChildCount() > 0 ? View.VISIBLE : View.GONE);
+
+        // Genres
+        ChipGroup genres = findViewById(R.id.dGenres);
+        genres.removeAllViews();
+        for (String g : i.genres) {
+            Chip c = (Chip) getLayoutInflater().inflate(R.layout.chip_site, genres, false);
+            c.setChipIcon(null);
+            c.setText(g);
+            c.setClickable(false);
+            genres.addView(c);
+        }
+        findViewById(R.id.dGenresTitle).setVisibility(i.genres.isEmpty() ? View.GONE : View.VISIBLE);
+
+        // Crédits
+        LinearLayout credits = findViewById(R.id.dCredits);
+        credits.removeAllViews();
+        for (int k = 0; k < i.credits.size(); k++) {
+            String[] c = i.credits.get(k);
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+            row.setPadding(0, dp(10), 0, dp(10));
+            ImageView ic = new ImageView(this);
+            ic.setImageResource(R.drawable.ic_person);
+            ic.setImageTintList(ColorStateList.valueOf(ContextCompat.getColor(this, R.color.text_soft)));
+            row.addView(ic, new LinearLayout.LayoutParams(dp(24), dp(24)));
+            LinearLayout col = new LinearLayout(this);
+            col.setOrientation(LinearLayout.VERTICAL);
+            col.setPadding(dp(14), 0, 0, 0);
+            TextView name = new TextView(this);
+            name.setText(c[0]);
+            name.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
+            name.setTextColor(ContextCompat.getColor(this, R.color.text_main));
+            TextView role = new TextView(this);
+            role.setText(c[1]);
+            role.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+            role.setTextColor(ContextCompat.getColor(this, R.color.text_soft));
+            col.addView(name);
+            col.addView(role);
+            row.addView(col);
+            if (k > 0) credits.addView(divider());
+            credits.addView(row);
+        }
+        boolean hasCredits = !i.credits.isEmpty();
+        findViewById(R.id.dCreditsTitle).setVisibility(hasCredits ? View.VISIBLE : View.GONE);
+        credits.setVisibility(hasCredits ? View.VISIBLE : View.GONE);
+
         MaterialButton ani = findViewById(R.id.dAniList);
         ani.setVisibility(i.siteUrl == null ? View.GONE : View.VISIBLE);
         ani.setOnClickListener(v -> openUrl(i.siteUrl));
+
+        findViewById(R.id.dAltCard).setVisibility(i.altTitles.isEmpty() ? View.GONE : View.VISIBLE);
+        ((TextView) findViewById(R.id.dAltList)).setText(String.join("\n", i.altTitles));
 
         LinearLayout recos = findViewById(R.id.dRecos);
         recos.removeAllViews();
@@ -444,20 +589,40 @@ public class DetailActivity extends AppCompatActivity {
         findViewById(R.id.dRecoScroll).setVisibility(vis);
     }
 
+    private View divider() {
+        View d = new View(this);
+        d.setBackgroundColor(ContextCompat.getColor(this, R.color.hairline));
+        d.setLayoutParams(new LinearLayout.LayoutParams(-1, dp(1)));
+        return d;
+    }
+
     private void addInfo(LinearLayout box, String label, String value) {
         if (value == null || value.isEmpty()) return;
+        if (box.getChildCount() > 0) box.addView(divider());
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setPadding(0, dp(5), 0, dp(5));
+        row.setPadding(0, dp(12), 0, dp(12));
         TextView l = new TextView(this);
         l.setText(label);
         l.setTextColor(ContextCompat.getColor(this, R.color.text_soft));
-        l.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
+        l.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
         TextView v = new TextView(this);
         v.setText(value);
-        v.setTextColor(ContextCompat.getColor(this, R.color.text_main));
-        v.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
-        row.addView(l, new LinearLayout.LayoutParams(dp(92), -2));
+        v.setTextColor(ContextCompat.getColor(this, value.startsWith("●") ? R.color.text_main : R.color.text_main));
+        v.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
+        if (value.startsWith("●")) {
+            android.text.SpannableString sp = new android.text.SpannableString(value);
+            sp.setSpan(new android.text.style.ForegroundColorSpan(ContextCompat.getColor(this, R.color.online)),
+                    0, 1, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            v.setText(sp);
+        }
+        if (value.startsWith("★")) {
+            android.text.SpannableString sp = new android.text.SpannableString(value);
+            sp.setSpan(new android.text.style.ForegroundColorSpan(ContextCompat.getColor(this, R.color.accent)),
+                    0, 1, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            v.setText(sp);
+        }
+        row.addView(l, new LinearLayout.LayoutParams(dp(120), -2));
         row.addView(v, new LinearLayout.LayoutParams(0, -2, 1));
         box.addView(row);
     }
@@ -561,7 +726,7 @@ public class DetailActivity extends AppCompatActivity {
     private void toggleSummary() {
         summaryExpanded = !summaryExpanded;
         TextView sum = findViewById(R.id.dSummary);
-        sum.setMaxLines(summaryExpanded ? Integer.MAX_VALUE : 6);
+        sum.setMaxLines(summaryExpanded ? Integer.MAX_VALUE : 5);
         ((TextView) findViewById(R.id.dSummaryMore)).setText(summaryExpanded ? "Réduire" : "Lire la suite");
         findViewById(R.id.dSummaryMore).setVisibility(View.VISIBLE);
     }

@@ -172,6 +172,32 @@ public final class Covers {
         CACHE.remove(key(into));
     }
 
+    /** Couverture du widget : l'image arrondie, ou une vignette colorée avec l'initiale. */
+    public static Bitmap widgetCover(Context ctx, String title, int w, int h, float radiusDp) {
+        float density = ctx.getResources().getDisplayMetrics().density;
+        float r = radiusDp * density;
+        Bitmap src = get(ctx, title);
+        Bitmap out = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+        Canvas c = new Canvas(out);
+        Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+        RectF rect = new RectF(0, 0, w, h);
+        if (src != null) {
+            Bitmap scaled = Bitmap.createScaledBitmap(src, w, h, true);
+            p.setShader(new BitmapShader(scaled, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP));
+            c.drawRoundRect(rect, r, r, p);
+        } else {
+            p.setColor(SeriesAdapter.colorFor(title));
+            c.drawRoundRect(rect, r, r, p);
+            Paint t = new Paint(Paint.ANTI_ALIAS_FLAG);
+            t.setColor(0xFFFFFFFF);
+            t.setTextAlign(Paint.Align.CENTER);
+            t.setTextSize(h * 0.38f);
+            t.setFakeBoldText(true);
+            c.drawText(SeriesAdapter.initialFor(title), w / 2f, h / 2f - (t.descent() + t.ascent()) / 2f, t);
+        }
+        return out;
+    }
+
     /** Version aux coins arrondis (pour le widget, qui ne sait pas arrondir une image). */
     public static Bitmap rounded(Bitmap src, float radiusRatio) {
         Bitmap out = Bitmap.createBitmap(src.getWidth(), src.getHeight(), Bitmap.Config.ARGB_8888);

@@ -23,4 +23,5 @@
     <color name="hero_end">#FFFFFF</color>
     <color name="hero_stroke">#1A6D4AFF</color>
     <color name="online">#2BB673</color>
+    <color name="hairline_strong">#266D4AFF</color>
 </resources>

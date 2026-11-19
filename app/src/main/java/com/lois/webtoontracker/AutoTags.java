@@ -33,6 +33,12 @@ public final class AutoTags {
         for (String[] e : t) THEMES.put(e[0], e[1]);
     }
 
+    /** "Comedy" → "Comédie" (ou le nom d'origine si inconnu). */
+    public static String genreFr(String g) {
+        String fr = GENRES.get(g);
+        return fr == null ? g : fr;
+    }
+
     public static String build(JSONObject media) {
         Set<String> out = new LinkedHashSet<>();
         JSONArray genres = media.optJSONArray("genres");
