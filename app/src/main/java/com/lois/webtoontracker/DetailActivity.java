@@ -155,7 +155,7 @@ public class DetailActivity extends AppCompatActivity {
         ((MaterialButton) findViewById(R.id.dResume)).setText(pr == null
                 ? "▶  Reprendre la lecture"
                 : pr.finished() ? "▶  Chapitre suivant"
-                : "▶  Reprendre · ch. " + Detector.formatChapter(pr.chapter) + " · " + pr.percent() + " %");
+                : "▶  Reprendre · " + pr.hint());
         bindTags(s);
         bindBell();
         bindProgress(s);
@@ -243,7 +243,7 @@ public class DetailActivity extends AppCompatActivity {
         Progress pr = Progress.forResume(this, title);
         String where = pr == null ? "" : "\n📍 " + (pr.finished()
                 ? "Chapitre " + Detector.formatChapter(pr.chapter) + " terminé"
-                : "Arrêté vers " + pr.percent() + " % du ch. " + Detector.formatChapter(pr.chapter));
+                : "Arrêté au ch. " + Detector.formatChapter(pr.chapter) + ", " + pr.where());
         LinearProgressIndicator bar = findViewById(R.id.dProgress);
         if (latest > last) {
             int behind = (int) Math.ceil(latest - last);

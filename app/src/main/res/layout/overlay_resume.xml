@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:paddingStart="12dp"
+    android:paddingTop="8dp"
+    android:paddingEnd="12dp"
+    android:paddingBottom="14dp">
+
+    <LinearLayout
+        android:id="@+id/rCard"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@drawable/bg_resume_card"
+        android:elevation="12dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:outlineAmbientShadowColor="#CC6D4AFF"
+        android:outlineSpotShadowColor="#CC6D4AFF"
+        android:paddingStart="10dp"
+        android:paddingTop="10dp"
+        android:paddingEnd="10dp"
+        android:paddingBottom="10dp">
+
+        <FrameLayout
+            android:layout_width="52dp"
+            android:layout_height="52dp">
+
+            <TextView
+                android:id="@+id/rLetter"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@drawable/bg_resume_thumb"
+                android:fontFamily="sans-serif-black"
+                android:gravity="center"
+                android:textColor="#FFFFFF"
+                android:textSize="22sp" />
+
+            <ImageView
+                android:id="@+id/rThumb"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@drawable/bg_resume_thumb"
+                android:contentDescription="@null"
+                android:scaleType="centerCrop"
+                android:visibility="gone" />
+        </FrameLayout>
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:layout_marginEnd="10dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/rKicker"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="sans-serif-medium"
+                android:letterSpacing="0.12"
+                android:text="REPRENDRE"
+                android:textColor="#FFFFC93C"
+                android:textSize="10sp" />
+
+            <TextView
+                android:id="@+id/rTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="1dp"
+                android:ellipsize="end"
+                android:fontFamily="sans-serif-medium"
+                android:maxLines="1"
+                android:textColor="#FFFFFF"
+                android:textSize="15sp" />
+
+            <TextView
+                android:id="@+id/rSub"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textColor="#B3FFFFFF"
+                android:textSize="12sp" />
+
+            <ProgressBar
+                android:id="@+id/rBar"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="5dp"
+                android:layout_marginTop="8dp"
+                android:max="1000"
+                android:progressDrawable="@drawable/resume_progress" />
+        </LinearLayout>
+
+        <FrameLayout
+            android:id="@+id/rGo"
+            android:layout_width="50dp"
+            android:layout_height="50dp"
+            android:background="@drawable/bg_resume_go"
+            android:elevation="6dp"
+            android:outlineAmbientShadowColor="#CCFFB020"
+            android:outlineSpotShadowColor="#CCFFB020">
+
+            <ImageView
+                android:id="@+id/rGoIcon"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_gravity="center"
+                android:contentDescription="Y aller"
+                android:src="@drawable/ic_arrow_down"
+                android:tint="#1A1203" />
+        </FrameLayout>
+
+        <ImageView
+            android:id="@+id/rClose"
+            android:layout_width="34dp"
+            android:layout_height="34dp"
+            android:layout_marginStart="4dp"
+            android:contentDescription="Fermer"
+            android:padding="8dp"
+            android:src="@drawable/ic_close"
+            android:tint="#80FFFFFF" />
+    </LinearLayout>
+</FrameLayout>

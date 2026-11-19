@@ -243,6 +243,11 @@ public class MainActivity extends AppCompatActivity {
                     .append("Résultat : ").append(d.getString("result", "")).append("\n")
                     .append(d.getString("texts", "")).append("\n");
         }
+        long scrollAt = d.getLong("scroll_at", 0);
+        if (scrollAt != 0) {
+            sb.append("\nDernier guidage vers la case (").append(fmt.format(new Date(scrollAt))).append(")\n")
+                    .append(d.getString("scroll", "")).append("\n");
+        }
         long crashAt = c.getLong("at", 0);
         if (crashAt != 0) {
             sb.append("\nDernière erreur (").append(fmt.format(new Date(crashAt))).append(")\n")

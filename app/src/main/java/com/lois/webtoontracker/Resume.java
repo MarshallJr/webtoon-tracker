@@ -33,13 +33,10 @@ public final class Resume {
     public static void open(Context ctx, String title) {
         try {
             ctx.startActivity(intentFor(ctx, title));
-            Progress p = Progress.forResume(ctx, title);
-            if (p != null) {
+            if (Progress.forResume(ctx, title) != null) {
                 ctx.sendBroadcast(new Intent(ReadingTrackerService.ACTION_RESUME_HINT)
                         .setPackage(ctx.getPackageName())
-                        .putExtra(ReadingTrackerService.EXTRA_HINT, p.hint())
-                        .putExtra(ReadingTrackerService.EXTRA_HINT_TITLE, title)
-                        .putExtra(ReadingTrackerService.EXTRA_HINT_PCT, p.pct));
+                        .putExtra(ReadingTrackerService.EXTRA_HINT_TITLE, title));
             }
         } catch (Exception e) {
             App.saveError(ctx, "Reprendre", e);

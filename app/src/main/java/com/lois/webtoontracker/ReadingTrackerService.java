@@ -68,59 +68,70 @@ public class ReadingTrackerService extends AccessibilityService {
     private final BroadcastReceiver resumeReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
-            if (banner == null) return;
-            float pct = intent.getFloatExtra(EXTRA_HINT_PCT, -1);
-            String hint = intent.getStringExtra(EXTRA_HINT);
             String title = intent.getStringExtra(EXTRA_HINT_TITLE);
-            if (pct <= 0 || pct >= 0.93f) {
-                // Juste une indication (chapitre fini ou position inconnue).
-                banner.show(NotifyPolicy.Kind.RESUME, hint, title, 5200, 1800);
-                return;
-            }
+            if (title == null || resumeCard == null) return;
+            Progress p = Progress.forResume(ReadingTrackerService.this, title);
+            if (p == null) return;
             // On laisse au chapitre le temps de s'ouvrir, puis on propose d'y aller.
-            int p = Math.round(pct * 100);
-            banner.show(NotifyPolicy.Kind.RESUME, hint, title, 9000, 2000,
-                    "Y aller ⤓", () -> startAutoScroll(pct, p));
+            resumeCard.offer(title, p, 1800, new ResumeOverlay.Actions() {
+                @Override
+                public void onGo() {
+                    startAutoScroll(title, p);
+                }
+
+                @Override
+                public void onStop() {
+                    if (scroller != null) scroller.stop();
+                    resumeCard.done(false, "Arrêté · tu reprends la main");
+                    saveScrollDebug(title, "arrêté par toi");
+                }
+            });
         }
     };
 
+    private ResumeOverlay resumeCard;
     private AutoScroller scroller;
 
-    /** Défilement jusqu'à la position retenue, lancé par le bouton "Y aller" de la bannière. */
-    private void startAutoScroll(float pct, int p) {
+    /** Lancé par le bouton ↓ de la carte : ramène à la case retenue. */
+    private void startAutoScroll(String title, Progress p) {
         if (scroller == null) scroller = new AutoScroller(this, () -> livePct);
-        livePct = -1; // la position du chapitre précédent ne compte plus
-        banner.show(NotifyPolicy.Kind.RESUME, "Je t'emmène vers " + p + " %…", "Touche la bannière pour arrêter",
-                0, 0, null, () -> {
-                    scroller.stop();
-                    banner.update("Défilement arrêté", "Tu reprends la main");
-                    handler.postDelayed(() -> banner.hide(), 1200);
-                });
-        scroller.start(pct, new AutoScroller.Listener() {
+        livePct = -1; // la position d'une page précédente ne compte plus
+        resumeCard.setRunning("Vers la " + p.where() + " · touche ■ pour arrêter");
+        scroller.start(p, new AutoScroller.Listener() {
             @Override
-            public void onProgress(float current, float target) {
-                banner.update("Je t'emmène vers " + p + " %…",
-                        Math.round(current * 100) + " % → " + p + " %  ·  touche pour arrêter");
+            public void onProgress(int current, int total, float pct) {
+                resumeCard.progress(pct, total > 0
+                        ? "Case " + (current + 1) + " / " + total + " → " + p.where().replace("case ", "")
+                        : Math.round(pct * 100) + " % → " + p.percent() + " %");
             }
 
             @Override
-            public void onDone(boolean reached, float current) {
+            public void onDone(boolean reached, int current, int total, String how) {
+                saveScrollDebug(title, (reached ? "réussi" : "échec") + " · " + how);
                 if (reached) {
-                    banner.update("Tu y es ✓", "Vers " + Math.round(Math.max(current, 0) * 100) + " % du chapitre");
+                    resumeCard.done(true, total > 0 ? "Case " + (current + 1) + " / " + total + " · bonne lecture"
+                            : "Te voilà vers " + p.percent() + " %");
+                } else if (current >= 0 && total > 0) {
+                    resumeCard.done(false, "Arrivé case " + (current + 1) + " / " + total + " · finis à la main");
                 } else {
-                    banner.update("Je n'ai pas pu aller plus loin",
-                            current >= 0 ? "Arrêté vers " + Math.round(current * 100) + " % · continue à la main"
-                                    : "Ce site ne me dit pas où on en est · fais défiler à la main");
+                    resumeCard.done(false, "Cette page ne se laisse pas guider · fais défiler à la main");
                 }
-                handler.postDelayed(() -> banner.hide(), 2600);
             }
         });
+    }
+
+    private void saveScrollDebug(String title, String text) {
+        getSharedPreferences(PREFS_DEBUG, Context.MODE_PRIVATE).edit()
+                .putString("scroll", title + " : " + text)
+                .putLong("scroll_at", System.currentTimeMillis())
+                .apply();
     }
 
     @Override
     protected void onServiceConnected() {
         super.onServiceConnected();
         banner = new Banner(this);
+        resumeCard = new ResumeOverlay(this);
         ContextCompat.registerReceiver(this, testReceiver,
                 new IntentFilter(ACTION_TEST_BANNER), ContextCompat.RECEIVER_NOT_EXPORTED);
         ContextCompat.registerReceiver(this, resumeReceiver,
@@ -135,6 +146,8 @@ public class ReadingTrackerService extends AccessibilityService {
         } catch (Throwable ignored) {
         }
         if (banner != null) banner.release();
+        if (resumeCard != null) resumeCard.release();
+        if (scroller != null) scroller.stop();
         super.onDestroy();
     }
 
@@ -186,15 +199,14 @@ public class ReadingTrackerService extends AccessibilityService {
     // ------------------------------------------------------------------ Position dans le chapitre
 
     private float lastPct = -1;
-    private long lastPctSave;
-    /** Dernière position mesurée dans la page affichée, même hors chapitre détecté. */
+    private long lastPctSave, lastPanelScan;
+    /** Dernière position mesurée dans la page affichée (au pourcentage), même hors chapitre détecté. */
     private volatile float livePct = -1;
 
     /**
-     * Relève où tu en es dans le chapitre en cours (approximatif) :
-     *  - pages web / lecteurs "un seul long défilement" : scrollY / scrollY max
-     *  - lecteurs en liste d'images (WEBTOON, Mihon…) : dernière image visible / nombre d'images
-     * On ignore les petits défilements (carrousels, menus) qui ne sont pas la page du chapitre.
+     * Relève où tu en es dans le chapitre en cours :
+     *  1. de préférence la CASE affichée (image n° X sur Y) → ancre précise pour revenir ;
+     *  2. sinon un pourcentage de défilement (scrollY / max, ou ligne visible / total).
      */
     private void trackScroll(AccessibilityEvent e) {
         int screenH = getResources().getDisplayMetrics().heightPixels;
@@ -204,18 +216,24 @@ public class ReadingTrackerService extends AccessibilityService {
         } else if (e.getItemCount() >= 5 && e.getToIndex() >= 0) {
             pct = Math.min(1f, (e.getToIndex() + 1) / (float) e.getItemCount());
         }
-        if (pct < 0) return;
-        livePct = pct;
-        if (pending == null) return;
+        if (pct >= 0) livePct = pct;
+        if (pending == null || (scroller != null && scroller.isRunning())) return; // pendant le guidage, on ne réécrit pas
+
         long now = SystemClock.uptimeMillis();
-        if (Math.abs(pct - lastPct) < 0.02f) return;
-        if (now - lastPctSave < 1500 && Math.abs(pct - lastPct) < 0.15f) return;
-        lastPct = pct;
-        lastPctSave = now;
+        if (now - lastPanelScan < 1800) return;      // au plus un relevé toutes les ~2 s pendant la lecture
+        lastPanelScan = now;
         final Detector.Result r = pending;
-        final float p = pct;
-        io.execute(() -> safe("Position", () ->
-                Progress.save(this, DbHelper.get(this).resolveTitle(r.title), r.chapter, p)));
+        final float fallback = pct;
+        io.execute(() -> safe("Position", () -> {
+            String title = DbHelper.get(this).resolveTitle(r.title);
+            Panels.Snapshot s = Panels.take(this);
+            if (s != null && s.current >= 0) {
+                Progress.save(this, title, r.chapter, s.pct(), s.current, s.count);
+            } else if (fallback >= 0 && Math.abs(fallback - lastPct) >= 0.02f) {
+                lastPct = fallback;
+                Progress.save(this, title, r.chapter, fallback);
+            }
+        }));
     }
 
     private void collect(AccessibilityNodeInfo node, List<Detector.TextNode> out, int depth) {
