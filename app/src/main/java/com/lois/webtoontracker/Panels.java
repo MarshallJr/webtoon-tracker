@@ -25,10 +25,12 @@ public final class Panels {
         public boolean collection;   // true : lecteur en liste (on saute par numéro de ligne)
         public int count;            // nombre de cases
         public int current = -1;     // case au centre de l'écran (0…count-1)
+        public float frac = 0.5f;    // où est le centre de l'écran DANS cette case (0 = haut, 1 = bas)
         public String pkg;
 
+        /** Position continue dans le chapitre (0 → 1), même au milieu d'une très longue image. */
         public float pct() {
-            return count <= 0 || current < 0 ? -1 : Math.min(1f, (current + 0.5f) / count);
+            return count <= 0 || current < 0 ? -1 : Math.min(1f, (current + frac) / count);
         }
 
         @Override
@@ -64,7 +66,10 @@ public final class Panels {
                     if (it == null) continue;
                     c.getBoundsInScreen(r);
                     if (firstVisible < 0 || it.getRowIndex() < firstVisible) firstVisible = it.getRowIndex();
-                    if (r.top <= center && r.bottom >= center) best = it.getRowIndex();
+                    if (r.top <= center && r.bottom >= center) {
+                        best = it.getRowIndex();
+                        s.frac = fracOf(r, center);
+                    }
                 }
                 s.current = best >= 0 ? best : firstVisible;
                 if (s.current >= 0) return s;
@@ -84,10 +89,17 @@ public final class Panels {
             if (!n.isVisibleToUser()) continue;
             n.getBoundsInScreen(r);
             if (firstVisible < 0) firstVisible = i;
-            if (r.top <= center && r.bottom >= center) best = i;
+            if (r.top <= center && r.bottom >= center) {
+                best = i;
+                s.frac = fracOf(r, center);
+            }
         }
         s.current = best >= 0 ? best : firstVisible;
         return s;
+    }
+
+    private static float fracOf(Rect r, int center) {
+        return r.height() <= 0 ? 0.5f : Math.max(0f, Math.min(1f, (center - r.top) / (float) r.height()));
     }
 
     private static void collectImages(AccessibilityNodeInfo n, List<AccessibilityNodeInfo> out,

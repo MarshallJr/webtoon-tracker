@@ -109,7 +109,7 @@
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
-            <View
+            <FrameLayout
                 android:layout_width="match_parent"
                 android:layout_height="1dp"
                 android:layout_marginTop="10dp"
@@ -171,7 +171,7 @@
                     </LinearLayout>
                 </LinearLayout>
 
-                <View
+                <FrameLayout
                     android:layout_width="1dp"
                     android:layout_height="36dp"
                     android:layout_marginStart="6dp"

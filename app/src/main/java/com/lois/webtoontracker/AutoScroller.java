@@ -10,14 +10,18 @@ import android.os.SystemClock;
 import android.view.accessibility.AccessibilityNodeInfo;
 
 /**
- * Ramène à la case où tu t'étais arrêté, à TA demande (bouton de la carte de reprise).
+ * Ramène à l'endroit où tu t'étais arrêté, à TA demande (bouton ↓ de la carte de reprise).
  *
- *  1. Saut direct à l'ancre :
- *     - lecteur en liste → "défiler jusqu'à la ligne N"
- *     - page web          → "afficher à l'écran" sur l'image N
- *  2. Si le saut ne suffit pas : pas à pas vers l'avant / l'arrière en recomptant les cases.
- *  3. Si la page n'a pas de cases repérables : pas à pas au pourcentage (moins précis).
- * S'arrête tout seul (arrivé, bloqué, changement d'appli, 40 s) ou dès que tu touches ■.
+ * Position mesurée en continu (0 → 1) :
+ *   - par les cases : n° de l'image au centre + où on est DANS cette image (marche aussi avec
+ *     des images très hautes, de plusieurs écrans) ;
+ *   - et par le défilement annoncé par le site / l'appli, quand il est disponible.
+ *
+ * Déplacement :
+ *   1. un saut direct à la case (si le lecteur ou le site l'accepte) ;
+ *   2. loin du but : grands lancers rapides (plusieurs pages d'un coup) ;
+ *   3. près du but : petits pas, et petit retour arrière si on a dépassé.
+ * S'arrête : arrivé, page vraiment immobile (~4 s), changement d'appli, 45 s max — ou si tu touches ■.
  */
 public final class AutoScroller {
 
@@ -29,15 +33,16 @@ public final class AutoScroller {
     }
 
     public interface PositionSource {
-        float current();   // position au pourcentage (événements de défilement), -1 si inconnue
+        float current();   // position annoncée par les événements de défilement, -1 si inconnue
+
+        long ageMs();      // âge de cette mesure
     }
 
-    private static final long STEP_MS = 450;
-    private static final long JUMP_WAIT_MS = 800;
-    private static final long MAX_MS = 40_000;
+    private static final long MAX_MS = 45_000;
+    private static final float TOLERANCE = 0.012f;   // ≈ 1 % du chapitre
 
     private final AccessibilityService svc;
-    private final PositionSource pos;
+    private final PositionSource src;
     private final Handler worker;
     private volatile boolean running;
 
@@ -45,16 +50,23 @@ public final class AutoScroller {
     private Listener listener;
     private String pkg;
     private long startedAt;
-    private int jumps, steps, stuck, lastIdx;
-    private float lastPct;
+    private int steps, stillSteps, backSteps;
+    private boolean jumped, gestures;   // gestures : l'action "page suivante" ne fait rien ici, on passe aux gestes
+    private int modeStill;
+    private float lastPanelPos = -2, lastEventPos = -2, bestPos = -1;
+    private int lastCur = -1, lastTotal = 0;
     private String how = "";
 
-    public AutoScroller(AccessibilityService svc, PositionSource pos) {
+    public AutoScroller(AccessibilityService svc, PositionSource src) {
         this.svc = svc;
-        this.pos = pos;
+        this.src = src;
         HandlerThread t = new HandlerThread("webtoon-autoscroll");
         t.start();
         worker = new Handler(t.getLooper());
+    }
+
+    public boolean isRunning() {
+        return running;
     }
 
     public void start(Progress target, Listener l) {
@@ -63,18 +75,18 @@ public final class AutoScroller {
         this.listener = l;
         this.running = true;
         this.startedAt = SystemClock.uptimeMillis();
-        this.jumps = 0;
         this.steps = 0;
-        this.stuck = 0;
-        this.lastIdx = -2;
-        this.lastPct = -1;
+        this.stillSteps = 0;
+        this.backSteps = 0;
+        this.jumped = false;
+        this.gestures = false;
+        this.modeStill = 0;
+        this.lastPanelPos = -2;
+        this.lastEventPos = -2;
+        this.bestPos = -1;
         this.how = "";
         this.pkg = null;
         worker.post(this::step);
-    }
-
-    public boolean isRunning() {
-        return running;
     }
 
     public void stop() {
@@ -82,11 +94,11 @@ public final class AutoScroller {
         worker.removeCallbacksAndMessages(null);
     }
 
-    private void finish(boolean ok, int cur, int total) {
+    private void finish(boolean ok) {
         if (!running) return;
         running = false;
         worker.removeCallbacksAndMessages(null);
-        listener.onDone(ok, cur, total, how);
+        listener.onDone(ok, lastCur, lastTotal, how);
     }
 
     private void again(long ms) {
@@ -101,136 +113,159 @@ public final class AutoScroller {
             if (pkg == null) pkg = p;
             if (p == null || !p.equals(pkg)) {
                 how += " · appli changée";
-                finish(false, -1, 0);
+                finish(false);
                 return;
             }
-            if (SystemClock.uptimeMillis() - startedAt > MAX_MS || steps > 250) {
+            if (SystemClock.uptimeMillis() - startedAt > MAX_MS || steps > 400) {
                 how += " · temps écoulé";
-                finish(false, lastIdx, 0);
+                finish(false);
                 return;
             }
 
+            // ---- Mesure
             Panels.Snapshot s = Panels.take(svc);
-            if (s != null && s.current >= 0) {
-                stepByPanels(s);
+            float panelPos = s != null && s.current >= 0 ? s.pct() : -1;
+            float eventPos = src.ageMs() < 2500 ? src.current() : -1;
+            if (s != null) {
+                lastCur = s.current;
+                lastTotal = s.count;
+            }
+            // Même mesure que celle enregistrée pendant la lecture (cases si connues, sinon défilement).
+            float pos = target.count > 0
+                    ? (panelPos >= 0 ? panelPos : eventPos)
+                    : (eventPos >= 0 ? eventPos : panelPos);
+            boolean moved = Math.abs(panelPos - lastPanelPos) > 0.0015f || Math.abs(eventPos - lastEventPos) > 0.0015f;
+            lastPanelPos = panelPos;
+            lastEventPos = eventPos;
+            if (steps > 0) {
+                stillSteps = moved ? 0 : stillSteps + 1;
+                modeStill = moved ? 0 : modeStill + 1;
+                if (modeStill >= 2) {           // la méthode actuelle ne fait plus bouger : on change
+                    gestures = !gestures;
+                    modeStill = 0;
+                    how += gestures ? " → gestes" : " → actions";
+                }
+            }
+
+            if (pos < 0) {
+                if (steps >= 5) {
+                    how += (how.isEmpty() ? "" : " → ") + "position inconnue (ni cases ni défilement)";
+                    finish(false);
+                    return;
+                }
+                fling(root, 1, true); // on bouge un peu pour obtenir une première mesure
+                steps++;
+                again(350);
+                return;
+            }
+            bestPos = Math.max(bestPos, pos);
+            listener.onProgress(s != null ? s.current : -1, s != null ? s.count : 0, pos);
+
+            float goal = target.pct;
+            float remaining = goal - pos;
+            if (Math.abs(remaining) <= TOLERANCE) {
+                how += (how.isEmpty() ? "" : " → ") + (panelPos >= 0 ? (s.collection ? "liste" : "cases") : "défilement") + " ok";
+                finish(true);
+                return;
+            }
+            if (stillSteps >= 12) {  // ~4 s sans bouger du tout, avec les deux méthodes : fin de page ou site qui bloque
+                how += " · page immobile vers " + Math.round(pos * 100) + " %";
+                finish(remaining < 0.03f);
+                return;
+            }
+
+            // ---- 1. Saut direct (une seule fois)
+            if (!jumped && s != null && remaining > 0.05f) {
+                jumped = true;
+                int want = Math.max(0, Math.min(s.count - 1, (int) Math.floor(goal * s.count)));
+                boolean ok;
+                if (s.collection) {
+                    Bundle args = new Bundle();
+                    args.putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_ROW_INT, want);
+                    args.putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_COLUMN_INT, 0);
+                    ok = s.container.performAction(android.R.id.accessibilityActionScrollToPosition, args);
+                    how = "saut liste " + (want + 1) + "/" + s.count + (ok ? "" : " refusé");
+                } else {
+                    ok = s.panels.get(want).performAction(android.R.id.accessibilityActionShowOnScreen);
+                    how = "saut case " + (want + 1) + "/" + s.count + (ok ? "" : " refusé");
+                }
+                if (ok) {
+                    steps++;
+                    again(650);
+                    return;
+                }
+            }
+
+            // ---- 2/3. Lancers rapides puis petits pas
+            steps++;
+            if (remaining < 0) {
+                // Dépassé : petit retour en arrière (3 fois max)
+                if (backSteps++ >= 3) {
+                    how += " · arrêté juste après";
+                    finish(true);
+                    return;
+                }
+                swipe(false, 0.18f, 260);
+                again(380);
+                return;
+            }
+            if (!how.contains("lancers")) how += (how.isEmpty() ? "" : " → ") + "lancers";
+            if (remaining > 0.25f) {
+                move(root, 3, 0.78f, 70);     // très loin : lancer fort
+                again(260);
+            } else if (remaining > 0.08f) {
+                move(root, 2, 0.65f, 130);    // loin : lancer moyen
+                again(300);
+            } else if (remaining > 0.03f) {
+                move(root, 1, 0.60f, 360);    // proche : glissé (sans élan)
+                again(360);
             } else {
-                stepByPercent();
+                swipe(true, 0.25f, 320);      // approche fine
+                again(380);
             }
         } catch (Throwable t) {
             how += " · erreur " + t.getClass().getSimpleName();
-            finish(false, -1, 0);
+            finish(false);
         }
     }
 
-    // ------------------------------------------------------------------ Par cases (précis)
+    /** Premier petit mouvement pour obtenir une mesure. */
+    private void fling(AccessibilityNodeInfo root, int pages, boolean gentle) {
+        move(root, pages, gentle ? 0.35f : 0.70f, gentle ? 220 : 90);
+    }
 
-    private void stepByPanels(Panels.Snapshot s) {
-        int want = wantedIndex(s);
-        listener.onProgress(s.current, s.count, s.pct());
-        if (Math.abs(s.current - want) <= 1) {
-            how = (how.isEmpty() ? "" : how + " → ") + (s.collection ? "liste" : "images") + " ok";
-            finish(true, s.current, s.count);
-            return;
-        }
-        if (s.current == lastIdx) stuck++;
-        else stuck = 0;
-        lastIdx = s.current;
-        if (stuck >= 6) {
-            how += " · bloqué case " + (s.current + 1) + "/" + s.count;
-            finish(false, s.current, s.count);
-            return;
-        }
-
-        // 1. Saut direct à l'ancre (3 essais : les images qui se chargent peuvent décaler la page).
-        if (jumps < 3) {
-            jumps++;
-            boolean ok;
-            if (s.collection) {
-                Bundle args = new Bundle();
-                args.putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_ROW_INT, want);
-                args.putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_COLUMN_INT, 0);
-                ok = s.container.performAction(android.R.id.accessibilityActionScrollToPosition, args);
-                how = "saut liste ligne " + (want + 1) + (ok ? "" : " refusé");
-            } else {
-                ok = s.panels.get(want).performAction(android.R.id.accessibilityActionShowOnScreen);
-                how = "saut image " + (want + 1) + "/" + s.count + (ok ? "" : " refusé");
+    /**
+     * Avance : "page suivante" de la zone qui défile (instantané) répété n fois,
+     * ou un geste (court = lancer avec élan, long = glissé précis) si les actions ne marchent pas ici.
+     */
+    private void move(AccessibilityNodeInfo root, int pages, float distance, long gestureMs) {
+        boolean ok = false;
+        if (!gestures) {
+            AccessibilityNodeInfo c = root == null ? null : Panels.biggestScrollable(root);
+            if (c != null) {
+                for (int i = 0; i < pages; i++) {
+                    if (c.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD)) ok = true;
+                    else break;
+                }
             }
-            if (ok) {
-                again(JUMP_WAIT_MS);
-                return;
-            }
-            jumps = 3; // le site refuse le saut : on passe au pas à pas
+            if (!ok) gestures = true;
         }
-
-        // 2. Pas à pas en recomptant les cases.
-        boolean forward = s.current < want;
-        boolean near = Math.abs(s.current - want) <= 3;
-        boolean acted = false;
-        if (s.container != null && !near) {
-            acted = s.container.performAction(forward ? AccessibilityNodeInfo.ACTION_SCROLL_FORWARD
-                    : AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD);
-        }
-        if (!acted) acted = swipe(forward, near);
-        if (!how.contains("pas à pas")) how += " → pas à pas";
-        steps++;
-        again(acted ? STEP_MS : STEP_MS * 2);
+        if (!ok) swipe(true, distance, gestureMs);
     }
 
-    /** Case visée : même case qu'à l'enregistrement si le chapitre a le même nombre de cases, sinon au prorata. */
-    private int wantedIndex(Panels.Snapshot s) {
-        int want;
-        if (target.index >= 0 && target.count > 0
-                && Math.abs(s.count - target.count) <= Math.max(3, target.count / 4)) {
-            want = target.index;
-        } else {
-            want = Math.round(target.pct * s.count) - 1;
-        }
-        return Math.max(0, Math.min(s.count - 1, want));
-    }
-
-    // ------------------------------------------------------------------ Au pourcentage (secours)
-
-    private void stepByPercent() {
-        float cur = pos.current();
-        if (!how.contains("pourcentage")) how += (how.isEmpty() ? "" : " → ") + "pourcentage (pas de cases repérées)";
-        if (cur >= 0) listener.onProgress(-1, 0, cur);
-        if (cur >= target.pct - 0.015f) {
-            finish(true, -1, 0);
-            return;
-        }
-        if (cur < 0 && steps >= 4) {
-            how += " · position inconnue";
-            finish(false, -1, 0);
-            return;
-        }
-        if (cur >= 0 && cur <= lastPct + 0.0005f) stuck++;
-        else stuck = 0;
-        if (stuck >= 6) {
-            how += " · bloqué";
-            finish(false, -1, 0);
-            return;
-        }
-        lastPct = Math.max(lastPct, cur);
-        boolean near = cur >= 0 && target.pct - cur < 0.04f;
-        AccessibilityNodeInfo root = svc.getRootInActiveWindow();
-        AccessibilityNodeInfo c = root == null ? null : Panels.biggestScrollable(root);
-        boolean acted = !near && c != null && c.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD);
-        if (!acted) acted = swipe(true, near);
-        steps++;
-        again(acted ? STEP_MS : STEP_MS * 2);
-    }
-
-    /** Balayage (demande le droit "effectuer des gestes" du service d'accessibilité). */
-    private boolean swipe(boolean forward, boolean small) {
+    /** Geste vertical. distance = fraction de l'écran ; durée courte = lancer. */
+    private boolean swipe(boolean forward, float distance, long durationMs) {
         try {
             int w = svc.getResources().getDisplayMetrics().widthPixels;
             int h = svc.getResources().getDisplayMetrics().heightPixels;
-            float from = h * (small ? 0.58f : 0.78f), to = h * (small ? 0.42f : 0.24f);
+            float mid = h * 0.5f, half = h * distance / 2f;
+            float from = forward ? mid + half : mid - half;
+            float to = forward ? mid - half : mid + half;
             Path p = new Path();
-            p.moveTo(w / 2f, forward ? from : to);
-            p.lineTo(w / 2f, forward ? to : from);
+            p.moveTo(w * 0.5f, from);
+            p.lineTo(w * 0.5f, to);
             GestureDescription g = new GestureDescription.Builder()
-                    .addStroke(new GestureDescription.StrokeDescription(p, 0, small ? 320 : 240))
+                    .addStroke(new GestureDescription.StrokeDescription(p, 0, durationMs))
                     .build();
             return svc.dispatchGesture(g, null, null);
         } catch (Throwable t) {

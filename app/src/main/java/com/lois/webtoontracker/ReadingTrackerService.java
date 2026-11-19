@@ -94,7 +94,17 @@ public class ReadingTrackerService extends AccessibilityService {
 
     /** Lancé par le bouton ↓ de la carte : ramène à la case retenue. */
     private void startAutoScroll(String title, Progress p) {
-        if (scroller == null) scroller = new AutoScroller(this, () -> livePct);
+        if (scroller == null) scroller = new AutoScroller(this, new AutoScroller.PositionSource() {
+            @Override
+            public float current() {
+                return livePct;
+            }
+
+            @Override
+            public long ageMs() {
+                return SystemClock.uptimeMillis() - livePctAt;
+            }
+        });
         livePct = -1; // la position d'une page précédente ne compte plus
         resumeCard.setRunning("Vers la " + p.where() + " · touche ■ pour arrêter");
         scroller.start(p, new AutoScroller.Listener() {
@@ -102,6 +112,7 @@ public class ReadingTrackerService extends AccessibilityService {
             public void onProgress(int current, int total, float pct) {
                 resumeCard.progress(pct, total > 0
                         ? "Case " + (current + 1) + " / " + total + " → " + p.where().replace("case ", "")
+                        + "  ·  " + Math.round(pct * 100) + " %"
                         : Math.round(pct * 100) + " % → " + p.percent() + " %");
             }
 
@@ -202,6 +213,7 @@ public class ReadingTrackerService extends AccessibilityService {
     private long lastPctSave, lastPanelScan;
     /** Dernière position mesurée dans la page affichée (au pourcentage), même hors chapitre détecté. */
     private volatile float livePct = -1;
+    private volatile long livePctAt;
 
     /**
      * Relève où tu en es dans le chapitre en cours :
@@ -216,7 +228,10 @@ public class ReadingTrackerService extends AccessibilityService {
         } else if (e.getItemCount() >= 5 && e.getToIndex() >= 0) {
             pct = Math.min(1f, (e.getToIndex() + 1) / (float) e.getItemCount());
         }
-        if (pct >= 0) livePct = pct;
+        if (pct >= 0) {
+            livePct = pct;
+            livePctAt = now0();
+        }
         if (pending == null || (scroller != null && scroller.isRunning())) return; // pendant le guidage, on ne réécrit pas
 
         long now = SystemClock.uptimeMillis();
@@ -234,6 +249,10 @@ public class ReadingTrackerService extends AccessibilityService {
                 Progress.save(this, title, r.chapter, fallback);
             }
         }));
+    }
+
+    private static long now0() {
+        return SystemClock.uptimeMillis();
     }
 
     private void collect(AccessibilityNodeInfo node, List<Detector.TextNode> out, int depth) {
