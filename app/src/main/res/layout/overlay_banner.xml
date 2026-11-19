@@ -58,5 +58,20 @@
                 android:textColor="#CCFFFFFF"
                 android:textSize="12sp" />
         </LinearLayout>
+
+        <TextView
+            android:id="@+id/bAction"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:background="@drawable/bg_widget_pill"
+            android:fontFamily="sans-serif-black"
+            android:paddingStart="14dp"
+            android:paddingTop="8dp"
+            android:paddingEnd="14dp"
+            android:paddingBottom="8dp"
+            android:textColor="#1A1203"
+            android:textSize="13sp"
+            android:visibility="gone" />
     </LinearLayout>
 </FrameLayout>

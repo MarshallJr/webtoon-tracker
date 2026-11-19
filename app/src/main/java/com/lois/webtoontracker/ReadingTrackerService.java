@@ -35,6 +35,7 @@ public class ReadingTrackerService extends AccessibilityService {
     public static final String ACTION_RESUME_HINT = "com.lois.webtoontracker.RESUME_HINT";
     public static final String EXTRA_HINT = "hint";
     public static final String EXTRA_HINT_TITLE = "hint_title";
+    public static final String EXTRA_HINT_PCT = "hint_pct";
     public static final String PREFS_DEBUG = "debug";
 
     public static final String KEY_NOTIFY_MODE = "notify_mode";
@@ -68,11 +69,53 @@ public class ReadingTrackerService extends AccessibilityService {
         @Override
         public void onReceive(Context context, Intent intent) {
             if (banner == null) return;
-            // On laisse au chapitre le temps de s'ouvrir, puis la bannière reste ~5 s.
-            banner.show(NotifyPolicy.Kind.RESUME, intent.getStringExtra(EXTRA_HINT),
-                    intent.getStringExtra(EXTRA_HINT_TITLE), 5200, 1800);
+            float pct = intent.getFloatExtra(EXTRA_HINT_PCT, -1);
+            String hint = intent.getStringExtra(EXTRA_HINT);
+            String title = intent.getStringExtra(EXTRA_HINT_TITLE);
+            if (pct <= 0 || pct >= 0.93f) {
+                // Juste une indication (chapitre fini ou position inconnue).
+                banner.show(NotifyPolicy.Kind.RESUME, hint, title, 5200, 1800);
+                return;
+            }
+            // On laisse au chapitre le temps de s'ouvrir, puis on propose d'y aller.
+            int p = Math.round(pct * 100);
+            banner.show(NotifyPolicy.Kind.RESUME, hint, title, 9000, 2000,
+                    "Y aller ⤓", () -> startAutoScroll(pct, p));
         }
     };
+
+    private AutoScroller scroller;
+
+    /** Défilement jusqu'à la position retenue, lancé par le bouton "Y aller" de la bannière. */
+    private void startAutoScroll(float pct, int p) {
+        if (scroller == null) scroller = new AutoScroller(this, () -> livePct);
+        livePct = -1; // la position du chapitre précédent ne compte plus
+        banner.show(NotifyPolicy.Kind.RESUME, "Je t'emmène vers " + p + " %…", "Touche la bannière pour arrêter",
+                0, 0, null, () -> {
+                    scroller.stop();
+                    banner.update("Défilement arrêté", "Tu reprends la main");
+                    handler.postDelayed(() -> banner.hide(), 1200);
+                });
+        scroller.start(pct, new AutoScroller.Listener() {
+            @Override
+            public void onProgress(float current, float target) {
+                banner.update("Je t'emmène vers " + p + " %…",
+                        Math.round(current * 100) + " % → " + p + " %  ·  touche pour arrêter");
+            }
+
+            @Override
+            public void onDone(boolean reached, float current) {
+                if (reached) {
+                    banner.update("Tu y es ✓", "Vers " + Math.round(Math.max(current, 0) * 100) + " % du chapitre");
+                } else {
+                    banner.update("Je n'ai pas pu aller plus loin",
+                            current >= 0 ? "Arrêté vers " + Math.round(current * 100) + " % · continue à la main"
+                                    : "Ce site ne me dit pas où on en est · fais défiler à la main");
+                }
+                handler.postDelayed(() -> banner.hide(), 2600);
+            }
+        });
+    }
 
     @Override
     protected void onServiceConnected() {
@@ -144,6 +187,8 @@ public class ReadingTrackerService extends AccessibilityService {
 
     private float lastPct = -1;
     private long lastPctSave;
+    /** Dernière position mesurée dans la page affichée, même hors chapitre détecté. */
+    private volatile float livePct = -1;
 
     /**
      * Relève où tu en es dans le chapitre en cours (approximatif) :
@@ -152,7 +197,6 @@ public class ReadingTrackerService extends AccessibilityService {
      * On ignore les petits défilements (carrousels, menus) qui ne sont pas la page du chapitre.
      */
     private void trackScroll(AccessibilityEvent e) {
-        if (pending == null) return;
         int screenH = getResources().getDisplayMetrics().heightPixels;
         float pct = -1;
         if (e.getMaxScrollY() > screenH * 2 && e.getScrollY() >= 0) {
@@ -161,6 +205,8 @@ public class ReadingTrackerService extends AccessibilityService {
             pct = Math.min(1f, (e.getToIndex() + 1) / (float) e.getItemCount());
         }
         if (pct < 0) return;
+        livePct = pct;
+        if (pending == null) return;
         long now = SystemClock.uptimeMillis();
         if (Math.abs(pct - lastPct) < 0.02f) return;
         if (now - lastPctSave < 1500 && Math.abs(pct - lastPct) < 0.15f) return;

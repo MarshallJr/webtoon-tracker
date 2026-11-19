@@ -38,7 +38,8 @@ public final class Resume {
                 ctx.sendBroadcast(new Intent(ReadingTrackerService.ACTION_RESUME_HINT)
                         .setPackage(ctx.getPackageName())
                         .putExtra(ReadingTrackerService.EXTRA_HINT, p.hint())
-                        .putExtra(ReadingTrackerService.EXTRA_HINT_TITLE, title));
+                        .putExtra(ReadingTrackerService.EXTRA_HINT_TITLE, title)
+                        .putExtra(ReadingTrackerService.EXTRA_HINT_PCT, p.pct));
             }
         } catch (Exception e) {
             App.saveError(ctx, "Reprendre", e);

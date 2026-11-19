@@ -19,7 +19,7 @@ import android.widget.TextView;
 /**
  * Petite bannière animée affichée par-dessus les autres applis (overlay d'accessibilité :
  * aucune permission en plus). Elle glisse depuis le haut, l'icône rebondit, puis elle repart.
- * Non cliquable : elle ne gêne jamais la lecture.
+ * Non cliquable par défaut (elle ne gêne jamais la lecture), sauf si elle porte un bouton.
  */
 public final class Banner {
 
@@ -42,16 +42,47 @@ public final class Banner {
 
     /** @param delayMs attendre avant d'afficher (ex : le temps que le chapitre s'ouvre) */
     public void show(NotifyPolicy.Kind kind, String title, String subtitle, long visibleMs, long delayMs) {
+        show(kind, title, subtitle, visibleMs, delayMs, null, null);
+    }
+
+    /**
+     * Variante avec bouton (ex : "Y aller"). La bannière devient touchable, mais seulement sur
+     * sa propre surface : le reste de l'écran reste utilisable normalement.
+     * visibleMs <= 0 : reste affichée jusqu'à hide().
+     */
+    public void show(NotifyPolicy.Kind kind, String title, String subtitle, long visibleMs, long delayMs,
+                     String actionLabel, Runnable action) {
         handler.postDelayed(() -> {
             try {
-                showNow(kind, title, subtitle, visibleMs);
+                showNow(kind, title, subtitle, visibleMs, actionLabel, action);
             } catch (Throwable t) {
                 App.saveError(service, "Bannière", t);
             }
         }, delayMs);
     }
 
-    private void showNow(NotifyPolicy.Kind kind, String title, String subtitle, long visibleMs) {
+    /** Met à jour le texte de la bannière affichée (ex : progression du défilement). */
+    public void update(String title, String subtitle) {
+        handler.post(() -> {
+            if (current == null) return;
+            ((TextView) current.findViewById(R.id.bTitle)).setText(title);
+            ((TextView) current.findViewById(R.id.bSubtitle)).setText(subtitle);
+        });
+    }
+
+    public void hide() {
+        handler.post(() -> {
+            if (hideTask != null) {
+                handler.removeCallbacks(hideTask);
+                hideTask.run();
+            } else {
+                removeNow();
+            }
+        });
+    }
+
+    private void showNow(NotifyPolicy.Kind kind, String title, String subtitle, long visibleMs,
+                         String actionLabel, Runnable action) {
         removeNow();
 
         View root = LayoutInflater.from(service).inflate(R.layout.overlay_banner, null);
@@ -77,6 +108,15 @@ public final class Banner {
                 color = 0xFF00B26A; iconRes = R.drawable.ic_check; break;
         }
         icon.setImageResource(iconRes);
+        TextView actionView = root.findViewById(R.id.bAction);
+        if (action != null) {
+            actionView.setVisibility(actionLabel == null ? View.GONE : View.VISIBLE);
+            actionView.setText(actionLabel);
+            banner.setOnClickListener(v -> {
+                v.performHapticFeedback(HapticFeedbackConstants.CONFIRM);
+                action.run();
+            });
+        }
         ((GradientDrawable) iconBg.getBackground().mutate()).setColor(color);
 
         float density = service.getResources().getDisplayMetrics().density;
@@ -85,7 +125,8 @@ public final class Banner {
                 WindowManager.LayoutParams.WRAP_CONTENT,
                 WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
-                        | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+                        | (action == null ? WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+                        : WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL)
                         | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
                 PixelFormat.TRANSLUCENT);
         lp.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
@@ -111,12 +152,13 @@ public final class Banner {
         banner.performHapticFeedback(HapticFeedbackConstants.CONFIRM);
 
         final View shown = root;
-        hideTask = () -> banner.animate().alpha(0f).translationY(-40 * density)
+        final View b = banner;
+        hideTask = () -> b.animate().alpha(0f).translationY(-40 * density)
                 .setDuration(260).setInterpolator(new AccelerateInterpolator())
                 .withEndAction(() -> {
                     if (current == shown) removeNow();
                 }).start();
-        handler.postDelayed(hideTask, visibleMs);
+        if (visibleMs > 0) handler.postDelayed(hideTask, visibleMs);
     }
 
     private void removeNow() {
