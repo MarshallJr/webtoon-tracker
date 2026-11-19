@@ -2,6 +2,7 @@
 <resources>
     <color name="brand">#6D4AFF</color>
     <color name="brand_dark">#2A1E6E</color>
+    <color name="splash_bg">#16102F</color>
     <color name="accent">#FFB020</color>
     <color name="on_accent">#1A1203</color>
     <color name="screen_bg">#F5F4FB</color>

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Appui : la vue s'enfonce, puis rebondit en douceur quand on relâche. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_pressed="true">
+        <set>
+            <objectAnimator android:duration="100" android:interpolator="@android:interpolator/fast_out_slow_in"
+                android:propertyName="scaleX" android:valueTo="0.86" android:valueType="floatType" />
+            <objectAnimator android:duration="100" android:interpolator="@android:interpolator/fast_out_slow_in"
+                android:propertyName="scaleY" android:valueTo="0.86" android:valueType="floatType" />
+        </set>
+    </item>
+    <item>
+        <set>
+            <objectAnimator android:duration="320" android:interpolator="@interpolator/soft_overshoot"
+                android:propertyName="scaleX" android:valueTo="1" android:valueType="floatType" />
+            <objectAnimator android:duration="320" android:interpolator="@interpolator/soft_overshoot"
+                android:propertyName="scaleY" android:valueTo="1" android:valueType="floatType" />
+        </set>
+    </item>
+</selector>

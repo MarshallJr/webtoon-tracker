@@ -63,10 +63,19 @@ public class MainActivity extends AppCompatActivity {
         }
     };
 
+    private long createdAt;
+    private boolean introPlayed;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        // Écran de démarrage : le logo reste un court instant, puis s'envole pendant que l'accueil apparaît.
+        androidx.core.splashscreen.SplashScreen splash = androidx.core.splashscreen.SplashScreen.installSplashScreen(this);
+        createdAt = android.os.SystemClock.uptimeMillis();
+        splash.setKeepOnScreenCondition(() -> android.os.SystemClock.uptimeMillis() - createdAt < 380);
+        splash.setOnExitAnimationListener(this::animateSplashExit);
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        introPlayed = savedInstanceState != null; // rotation, etc. : pas de nouvelle intro
 
         // Android 15 affiche l'appli bord à bord : on décale le contenu sous la barre d'état.
         View root = findViewById(R.id.root);
@@ -151,6 +160,28 @@ public class MainActivity extends AppCompatActivity {
         new Thread(() -> {
             if (Repair.run(this) > 0) runOnUiThread(this::refresh); // titres incohérents corrigés
         }).start();
+        Anim.pressAll(root);
+    }
+
+    private void animateSplashExit(androidx.core.splashscreen.SplashScreenViewProvider provider) {
+        View screen = provider.getView();
+        try {
+            View icon = provider.getIconView();
+            icon.animate().scaleX(1.25f).scaleY(1.25f).translationY(-icon.getHeight() * 0.08f).alpha(0f)
+                    .setDuration(380).setInterpolator(Anim.EASE).start();
+        } catch (Throwable ignored) {
+        }
+        screen.animate().alpha(0f).setStartDelay(60).setDuration(340).setInterpolator(Anim.EASE)
+                .withEndAction(provider::remove).start();
+        playIntro();
+    }
+
+    /** Arrivée sur l'accueil : les blocs apparaissent en cascade (une fois par lancement). */
+    private void playIntro() {
+        if (introPlayed) return;
+        introPlayed = true;
+        Anim.stagger(((ViewGroup) findViewById(R.id.pageHome)).getChildAt(0));
+        Anim.enter(findViewById(R.id.bottomNav), 3);
     }
 
     @Override
@@ -209,9 +240,9 @@ public class MainActivity extends AppCompatActivity {
             WidgetProvider.updateAll(this);
             CoverWorker.enqueueIfNeeded(this);
             int week = db.countSince(System.currentTimeMillis() - 7L * 24 * 3600 * 1000);
-            statSeries.setText(String.valueOf(series.size()));
-            statChapters.setText(String.valueOf(db.totalChapters()));
-            statWeek.setText(String.valueOf(week));
+            Anim.count(statSeries, series.size());
+            Anim.count(statChapters, db.totalChapters());
+            Anim.count(statWeek, week);
             bindHome(series);
             ((TextView) findViewById(R.id.libCount)).setText(series.size() + (series.size() > 1 ? " séries" : " série")
                     + " · " + db.totalChapters() + " chapitres");
@@ -264,14 +295,38 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         View from = pageView(page), to = pageView(p);
+        int dir = p > page ? 1 : -1;   // vers la droite ou la gauche selon l'onglet choisi
         page = p;
-        from.setVisibility(View.GONE);
-        to.setAlpha(0f);
-        to.setTranslationY(24f);
+        for (int i = 0; i < 3; i++) {
+            View pv = pageView(i);
+            pv.animate().cancel();
+            if (pv != from && pv != to) pv.setVisibility(View.GONE);
+        }
+        if (Anim.on()) {
+            from.animate().alpha(0f).translationX(-dir * 18 * getResources().getDisplayMetrics().density)
+                    .setDuration(140).setInterpolator(Anim.EASE).withEndAction(() -> {
+                        from.setVisibility(View.GONE);
+                        from.setAlpha(1f);
+                        from.setTranslationX(0f);
+                    }).start();
+        } else {
+            from.setVisibility(View.GONE);
+        }
         to.setVisibility(View.VISIBLE);
-        to.animate().alpha(1f).translationY(0f).setDuration(220).start();
-        if (p == PAGE_ACTIVITY) StatsBinder.bind(this, findViewById(R.id.activityContent));
+        to.setTranslationY(0f);
+        Anim.slideIn(to, dir);
+        if (p == PAGE_ACTIVITY) {
+            View content = findViewById(R.id.activityContent);
+            StatsBinder.bind(this, content);
+            Anim.stagger(content);
+        } else if (p == PAGE_LIBRARY) {
+            RecyclerView list = findViewById(R.id.seriesList);
+            if (list.getAdapter() != null) list.getAdapter().notifyDataSetChanged(); // les cartes arrivent en cascade
+        }
         styleNav();
+        int[] icons = {R.id.navHomeIcon, R.id.navLibraryIcon, R.id.navActivityIcon};
+        Anim.pop(findViewById(icons[p]));
+        Anim.fadeInBackground(findViewById(p == PAGE_LIBRARY ? R.id.navLibrary : p == PAGE_ACTIVITY ? R.id.navActivity : R.id.navHome));
     }
 
     private View pageView(int p) {
@@ -343,6 +398,7 @@ public class MainActivity extends AppCompatActivity {
             SeriesAdapter.bindCard(card, s, fresh.get(s.title.toLowerCase(Locale.ROOT)),
                     x -> DetailActivity.open(this, x.title), this::confirmDeleteSeries, x -> Resume.open(this, x.title));
             recent.addView(card);
+            Anim.pressAll(card);
         }
     }
 
@@ -725,6 +781,7 @@ public class MainActivity extends AppCompatActivity {
         group.removeAllViews();
         group.addView(makeChip(group, "Tout", selectedTag == null));
         for (String t : tags) group.addView(makeChip(group, t, t.equalsIgnoreCase(selectedTag == null ? "" : selectedTag)));
+        Anim.pressAll(group);
         group.setOnCheckedStateChangeListener((g, ids) -> {
             if (ids.isEmpty()) return;
             com.google.android.material.chip.Chip c = g.findViewById(ids.get(0));

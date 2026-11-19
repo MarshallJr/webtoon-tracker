@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- L'écran du dessous recule à peine pendant que la fiche s'ouvre. -->
+<set xmlns:android="http://schemas.android.com/apk/res/android"
+    android:duration="320"
+    android:interpolator="@interpolator/emphasized">
+    <scale android:fromXScale="1" android:fromYScale="1" android:toXScale="0.97" android:toYScale="0.97"
+        android:pivotX="50%" android:pivotY="50%" />
+    <alpha android:fromAlpha="1" android:toAlpha="0.6" />
+</set>

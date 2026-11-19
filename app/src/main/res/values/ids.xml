@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <item name="anim_press" type="id" />
+    <item name="anim_count" type="id" />
+    <item name="anim_seen" type="id" />
+    <item name="anim_counter" type="id" />
+</resources>

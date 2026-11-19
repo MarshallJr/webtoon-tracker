@@ -128,6 +128,26 @@ public final class Panels {
         return best[0];
     }
 
+    /** Toutes les zones qui défilent, de la plus grande à la plus petite (max 4). */
+    static List<AccessibilityNodeInfo> scrollables(AccessibilityNodeInfo root) {
+        List<AccessibilityNodeInfo> out = new ArrayList<>();
+        int[] budget = {MAX_NODES};
+        gather(root, out, budget, 0);
+        Rect a = new Rect(), b = new Rect();
+        out.sort((x, y) -> {
+            x.getBoundsInScreen(a);
+            y.getBoundsInScreen(b);
+            return Long.compare((long) b.width() * b.height(), (long) a.width() * a.height());
+        });
+        return out.size() > 4 ? new ArrayList<>(out.subList(0, 4)) : out;
+    }
+
+    private static void gather(AccessibilityNodeInfo n, List<AccessibilityNodeInfo> out, int[] budget, int depth) {
+        if (n == null || depth > 40 || budget[0]-- <= 0) return;
+        if (n.isScrollable()) out.add(n);
+        for (int i = 0; i < n.getChildCount(); i++) gather(n.getChild(i), out, budget, depth + 1);
+    }
+
     private static void walk(AccessibilityNodeInfo n, AccessibilityNodeInfo[] best, long[] area, int[] budget, int depth) {
         if (n == null || depth > 40 || budget[0]-- <= 0) return;
         if (n.isScrollable()) {

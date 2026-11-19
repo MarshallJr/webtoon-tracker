@@ -44,7 +44,7 @@ public final class StatsBinder {
 
         int week = db.countSince(now - 7 * DAY);
         int prev = db.countSince(now - 14 * DAY) - week;
-        text(root, R.id.aWeek, String.valueOf(week));
+        Anim.count(root.findViewById(R.id.aWeek), week);
         String trend;
         if (prev <= 0) trend = week > 0 ? "✨ Bonne semaine" : "Prêt pour une nouvelle semaine";
         else {
@@ -54,9 +54,9 @@ public final class StatsBinder {
         }
         text(root, R.id.aTrend, trend);
 
-        text(root, R.id.sStreak, s.currentStreak + (s.currentStreak > 1 ? " jours" : " jour"));
+        Anim.count(root.findViewById(R.id.sStreak), s.currentStreak, n -> n + (n > 1 ? " jours" : " jour"));
         text(root, R.id.sStreakSub, "Meilleure : " + s.bestStreak + " j");
-        text(root, R.id.sRecord, s.recordCount + " ch.");
+        Anim.count(root.findViewById(R.id.sRecord), s.recordCount, n -> n + " ch.");
         text(root, R.id.sRecordSub, s.recordCount > 0
                 ? new SimpleDateFormat("d MMM yyyy", Locale.FRANCE).format(new Date(s.recordDay)) : "");
         text(root, R.id.sDay, s.favoriteWeekday >= 0 ? cap(StatsCalc.WEEKDAYS[s.favoriteWeekday]) : "—");

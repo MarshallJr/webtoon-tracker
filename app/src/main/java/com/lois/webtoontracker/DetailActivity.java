@@ -17,6 +17,7 @@ import android.text.format.DateUtils;
 import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -70,11 +71,27 @@ public class DetailActivity extends AppCompatActivity {
 
     public static void open(Context ctx, String title) {
         ctx.startActivity(new Intent(ctx, DetailActivity.class).putExtra(EXTRA_TITLE, title));
+        if (ctx instanceof android.app.Activity && Build.VERSION.SDK_INT < 34) {
+            ((android.app.Activity) ctx).overridePendingTransition(R.anim.detail_in, R.anim.hold_back);
+        }
     }
+
+    @Override
+    public void finish() {
+        super.finish();
+        if (Build.VERSION.SDK_INT < 34) overridePendingTransition(R.anim.hold_return, R.anim.detail_out);
+    }
+
+    private int currentTab;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        if (Build.VERSION.SDK_INT >= 34) {
+            // La fiche monte en apparaissant, et redescend en se fermant.
+            overrideActivityTransition(OVERRIDE_TRANSITION_OPEN, R.anim.detail_in, R.anim.hold_back);
+            overrideActivityTransition(OVERRIDE_TRANSITION_CLOSE, R.anim.hold_return, R.anim.detail_out);
+        }
         setContentView(R.layout.activity_detail);
         title = getIntent().getStringExtra(EXTRA_TITLE);
         db = DbHelper.get(this);
@@ -146,6 +163,23 @@ public class DetailActivity extends AppCompatActivity {
 
         bindAll();
         loadInfo(false);
+        Anim.pressAll(findViewById(R.id.dRoot));
+        if (savedInstanceState == null) playIntro();
+    }
+
+    /** Arrivée sur la fiche : la miniature « pop », puis le reste en cascade. */
+    private void playIntro() {
+        Anim.zoomIn(findViewById(R.id.dCover), 120);
+        Anim.zoomIn(findViewById(R.id.dAvatar), 120);
+        ViewGroup content = findViewById(R.id.dContent);
+        int k = 1;
+        for (int i = 0; i < content.getChildCount(); i++) {
+            View c = content.getChildAt(i);
+            if (c.getVisibility() != View.VISIBLE || i == 0) continue;
+            Anim.enter(c, k++);
+            if (k > 6) break;
+        }
+        Anim.enter(((ViewGroup) content.getChildAt(0)).getChildAt(1), 1); // titre & infos
     }
 
     @Override
@@ -171,12 +205,13 @@ public class DetailActivity extends AppCompatActivity {
 
     private void showTab(int i) {
         int[] ids = {R.id.tabOverview, R.id.tabTracking, R.id.tabDetails};
+        int dir = i >= currentTab ? 1 : -1;   // glisse dans le sens de l'onglet choisi
+        currentTab = i;
         for (int k = 0; k < ids.length; k++) {
             View v = findViewById(ids[k]);
             if (k == i) {
-                v.setAlpha(0f);
                 v.setVisibility(View.VISIBLE);
-                v.animate().alpha(1f).setDuration(180).start();
+                Anim.slideIn(v, dir);
             } else {
                 v.setVisibility(View.GONE);
             }
@@ -306,8 +341,8 @@ public class DetailActivity extends AppCompatActivity {
         Follow.set(this, title, on);
         bindBell();
         View bell = findViewById(R.id.dBellIcon);
-        bell.animate().rotation(on ? 18 : 0).scaleX(1.2f).scaleY(1.2f).setDuration(120)
-                .withEndAction(() -> bell.animate().rotation(0).scaleX(1f).scaleY(1f).setDuration(180).start()).start();
+        if (on) Anim.ring(bell);
+        else Anim.pop(bell);
         bell.performHapticFeedback(android.view.HapticFeedbackConstants.CONFIRM);
         Toast.makeText(this, on ? "🔔 Alertes activées pour « " + title + " »" : "Alertes désactivées", Toast.LENGTH_SHORT).show();
     }
@@ -398,14 +433,21 @@ public class DetailActivity extends AppCompatActivity {
             star.setImageTintList(android.content.res.ColorStateList.valueOf(
                     ContextCompat.getColor(this, i <= rating ? R.color.accent : R.color.text_soft)));
             star.setPadding(dp(2), 0, dp(6), 0);
+            star.setTag(R.id.anim_press, Boolean.TRUE); // les étoiles ont leur propre animation
             final int value = i;
             star.setOnClickListener(v -> {
                 int cur = db.getMeta(title) == null ? 0 : db.getMeta(title).rating;
-                db.setRating(title, cur == value ? 0 : value);
+                int next = cur == value ? 0 : value;
+                db.setRating(title, next);
                 NoteWriter.writeAsync(this);
                 bindStars();
-                v.animate().scaleX(1.25f).scaleY(1.25f).setDuration(110)
-                        .withEndAction(() -> v.animate().scaleX(1f).scaleY(1f).setDuration(140).start()).start();
+                v.performHapticFeedback(android.view.HapticFeedbackConstants.CLOCK_TICK);
+                // les étoiles s'allument une à une
+                LinearLayout row = findViewById(R.id.dStars);
+                for (int k = 0; k < next && k < row.getChildCount(); k++) {
+                    View st = row.getChildAt(k);
+                    st.postDelayed(() -> Anim.pop(st), k * 55L);
+                }
             });
             box.addView(star, new LinearLayout.LayoutParams(dp(40), dp(34)));
         }
@@ -584,6 +626,11 @@ public class DetailActivity extends AppCompatActivity {
         LinearLayout recos = findViewById(R.id.dRecos);
         recos.removeAllViews();
         for (SeriesInfo.Reco r : i.recos) recos.addView(recoCard(r));
+        Anim.pressAll(recos);
+        if (recos.getChildCount() > 0 && recos.getTag() == null) {   // la 1re fois : les cartes glissent en cascade
+            recos.setTag(Boolean.TRUE);
+            Anim.stagger(recos);
+        }
         int vis = i.recos.isEmpty() ? View.GONE : View.VISIBLE;
         findViewById(R.id.dRecoTitle).setVisibility(vis);
         findViewById(R.id.dRecoScroll).setVisibility(vis);

@@ -188,8 +188,8 @@ public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.VH> {
         // petite animation d'apparition
         h.itemView.setAlpha(0f);
         h.itemView.setTranslationY(18f);
-        h.itemView.animate().alpha(1f).translationY(0f).setDuration(260)
-                .setStartDelay(Math.min(position, 8) * 30L).start();
+        h.itemView.animate().alpha(1f).translationY(0f).setDuration(320).setInterpolator(Anim.EASE)
+                .setStartDelay(Math.min(position, 8) * 35L).start();
     }
 
     /** Remplit une carte "série" (utilisée par la bibliothèque ET par l'accueil). */
@@ -207,6 +207,7 @@ public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.VH> {
         TextView nw = v.findViewById(R.id.newBadge);
         nw.setVisibility(newChapter == null ? View.GONE : View.VISIBLE);
         if (newChapter != null) nw.setText("Nouveau · Ch. " + Detector.formatChapter(newChapter));
+        if (newChapter != null) Anim.attention(nw);
         v.setOnClickListener(x -> click.on(s));
         v.setOnLongClickListener(x -> {
             if (longClick != null) longClick.on(s);
@@ -216,6 +217,7 @@ public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.VH> {
         p.setOnClickListener(x -> {
             if (play != null) play.on(s);
         });
+        Anim.pressAll(v);
     }
 
     @Override
