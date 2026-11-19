@@ -1,232 +1,295 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Widget CONFORT (5×2) -->
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/wRoot"
+<!--
+  Widget CONFORT (5×2), d'après la maquette :
+  en-tête (logo · nom · rythme de la semaine), couverture à gauche sur toute la hauteur,
+  à droite titre + chapitre et gros bouton jaune « Reprendre », puis carrousel ‹ › des autres séries.
+  (Uniquement des vues autorisées dans un widget : LinearLayout, FrameLayout, ImageView, TextView.)
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@android:id/background"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/bg_widget_solid"
-    android:padding="16dp">
+    android:orientation="vertical"
+    android:paddingStart="14dp"
+    android:paddingTop="12dp"
+    android:paddingEnd="14dp"
+    android:paddingBottom="12dp">
 
+    <!-- En-tête -->
     <LinearLayout
+        android:id="@+id/wHeader"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:orientation="vertical">
+        android:layout_height="26dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
 
-        <LinearLayout
-            android:id="@+id/wHeader"
-            android:layout_width="match_parent"
+        <ImageView
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/ic_logo" />
+
+        <TextView
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
-
-            <ImageView
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:src="@drawable/ic_logo" />
-
-            <TextView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
-                android:layout_weight="1"
-                android:fontFamily="sans-serif-medium"
-                android:text="Webtoon Tracker"
-                android:textColor="#FFFFFF"
-                android:textSize="14sp" />
-
-            <TextView
-                android:id="@+id/wWeek"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:textColor="#CFC4FF"
-                android:textSize="12sp" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:id="@+id/wMain"
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_marginTop="10dp"
+            android:layout_marginStart="8dp"
             android:layout_weight="1"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
+            android:ellipsize="end"
+            android:fontFamily="sans-serif"
+            android:maxLines="1"
+            android:text="Webtoon Tracker"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp"
+            android:textStyle="bold" />
 
-            <ImageView
-                android:id="@+id/wCover"
-                android:layout_width="68dp"
-                android:layout_height="100dp"
-                android:scaleType="fitCenter" />
+        <ImageView
+            android:id="@+id/wWeekIcon"
+            android:layout_width="16dp"
+            android:layout_height="16dp"
+            android:src="@drawable/ic_activity"
+            android:tint="#B79CFF" />
 
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="14dp"
-                android:layout_marginEnd="10dp"
-                android:layout_weight="1"
-                android:orientation="vertical">
+        <TextView
+            android:id="@+id/wWeek"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:maxLines="1"
+            android:text="0 chapitre cette semaine"
+            android:textColor="#D9D2F0"
+            android:textSize="12sp" />
+    </LinearLayout>
 
-                <TextView
-                    android:id="@+id/wTitle"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:ellipsize="end"
-                    android:fontFamily="sans-serif-black"
-                    android:maxLines="2"
-                    android:text="Aucune lecture"
-                    android:textColor="#FFFFFF"
-                    android:textSize="18sp" />
+    <!-- Corps -->
+    <LinearLayout
+        android:id="@+id/wMain"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginTop="8dp"
+        android:layout_weight="1"
+        android:orientation="horizontal">
 
-                <TextView
-                    android:id="@+id/wSub"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="3dp"
-                    android:ellipsize="end"
-                    android:maxLines="1"
-                    android:text="Lis un chapitre pour le voir ici"
-                    android:textColor="#A6FFFFFF"
-                    android:textSize="13sp" />
-            </LinearLayout>
-
-            <TextView
-                android:id="@+id/wResume"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:background="@drawable/bg_widget_pill"
-                android:fontFamily="sans-serif-black"
-                android:paddingStart="18dp"
-                android:paddingTop="12dp"
-                android:paddingEnd="18dp"
-                android:paddingBottom="12dp"
-                android:text="▶  Reprendre"
-                android:textColor="#1A1203"
-                android:textSize="15sp" />
-        </LinearLayout>
+        <ImageView
+            android:id="@+id/wCover"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:adjustViewBounds="true"
+            android:maxWidth="84dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/widget_cover_placeholder" />
 
         <LinearLayout
-            android:id="@+id/wRows"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_marginStart="12dp"
+            android:layout_weight="1"
             android:orientation="vertical">
 
-            <FrameLayout
-                android:layout_width="match_parent"
-                android:layout_height="1dp"
-                android:layout_marginTop="10dp"
-                android:layout_marginBottom="8dp"
-                android:background="#1FFFFFFF" />
-
+            <!-- Titre + chapitre | Reprendre -->
             <LinearLayout
+                android:id="@+id/wTop"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+                android:layout_height="0dp"
+                android:layout_weight="1"
                 android:gravity="center_vertical"
                 android:orientation="horizontal">
 
-                <TextView
-                    android:id="@+id/wPrev"
-                    android:layout_width="28dp"
-                    android:layout_height="44dp"
-                    android:gravity="center"
-                    android:text="‹"
-                    android:textColor="#CCFFFFFF"
-                    android:textSize="24sp" />
-
                 <LinearLayout
-                    android:id="@+id/wRow1"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
+                    android:orientation="vertical">
 
-                    <ImageView
-                        android:id="@+id/wRow1Cover"
-                        android:layout_width="30dp"
-                        android:layout_height="44dp" />
-
-                    <LinearLayout
-                        android:layout_width="0dp"
+                    <TextView
+                        android:id="@+id/wTitle"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="8dp"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
+                        android:ellipsize="end"
+                        android:fontFamily="sans-serif"
+                        android:lineSpacingMultiplier="0.92"
+                        android:maxLines="2"
+                        android:text="Aucune lecture"
+                        android:textColor="#FFFFFF"
+                        android:textSize="17sp"
+                        android:textStyle="bold" />
 
-                        <TextView
-                            android:id="@+id/wRow1Title"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:ellipsize="end"
-                            android:fontFamily="sans-serif-medium"
-                            android:maxLines="2"
-                            android:textColor="#FFFFFF"
-                            android:textSize="12sp" />
-
-                        <TextView
-                            android:id="@+id/wRow1Ch"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:maxLines="1"
-                            android:textColor="#8CFFFFFF"
-                            android:textSize="11sp" />
-                    </LinearLayout>
+                    <TextView
+                        android:id="@+id/wSub"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:text="Lis un chapitre pour le voir ici"
+                        android:textColor="#A9A1C6"
+                        android:textSize="12sp" />
                 </LinearLayout>
 
+                <LinearLayout
+                    android:id="@+id/wResume"
+                    android:layout_width="wrap_content"
+                    android:layout_height="40dp"
+                    android:layout_marginStart="10dp"
+                    android:background="@drawable/bg_widget_pill"
+                    android:gravity="center"
+                    android:orientation="horizontal"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="15dp">
+
+                    <ImageView
+                        android:layout_width="16dp"
+                        android:layout_height="16dp"
+                        android:src="@drawable/ic_play"
+                        android:tint="#1A1203" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="6dp"
+                        android:fontFamily="sans-serif"
+                        android:maxLines="1"
+                        android:text="Reprendre"
+                        android:textColor="#1A1203"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- Carrousel des autres séries -->
+            <LinearLayout
+                android:id="@+id/wRows"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
                 <FrameLayout
-                    android:layout_width="1dp"
-                    android:layout_height="36dp"
-                    android:layout_marginStart="6dp"
-                    android:layout_marginEnd="6dp"
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginTop="8dp"
+                    android:layout_marginBottom="8dp"
                     android:background="#1FFFFFFF" />
 
                 <LinearLayout
-                    android:id="@+id/wRow2"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
+                    android:layout_width="match_parent"
+                    android:layout_height="44dp"
                     android:gravity="center_vertical"
                     android:orientation="horizontal">
 
                     <ImageView
-                        android:id="@+id/wRow2Cover"
-                        android:layout_width="30dp"
-                        android:layout_height="44dp" />
+                        android:id="@+id/wPrev"
+                        android:layout_width="20dp"
+                        android:layout_height="44dp"
+                        android:padding="2dp"
+                        android:rotation="180"
+                        android:src="@drawable/ic_chevron_right"
+                        android:tint="#B79CFF" />
 
                     <LinearLayout
+                        android:id="@+id/wRow1"
                         android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="8dp"
+                        android:layout_height="match_parent"
+                        android:layout_marginStart="4dp"
                         android:layout_weight="1"
-                        android:orientation="vertical">
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
 
-                        <TextView
-                            android:id="@+id/wRow2Title"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:ellipsize="end"
-                            android:fontFamily="sans-serif-medium"
-                            android:maxLines="2"
-                            android:textColor="#FFFFFF"
-                            android:textSize="12sp" />
+                        <ImageView
+                            android:id="@+id/wRow1Cover"
+                            android:layout_width="30dp"
+                            android:layout_height="40dp"
+                            android:scaleType="fitCenter" />
 
-                        <TextView
-                            android:id="@+id/wRow2Ch"
-                            android:layout_width="match_parent"
+                        <LinearLayout
+                            android:layout_width="0dp"
                             android:layout_height="wrap_content"
-                            android:maxLines="1"
-                            android:textColor="#8CFFFFFF"
-                            android:textSize="11sp" />
+                            android:layout_marginStart="8dp"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:id="@+id/wRow1Title"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:ellipsize="end"
+                                android:fontFamily="sans-serif"
+                                android:lineSpacingMultiplier="0.9"
+                                android:maxLines="2"
+                                android:textColor="#FFFFFF"
+                                android:textSize="11.5sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:id="@+id/wRow1Ch"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:ellipsize="end"
+                                android:maxLines="1"
+                                android:textColor="#A9A1C6"
+                                android:textSize="10.5sp" />
+                        </LinearLayout>
                     </LinearLayout>
-                </LinearLayout>
 
-                <TextView
-                    android:id="@+id/wNext"
-                    android:layout_width="28dp"
-                    android:layout_height="44dp"
-                    android:gravity="center"
-                    android:text="›"
-                    android:textColor="#CCFFFFFF"
-                    android:textSize="24sp" />
+                    <FrameLayout
+                        android:layout_width="1dp"
+                        android:layout_height="32dp"
+                        android:layout_marginStart="6dp"
+                        android:layout_marginEnd="6dp"
+                        android:background="#1FFFFFFF" />
+
+                    <LinearLayout
+                        android:id="@+id/wRow2"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <ImageView
+                            android:id="@+id/wRow2Cover"
+                            android:layout_width="30dp"
+                            android:layout_height="40dp"
+                            android:scaleType="fitCenter" />
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="8dp"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:id="@+id/wRow2Title"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:ellipsize="end"
+                                android:fontFamily="sans-serif"
+                                android:lineSpacingMultiplier="0.9"
+                                android:maxLines="2"
+                                android:textColor="#FFFFFF"
+                                android:textSize="11.5sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:id="@+id/wRow2Ch"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:ellipsize="end"
+                                android:maxLines="1"
+                                android:textColor="#A9A1C6"
+                                android:textSize="10.5sp" />
+                        </LinearLayout>
+                    </LinearLayout>
+
+                    <ImageView
+                        android:id="@+id/wNext"
+                        android:layout_width="20dp"
+                        android:layout_height="44dp"
+                        android:layout_marginStart="4dp"
+                        android:padding="2dp"
+                        android:src="@drawable/ic_chevron_right"
+                        android:tint="#B79CFF" />
+                </LinearLayout>
             </LinearLayout>
         </LinearLayout>
     </LinearLayout>
-</FrameLayout>
+</LinearLayout>

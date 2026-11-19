@@ -182,9 +182,21 @@ public final class Covers {
         Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
         RectF rect = new RectF(0, 0, w, h);
         if (src != null) {
-            Bitmap scaled = Bitmap.createScaledBitmap(src, w, h, true);
+            // Recadrage centré (jamais déformé), puis coins arrondis.
+            float scale = Math.max(w / (float) src.getWidth(), h / (float) src.getHeight());
+            int cw = Math.round(w / scale), ch = Math.round(h / scale);
+            int cx = Math.max(0, (src.getWidth() - cw) / 2), cy = Math.max(0, (src.getHeight() - ch) / 4);
+            Bitmap crop = Bitmap.createBitmap(src, cx, cy, Math.min(cw, src.getWidth() - cx), Math.min(ch, src.getHeight() - cy));
+            Bitmap scaled = Bitmap.createScaledBitmap(crop, w, h, true);
             p.setShader(new BitmapShader(scaled, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP));
             c.drawRoundRect(rect, r, r, p);
+            // fin liseré clair, comme sur la maquette
+            Paint stroke = new Paint(Paint.ANTI_ALIAS_FLAG);
+            stroke.setStyle(Paint.Style.STROKE);
+            stroke.setStrokeWidth(density);
+            stroke.setColor(0x26FFFFFF);
+            RectF in = new RectF(density / 2f, density / 2f, w - density / 2f, h - density / 2f);
+            c.drawRoundRect(in, r, r, stroke);
         } else {
             p.setColor(SeriesAdapter.colorFor(title));
             c.drawRoundRect(rect, r, r, p);

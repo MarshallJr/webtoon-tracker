@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Surface opaque, coins 28 dp, liseré clair, léger reflet violet en haut à gauche -->
+<!-- Surface opaque violet nuit, coins 24 dp, liseré lavande discret (maquette) -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item>
         <shape android:shape="rectangle">
-            <corners android:radius="28dp" />
-            <gradient android:angle="315" android:startColor="#FF251E42" android:endColor="#FF14111F" />
+            <corners android:radius="24dp" />
+            <gradient android:angle="315" android:startColor="#FF2A2147" android:centerColor="#FF1D1733" android:endColor="#FF151021" />
         </shape>
     </item>
     <item>
         <shape android:shape="rectangle">
-            <corners android:radius="28dp" />
-            <stroke android:width="1dp" android:color="#2EFFFFFF" />
+            <corners android:radius="24dp" />
+            <stroke android:width="1dp" android:color="#40B79CFF" />
         </shape>
     </item>
 </layer-list>
