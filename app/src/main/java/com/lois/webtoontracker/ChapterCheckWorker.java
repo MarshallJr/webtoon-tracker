@@ -74,49 +74,83 @@ public class ChapterCheckWorker extends Worker {
 
     // ------------------------------------------------------------------ Travail
 
+    private static final long SEARCH_RETRY_MS = 7L * 24 * 3600 * 1000;
+    private static final long ACTIVE_MS = 180L * 24 * 3600 * 1000; // séries lues ces 6 derniers mois
+
     @NonNull
     @Override
     public Result doWork() {
         Context ctx = getApplicationContext();
         DbHelper db = DbHelper.get(ctx);
+        android.content.SharedPreferences tries = ctx.getSharedPreferences("covers_meta", Context.MODE_PRIVATE);
+        long now = System.currentTimeMillis();
         int found = 0;
-        for (DbHelper.Meta m : db.getAllMeta()) {
+
+        for (DbHelper.Series s : db.getSeries()) {
             if (isStopped()) break;
-            if (m.titleNo == null || m.rssBase == null) continue;
+            if (now - s.lastReadAt > ACTIVE_MS) continue;
+            DbHelper.Meta m = db.getMeta(s.title);
+            if (m == null) m = new DbHelper.Meta();
+            String tryKey = "src_" + s.title.toLowerCase(java.util.Locale.ROOT);
+            boolean canSearch = now - tries.getLong(tryKey, 0) > SEARCH_RETRY_MS;
+            java.util.List<DbHelper.Release> rel = new java.util.ArrayList<>();
+
+            // 1. MangaDex (EN + FR, scans et liens officiels)
             try {
-                String xml = fetch(m.rssBase + "/rss?title_no=" + m.titleNo);
-                RssParser.Latest latest = RssParser.latest(xml);
-                if (latest == null) continue;
-                if (m.rssLastEp == 0) {
-                    db.setRssLastEp(m.title, latest.episodeNo);   // 1re fois : on mémorise sans alerter
-                } else if (latest.episodeNo > m.rssLastEp) {
-                    db.setRssLastEp(m.title, latest.episodeNo);
-                    notifyNew(ctx, m.title, latest);
-                    found++;
+                String id = m.mdxId;
+                if ((id == null || (isNone(id) && canSearch))) {
+                    id = ReleaseSources.mangadexFind(s.title);
+                    db.setSourceIds(s.title, id, null);
+                    Thread.sleep(250);
                 }
-            } catch (Exception e) {
-                // pas de réseau, site indisponible… on réessaiera au prochain passage
+                if (id != null && !isNone(id)) rel.addAll(ReleaseSources.mangadexLatest(s.title, id));
+                Thread.sleep(250);
+            } catch (Exception ignored) {
+            }
+            // 2. MangaUpdates (toutes les sorties, tous sites)
+            try {
+                String id = m.muId;
+                if ((id == null || (isNone(id) && canSearch))) {
+                    id = ReleaseSources.mangaupdatesFind(s.title);
+                    db.setSourceIds(s.title, null, id);
+                    Thread.sleep(400);
+                }
+                if (id != null && !isNone(id)) {
+                    DbHelper.Release r = ReleaseSources.mangaupdatesLatest(s.title, id);
+                    if (r != null) rel.add(r);
+                }
+                Thread.sleep(400);
+            } catch (Exception ignored) {
+            }
+            // 3. Webtoon officiel (si la série est liée)
+            try {
+                if (m.titleNo != null && m.rssBase != null) {
+                    DbHelper.Release r = ReleaseSources.webtoonLatest(s.title, m.rssBase, m.titleNo);
+                    if (r != null) rel.add(r);
+                }
+            } catch (Exception ignored) {
+            }
+            if (canSearch) tries.edit().putLong(tryKey, now).apply();
+
+            for (DbHelper.Release r : rel) db.saveRelease(r);
+
+            // Nouveau = plus loin que ton dernier chapitre lu ET pas déjà signalé.
+            java.util.List<DbHelper.Release> fresh = db.newReleases(s.title);
+            if (!fresh.isEmpty() && fresh.get(0).chapter > m.notifiedCh) {
+                notifyNew(ctx, s.title, db.lastRead(s.title), fresh);
+                db.setNotified(s.title, fresh.get(0).chapter);
+                found++;
             }
         }
         ctx.getSharedPreferences(NoteWriter.PREFS, Context.MODE_PRIVATE).edit()
                 .putLong("last_check", System.currentTimeMillis())
                 .putInt("last_check_found", found).apply();
+        ctx.sendBroadcast(new Intent(ReadingTrackerService.ACTION_UPDATED).setPackage(ctx.getPackageName()));
         return Result.success();
     }
 
-    private static String fetch(String url) throws Exception {
-        HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
-        c.setConnectTimeout(10000);
-        c.setReadTimeout(10000);
-        c.setRequestProperty("User-Agent", "Mozilla/5.0 (Android) WebtoonTracker");
-        try (BufferedReader r = new BufferedReader(new InputStreamReader(c.getInputStream(), StandardCharsets.UTF_8))) {
-            StringBuilder sb = new StringBuilder();
-            String line;
-            while ((line = r.readLine()) != null && sb.length() < 400_000) sb.append(line).append('\n');
-            return sb.toString();
-        } finally {
-            c.disconnect();
-        }
+    private static boolean isNone(String id) {
+        return ReleaseSources.NOT_FOUND.equals(id);
     }
 
     // ------------------------------------------------------------------ Notification
@@ -130,21 +164,56 @@ public class ChapterCheckWorker extends Worker {
         }
     }
 
-    private static void notifyNew(Context ctx, String series, RssParser.Latest latest) {
+    public static final String EXTRA_SHOW_UPDATES = "show_updates";
+
+    private static void notifyNew(Context ctx, String series, double lastRead, java.util.List<DbHelper.Release> fresh) {
         if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(ctx,
                 Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return;
         createChannel(ctx);
-        Intent open = new Intent(Intent.ACTION_VIEW, Uri.parse(latest.link)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        DbHelper.Release top = fresh.get(0);
+        int extra = (int) Math.max(0, Math.floor(top.chapter - Math.max(lastRead, 0)));
+
+        // Où le lire : chaque site une seule fois, le plus avancé d'abord.
+        java.util.LinkedHashMap<String, DbHelper.Release> bySite = new java.util.LinkedHashMap<>();
+        for (DbHelper.Release r : fresh) {
+            String k = r.label + r.lang;
+            if (!bySite.containsKey(k)) bySite.put(k, r);
+        }
+        StringBuilder where = new StringBuilder();
+        for (DbHelper.Release r : bySite.values()) {
+            if (where.length() > 0) where.append(" · ");
+            where.append(r.label).append(" ").append(r.lang).append(" (ch. ").append(Detector.formatChapter(r.chapter)).append(")");
+        }
+
+        Intent open = new Intent(ctx, MainActivity.class)
+                .putExtra(EXTRA_SHOW_UPDATES, series)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         PendingIntent pi = PendingIntent.getActivity(ctx, series.hashCode(), open,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+
+        String text = "Ch. " + Detector.formatChapter(top.chapter) + " dispo"
+                + (lastRead > 0 ? " · tu en es au " + Detector.formatChapter(lastRead) : "")
+                + (extra > 1 ? " (" + extra + " de retard)" : "");
         NotificationCompat.Builder b = new NotificationCompat.Builder(ctx, CHANNEL)
                 .setSmallIcon(R.drawable.ic_notif)
                 .setColor(0xFF6D4AFF)
-                .setContentTitle("⚡ Nouveau chapitre : " + series)
-                .setContentText(latest.title + " est disponible")
+                .setContentTitle("⚡ " + series)
+                .setContentText(text)
+                .setStyle(new NotificationCompat.BigTextStyle().bigText(text + "\nOù le lire : " + where))
                 .setContentIntent(pi)
                 .setAutoCancel(true)
                 .setGroup("new_chapters");
+
+        // Jusqu'à 2 boutons "Lire" qui ouvrent directement le chapitre dans le navigateur / l'appli.
+        int i = 0;
+        for (DbHelper.Release r : bySite.values()) {
+            if (i >= 2 || r.url == null) break;
+            Intent view = new Intent(Intent.ACTION_VIEW, Uri.parse(r.url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            PendingIntent vp = PendingIntent.getActivity(ctx, (series + r.label + r.lang).hashCode(), view,
+                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+            b.addAction(0, "Lire · " + r.label + " " + r.lang, vp);
+            i++;
+        }
         NotificationManagerCompat.from(ctx).notify(series.toLowerCase().hashCode(), b.build());
     }
 }

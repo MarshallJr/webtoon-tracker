@@ -32,6 +32,13 @@ public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.VH> {
     private final List<DbHelper.Series> shown = new ArrayList<>();
     private String query = "";
     private String tag = null; // null = toutes
+    private java.util.Map<String, Double> newChapters = new java.util.HashMap<>();
+
+    /** Séries pour lesquelles un chapitre plus récent que ton dernier lu est sorti. */
+    public void setNewChapters(java.util.Map<String, Double> map) {
+        newChapters = map;
+        notifyDataSetChanged();
+    }
 
     public SeriesAdapter(OnSeries onClick, OnSeries onLongClick) {
         this.onClick = onClick;
@@ -124,6 +131,9 @@ public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.VH> {
         CharSequence when = DateUtils.getRelativeTimeSpanString(
                 s.lastReadAt, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS);
         h.subtitle.setText(s.count + (s.count > 1 ? " chapitres lus" : " chapitre lu") + " · " + when);
+        Double nw = newChapters.get(s.title.toLowerCase(Locale.ROOT));
+        h.newBadge.setVisibility(nw == null ? View.GONE : View.VISIBLE);
+        if (nw != null) h.newBadge.setText("NOUVEAU · CH. " + Detector.formatChapter(nw));
         h.tagLine.setText(s.tags.replace(", ", "  ·  "));
         h.tagLine.setVisibility(s.tags.isEmpty() ? View.GONE : View.VISIBLE);
         // petite animation d'apparition
@@ -144,7 +154,7 @@ public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.VH> {
     }
 
     static class VH extends RecyclerView.ViewHolder {
-        final TextView title, subtitle, chapter, avatar, tagLine;
+        final TextView title, subtitle, chapter, avatar, tagLine, newBadge;
         final android.widget.ImageView cover;
 
         VH(View v) {
@@ -154,6 +164,7 @@ public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.VH> {
             chapter = v.findViewById(R.id.chapter);
             avatar = v.findViewById(R.id.avatar);
             tagLine = v.findViewById(R.id.tagLine);
+            newBadge = v.findViewById(R.id.newBadge);
             cover = v.findViewById(R.id.cover);
         }
     }

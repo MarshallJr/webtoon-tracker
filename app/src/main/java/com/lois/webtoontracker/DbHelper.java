@@ -16,7 +16,7 @@ import java.util.TreeSet;
 public class DbHelper extends SQLiteOpenHelper {
 
     private static final String DB_NAME = "webtoons.db";
-    private static final int DB_VERSION = 2;
+    private static final int DB_VERSION = 3;
     private static DbHelper instance;
 
     public static synchronized DbHelper get(Context ctx) {
@@ -38,6 +38,23 @@ public class DbHelper extends SQLiteOpenHelper {
                 "source TEXT)");
         db.execSQL("CREATE UNIQUE INDEX idx_reads_unique ON reads(title COLLATE NOCASE, chapter)");
         createMeta(db);
+        upgradeTo3(db);
+    }
+
+    /** v3 : sorties de chapitres trouvées sur les sources (MangaDex, MangaUpdates, Webtoon). */
+    private void upgradeTo3(SQLiteDatabase db) {
+        db.execSQL("ALTER TABLE series_meta ADD COLUMN mdx_id TEXT");
+        db.execSQL("ALTER TABLE series_meta ADD COLUMN mu_id TEXT");
+        db.execSQL("ALTER TABLE series_meta ADD COLUMN notified_ch REAL DEFAULT 0");
+        db.execSQL("CREATE TABLE IF NOT EXISTS releases (" +
+                "title TEXT NOT NULL COLLATE NOCASE," +
+                "source TEXT NOT NULL," +
+                "lang TEXT NOT NULL," +
+                "chapter REAL NOT NULL," +
+                "url TEXT," +
+                "label TEXT," +
+                "found_at INTEGER," +
+                "PRIMARY KEY (title, source, lang))");
     }
 
     private void createMeta(SQLiteDatabase db) {
@@ -54,6 +71,7 @@ public class DbHelper extends SQLiteOpenHelper {
     @Override
     public void onUpgrade(SQLiteDatabase db, int oldV, int newV) {
         if (oldV < 2) createMeta(db); // v1 → v2 : on garde toutes les lectures
+        if (oldV < 3) upgradeTo3(db);
     }
 
     // ------------------------------------------------------------------ Modèles
@@ -89,8 +107,16 @@ public class DbHelper extends SQLiteOpenHelper {
     }
 
     public static final class Meta {
-        public String title, tags, lastUrl, lastPkg, titleNo, rssBase;
+        public String title, tags, lastUrl, lastPkg, titleNo, rssBase, mdxId, muId;
         public long rssLastEp;
+        public double notifiedCh;
+    }
+
+    /** Un chapitre disponible quelque part (site + langue). */
+    public static final class Release {
+        public String title, source, lang, url, label;
+        public double chapter;
+        public long foundAt;
     }
 
     // ------------------------------------------------------------------ Lectures
@@ -170,6 +196,7 @@ public class DbHelper extends SQLiteOpenHelper {
 
     public synchronized void deleteSeries(String title) {
         SQLiteDatabase db = getWritableDatabase();
+        db.delete("releases", "title = ? COLLATE NOCASE", new String[]{title});
         db.delete("reads", "title = ? COLLATE NOCASE", new String[]{title});
         db.delete("series_meta", "title = ? COLLATE NOCASE", new String[]{title});
     }
@@ -185,6 +212,7 @@ public class DbHelper extends SQLiteOpenHelper {
         db.beginTransaction();
         try {
             db.execSQL("UPDATE OR IGNORE reads SET title = ? WHERE title = ? COLLATE NOCASE", new Object[]{into, from});
+            db.delete("releases", "title = ? COLLATE NOCASE", new String[]{from});
             db.delete("reads", "title = ? COLLATE NOCASE", new String[]{from});
 
             Meta a = getMeta(from), b = getMeta(into);
@@ -212,7 +240,7 @@ public class DbHelper extends SQLiteOpenHelper {
 
     public Meta getMeta(String title) {
         try (Cursor c = getReadableDatabase().rawQuery(
-                "SELECT title, tags, last_url, last_pkg, title_no, rss_base, rss_last_ep FROM series_meta " +
+                "SELECT title, tags, last_url, last_pkg, title_no, rss_base, rss_last_ep, mdx_id, mu_id, notified_ch FROM series_meta " +
                         "WHERE title = ? COLLATE NOCASE", new String[]{title})) {
             if (!c.moveToFirst()) return null;
             Meta m = new Meta();
@@ -223,6 +251,9 @@ public class DbHelper extends SQLiteOpenHelper {
             m.titleNo = c.getString(4);
             m.rssBase = c.getString(5);
             m.rssLastEp = c.getLong(6);
+            m.mdxId = c.getString(7);
+            m.muId = c.getString(8);
+            m.notifiedCh = c.getDouble(9);
             return m;
         }
     }
@@ -247,6 +278,9 @@ public class DbHelper extends SQLiteOpenHelper {
         v.put("title_no", m.titleNo);
         v.put("rss_base", m.rssBase);
         v.put("rss_last_ep", m.rssLastEp);
+        v.put("mdx_id", m.mdxId);
+        v.put("mu_id", m.muId);
+        v.put("notified_ch", m.notifiedCh);
         db.insertWithOnConflict("series_meta", null, v, SQLiteDatabase.CONFLICT_REPLACE);
     }
 
@@ -300,6 +334,65 @@ public class DbHelper extends SQLiteOpenHelper {
         Set<String> out = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
         for (Series s : getSeries()) out.addAll(Titles.splitTags(s.tags));
         return out;
+    }
+
+    // ------------------------------------------------------------------ Sorties de chapitres
+
+    public synchronized void saveRelease(Release r) {
+        ContentValues v = new ContentValues();
+        v.put("title", r.title);
+        v.put("source", r.source);
+        v.put("lang", r.lang);
+        v.put("chapter", r.chapter);
+        v.put("url", r.url);
+        v.put("label", r.label);
+        v.put("found_at", r.foundAt);
+        getWritableDatabase().insertWithOnConflict("releases", null, v, SQLiteDatabase.CONFLICT_REPLACE);
+    }
+
+    /** Dernier chapitre lu (le plus grand numéro), ou 0. */
+    public double lastRead(String title) {
+        try (Cursor c = getReadableDatabase().rawQuery(
+                "SELECT MAX(chapter) FROM reads WHERE title = ? COLLATE NOCASE", new String[]{title})) {
+            return c.moveToFirst() ? c.getDouble(0) : 0;
+        }
+    }
+
+    /** Sorties PLUS RÉCENTES que ton dernier chapitre lu, la plus avancée d'abord. */
+    public List<Release> newReleases(String titleOrNull) {
+        List<Release> out = new ArrayList<>();
+        String where = titleOrNull == null ? "" : " AND r.title = ? COLLATE NOCASE";
+        String[] args = titleOrNull == null ? null : new String[]{titleOrNull};
+        try (Cursor c = getReadableDatabase().rawQuery(
+                "SELECT r.title, r.source, r.lang, r.chapter, r.url, r.label, r.found_at FROM releases r " +
+                        "WHERE r.chapter > IFNULL((SELECT MAX(chapter) FROM reads x WHERE x.title = r.title COLLATE NOCASE), 0)" +
+                        where + " ORDER BY r.chapter DESC, r.found_at DESC", args)) {
+            while (c.moveToNext()) {
+                Release r = new Release();
+                r.title = c.getString(0);
+                r.source = c.getString(1);
+                r.lang = c.getString(2);
+                r.chapter = c.getDouble(3);
+                r.url = c.getString(4);
+                r.label = c.getString(5);
+                r.foundAt = c.getLong(6);
+                out.add(r);
+            }
+        }
+        return out;
+    }
+
+    public synchronized void setNotified(String title, double ch) {
+        Meta m = metaOrNew(title);
+        m.notifiedCh = ch;
+        saveMeta(m);
+    }
+
+    public synchronized void setSourceIds(String title, String mdxId, String muId) {
+        Meta m = metaOrNew(title);
+        if (mdxId != null) m.mdxId = mdxId;
+        if (muId != null) m.muId = muId;
+        saveMeta(m);
     }
 
     /** Début du jour (minuit local) pour un instant donné. */

@@ -73,6 +73,21 @@
                 android:textSize="13sp" />
 
             <TextView
+                android:id="@+id/newBadge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="5dp"
+                android:background="@drawable/bg_new_badge"
+                android:fontFamily="sans-serif-black"
+                android:paddingStart="8dp"
+                android:paddingTop="2dp"
+                android:paddingEnd="8dp"
+                android:paddingBottom="2dp"
+                android:textColor="@color/on_accent"
+                android:textSize="11sp"
+                android:visibility="gone" />
+
+            <TextView
                 android:id="@+id/tagLine"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"

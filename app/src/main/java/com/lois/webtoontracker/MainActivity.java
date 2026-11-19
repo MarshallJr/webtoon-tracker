@@ -142,7 +142,22 @@ public class MainActivity extends AppCompatActivity {
             @Override public void afterTextChanged(Editable s) {}
         });
 
+        findViewById(R.id.updatesCard).setOnClickListener(v -> showUpdates(null));
         showPendingCrash();
+        handleIntent(getIntent());
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        handleIntent(intent);
+    }
+
+    private void handleIntent(Intent intent) {
+        if (intent == null || !intent.hasExtra(ChapterCheckWorker.EXTRA_SHOW_UPDATES)) return;
+        String t = intent.getStringExtra(ChapterCheckWorker.EXTRA_SHOW_UPDATES);
+        intent.removeExtra(ChapterCheckWorker.EXTRA_SHOW_UPDATES);
+        findViewById(R.id.root).post(() -> showUpdates(t));
     }
 
     @Override
@@ -183,6 +198,7 @@ public class MainActivity extends AppCompatActivity {
             List<DbHelper.Series> series = db.getSeries();
             adapter.setData(series);
             buildTagChips(db);
+            refreshUpdates(db);
             updateDuplicates(series);
             WidgetProvider.updateAll(this);
             CoverWorker.enqueueIfNeeded(this);
@@ -361,14 +377,13 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private String alertsDescription() {
-        int linked = 0;
-        for (DbHelper.Meta m : DbHelper.get(this).getAllMeta()) if (m.titleNo != null) linked++;
         SharedPreferences p = getSharedPreferences(NoteWriter.PREFS, MODE_PRIVATE);
         long last = p.getLong("last_check", 0);
-        return "Vérifie 2 fois par jour, seulement avec du réseau et une batterie non faible "
-                + "(quasi aucun impact batterie). " + linked + (linked > 1 ? " séries liées" : " série liée")
-                + " à webtoons.com. Les séries sont liées automatiquement (recherche sur webtoons.com) ; "
-                + "« ⚡ Alertes » dans la fiche d'une série sert seulement si une série n'est pas trouvée."
+        return "Environ 2 fois par jour, l'appli regarde si un chapitre plus récent que ton dernier lu "
+                + "est sorti en anglais ou en français, sur MangaDex (scans + sites officiels), "
+                + "MangaUpdates (toutes les sorties, tous groupes) et WEBTOON. "
+                + "La notification te dit où le lire et ouvre le chapitre en un appui. "
+                + "Seulement avec du réseau et une batterie non faible."
                 + (last > 0 ? "\nDernière vérification : "
                 + new SimpleDateFormat("dd/MM HH:mm", Locale.FRANCE).format(new Date(last)) : "");
     }
@@ -411,6 +426,121 @@ public class MainActivity extends AppCompatActivity {
                 })
                 .setNegativeButton("Annuler", null)
                 .show();
+    }
+
+    // ------------------------------------------------------------------ Nouveaux chapitres
+
+    /** Regroupe les sorties plus récentes que ton dernier chapitre lu, par série. */
+    private java.util.LinkedHashMap<String, List<DbHelper.Release>> groupedUpdates(String onlyTitle) {
+        java.util.LinkedHashMap<String, List<DbHelper.Release>> map = new java.util.LinkedHashMap<>();
+        for (DbHelper.Release r : DbHelper.get(this).newReleases(onlyTitle)) {
+            String k = r.title.toLowerCase(Locale.ROOT);
+            List<DbHelper.Release> l = map.get(k);
+            if (l == null) {
+                l = new java.util.ArrayList<>();
+                map.put(k, l);
+            }
+            l.add(r);
+        }
+        return map;
+    }
+
+    private void refreshUpdates(DbHelper db) {
+        java.util.LinkedHashMap<String, List<DbHelper.Release>> map = groupedUpdates(null);
+        java.util.Map<String, Double> best = new java.util.HashMap<>();
+        for (java.util.Map.Entry<String, List<DbHelper.Release>> e : map.entrySet()) {
+            best.put(e.getKey(), e.getValue().get(0).chapter);
+        }
+        adapter.setNewChapters(best);
+        View card = findViewById(R.id.updatesCard);
+        card.setVisibility(map.isEmpty() ? View.GONE : View.VISIBLE);
+        if (!map.isEmpty()) {
+            int n = map.size();
+            ((TextView) findViewById(R.id.updatesTitle)).setText(n + (n > 1 ? " séries ont du nouveau" : " série a du nouveau"));
+            StringBuilder sb = new StringBuilder();
+            for (List<DbHelper.Release> l : map.values()) {
+                if (sb.length() > 40) break;
+                if (sb.length() > 0) sb.append(" · ");
+                sb.append(l.get(0).title).append(" ").append(Detector.formatChapter(l.get(0).chapter));
+            }
+            ((TextView) findViewById(R.id.updatesSub)).setText(sb);
+        }
+    }
+
+    /** Panneau "Nouveaux chapitres" : pour chaque série, les sites où lire, en EN et FR. */
+    private void showUpdates(String onlyTitle) {
+        java.util.LinkedHashMap<String, List<DbHelper.Release>> map = groupedUpdates(onlyTitle);
+        BottomSheetDialog sheet = new BottomSheetDialog(this);
+        float dp = getResources().getDisplayMetrics().density;
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding((int) (20 * dp), (int) (8 * dp), (int) (20 * dp), (int) (24 * dp));
+
+        TextView head = new TextView(this);
+        head.setText(onlyTitle == null ? "🔔 Nouveaux chapitres" : "🔔 " + onlyTitle);
+        head.setTextSize(20);
+        head.setTypeface(android.graphics.Typeface.create("sans-serif-black", android.graphics.Typeface.NORMAL));
+        head.setTextColor(ContextCompat.getColor(this, R.color.text_main));
+        box.addView(head);
+        TextView hint = new TextView(this);
+        hint.setText("Touche un site pour ouvrir le chapitre dans ton navigateur (nouvel onglet) ou dans l'appli du site.");
+        hint.setTextColor(ContextCompat.getColor(this, R.color.text_soft));
+        hint.setTextSize(13);
+        hint.setPadding(0, (int) (4 * dp), 0, (int) (8 * dp));
+        box.addView(hint);
+
+        if (map.isEmpty()) {
+            TextView none = new TextView(this);
+            none.setText("Rien de neuf pour l'instant : tu es à jour 🎉");
+            none.setTextColor(ContextCompat.getColor(this, R.color.text_main));
+            none.setPadding(0, (int) (12 * dp), 0, 0);
+            box.addView(none);
+        }
+
+        for (List<DbHelper.Release> list : map.values()) {
+            DbHelper.Release top = list.get(0);
+            View row = getLayoutInflater().inflate(R.layout.item_update, box, false);
+            SeriesAdapter.bindCover(row.findViewById(R.id.uAvatar), row.findViewById(R.id.uCover), top.title);
+            ((TextView) row.findViewById(R.id.uTitle)).setText(top.title);
+            double last = DbHelper.get(this).lastRead(top.title);
+            ((TextView) row.findViewById(R.id.uSub)).setText("Ch. " + Detector.formatChapter(top.chapter)
+                    + " dispo · tu en es au " + Detector.formatChapter(last));
+            com.google.android.material.chip.ChipGroup sites = row.findViewById(R.id.uSites);
+            java.util.Set<String> seen = new java.util.HashSet<>();
+            for (DbHelper.Release r : list) {
+                if (r.url == null || !seen.add(r.label + r.lang)) continue;
+                com.google.android.material.chip.Chip c = (com.google.android.material.chip.Chip)
+                        getLayoutInflater().inflate(R.layout.chip_site, sites, false);
+                c.setText(r.lang + " · " + r.label + " · ch. " + Detector.formatChapter(r.chapter));
+                c.setOnClickListener(x -> {
+                    try {
+                        startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(r.url)));
+                    } catch (Exception e) {
+                        Toast.makeText(this, "Impossible d'ouvrir le lien", Toast.LENGTH_SHORT).show();
+                    }
+                });
+                sites.addView(c);
+            }
+            row.findViewById(R.id.uResume).setOnClickListener(x -> Resume.open(this, top.title));
+            box.addView(row);
+        }
+
+        com.google.android.material.button.MaterialButton check = new com.google.android.material.button.MaterialButton(
+                this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle);
+        check.setText("Vérifier maintenant");
+        check.setOnClickListener(x -> {
+            ChapterCheckWorker.checkNow(this);
+            Toast.makeText(this, "Vérification lancée…", Toast.LENGTH_SHORT).show();
+            sheet.dismiss();
+        });
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
+        lp.topMargin = (int) (12 * dp);
+        box.addView(check, lp);
+
+        androidx.core.widget.NestedScrollView scroll = new androidx.core.widget.NestedScrollView(this);
+        scroll.addView(box);
+        sheet.setContentView(scroll);
+        sheet.show();
     }
 
     // ------------------------------------------------------------------ Miniatures
@@ -700,6 +830,16 @@ public class MainActivity extends AppCompatActivity {
             confirmDeleteEntry(s, e);
         }));
 
+        List<DbHelper.Release> fresh = DbHelper.get(this).newReleases(s.title);
+        com.google.android.material.button.MaterialButton newBtn = v.findViewById(R.id.sNew);
+        if (!fresh.isEmpty()) {
+            newBtn.setVisibility(View.VISIBLE);
+            newBtn.setText("🔔 Ch. " + Detector.formatChapter(fresh.get(0).chapter) + " dispo · où le lire ?");
+            newBtn.setOnClickListener(b -> {
+                sheet.dismiss();
+                showUpdates(s.title);
+            });
+        }
         TextView tagsView = v.findViewById(R.id.sTags);
         tagsView.setText(s.tags.isEmpty() ? "" : "🏷 " + s.tags);
         tagsView.setVisibility(s.tags.isEmpty() ? View.GONE : View.VISIBLE);

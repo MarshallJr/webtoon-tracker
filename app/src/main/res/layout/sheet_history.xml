@@ -87,6 +87,15 @@
         app:backgroundTint="@color/accent"
         app:cornerRadius="18dp" />
 
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/sNew"
+        style="@style/Widget.Material3.Button.TonalButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="20dp"
+        android:layout_marginEnd="20dp"
+        android:visibility="gone" />
+
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
