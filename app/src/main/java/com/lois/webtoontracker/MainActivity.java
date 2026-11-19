@@ -367,8 +367,8 @@ public class MainActivity extends AppCompatActivity {
         long last = p.getLong("last_check", 0);
         return "Vérifie 2 fois par jour, seulement avec du réseau et une batterie non faible "
                 + "(quasi aucun impact batterie). " + linked + (linked > 1 ? " séries liées" : " série liée")
-                + " à webtoons.com : les séries lues dans le navigateur sont liées toutes seules, sinon "
-                + "utilise « ⚡ Alertes » dans la fiche d'une série."
+                + " à webtoons.com. Les séries sont liées automatiquement (recherche sur webtoons.com) ; "
+                + "« ⚡ Alertes » dans la fiche d'une série sert seulement si une série n'est pas trouvée."
                 + (last > 0 ? "\nDernière vérification : "
                 + new SimpleDateFormat("dd/MM HH:mm", Locale.FRANCE).format(new Date(last)) : "");
     }

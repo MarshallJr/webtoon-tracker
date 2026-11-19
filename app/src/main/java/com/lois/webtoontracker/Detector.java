@@ -254,7 +254,7 @@ public final class Detector {
         }
     }
 
-    static String slugToTitle(String slug) {
+    public static String slugToTitle(String slug) {
         String s = slug.replaceAll("[-_+]+", " ").replaceAll("%20", " ").trim();
         StringBuilder sb = new StringBuilder();
         for (String w : s.split("\\s+")) {

@@ -15,4 +15,5 @@
     <color name="hairline">#0F17142B</color>
     <color name="shadow">#336D4AFF</color>
     <color name="shadow_strong">#806D4AFF</color>
+    <color name="card_shadow">#B36D4AFF</color>
 </resources>
