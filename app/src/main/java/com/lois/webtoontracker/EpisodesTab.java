@@ -104,39 +104,39 @@ final class EpisodesTab {
         DbHelper.Meta meta = db.getMeta(title);
         double furthest = entries.isEmpty() ? 0 : entries.get(0).chapter;
 
-        // Nouveaux chapitres (un par numéro, 3 au plus)
-        List<Row> fresh = new ArrayList<>();
+        // Tous les chapitres de 1 au dernier connu (lu ou sorti), comme la liste d'épisodes de WEBTOON :
+        // les lus sont grisés, les autres restent en clair.
+        java.util.Map<Double, DbHelper.Entry> read = new java.util.HashMap<>();
+        for (DbHelper.Entry e : entries) read.put(e.chapter, e);
+        java.util.Map<Double, DbHelper.Release> fresh = new java.util.HashMap<>();
+        double latest = furthest;
         for (DbHelper.Release r : db.newReleases(title)) {
-            if (r.chapter <= furthest) continue;
-            boolean dup = false;
-            for (Row x : fresh) if (x.chapter == r.chapter) dup = true;
-            if (dup || fresh.size() >= 3) continue;
-            Row row = new Row();
-            row.release = r;
-            row.chapter = r.chapter;
-            fresh.add(row);
+            if (r.chapter <= furthest || fresh.containsKey(r.chapter)) continue;
+            fresh.put(r.chapter, r);
+            latest = Math.max(latest, r.chapter);
         }
-        fresh.sort((a, b) -> Double.compare(b.chapter, a.chapter));
+        java.util.TreeSet<Double> all = new java.util.TreeSet<>(read.keySet());
+        all.addAll(fresh.keySet());
+        if (latest <= 3000) for (int c = 1; c <= (int) Math.floor(latest); c++) all.add((double) c);
 
-        List<Row> rows = new ArrayList<>();
         boolean newest = newestFirst();
-        if (newest) rows.addAll(fresh);
-        for (DbHelper.Entry e : entries) {
+        List<Row> rows = new ArrayList<>();
+        for (Double ch : newest ? all.descendingSet() : all) {
             Row row = new Row();
-            row.entry = e;
-            row.chapter = e.chapter;
+            row.chapter = ch;
+            row.entry = read.get(ch);
+            row.release = row.entry == null ? fresh.get(ch) : null;
             rows.add(row);
         }
-        if (!newest) {
-            java.util.Collections.reverse(rows);
-            List<Row> f = new ArrayList<>(fresh);
-            java.util.Collections.reverse(f);
-            rows.addAll(f);
+        // Le chapitre en cours doit être visible sans avoir à charger plus.
+        for (int i = 0; i < rows.size(); i++) {
+            if (rows.get(i).chapter == furthest && shown < i + 6) shown = ((i + 6) / PAGE + 1) * PAGE;
         }
 
         // En-tête
         TextView count = act.findViewById(R.id.eCount);
-        String c = entries.size() + (entries.size() > 1 ? " épisodes lus" : " épisode lu");
+        String c = all.size() + (all.size() > 1 ? " épisodes" : " épisode") + "  ·  " + entries.size()
+                + (entries.size() > 1 ? " lus" : " lu");
         count.setText(c);
         ((TextView) act.findViewById(R.id.eSort)).setText(newest ? "Plus récents" : "Plus anciens");
         bindBackfill(entries);
@@ -229,12 +229,19 @@ final class EpisodesTab {
                     + (r.release.lang == null ? "" : " · " + r.release.lang.toUpperCase(Locale.ROOT)));
             extra.setTextColor(ContextCompat.getColor(act, R.color.text_soft));
             extra.setVisibility(View.VISIBLE);
-            thumb.setAlpha(0.85f);
             btn.setText("Lire");
             btn.setBackgroundResource(R.drawable.bg_episode_btn_new);
             btn.setTextColor(0xFFFFFFFF);
             String url = r.release.url;
             action = url == null ? null : () -> open(url);
+            v.setOnLongClickListener(x -> markRead(x, r.chapter));
+        } else if (r.entry == null) {
+            // Pas encore lu : en clair
+            date.setText(r.chapter > furthest ? "À lire" : "Pas lu");
+            btn.setText("Lire");
+            String url = ChapterLinks.urlFor(meta, entries, r.chapter);
+            action = url == null ? null : () -> open(url);
+            v.setOnLongClickListener(x -> markRead(x, r.chapter));
         } else {
             DbHelper.Entry e = r.entry;
             boolean current = e.chapter == furthest;
@@ -246,6 +253,10 @@ final class EpisodesTab {
                 badge.setText("EN COURS");
                 badge.setTextColor(ContextCompat.getColor(act, R.color.brand));
                 badge.setVisibility(View.VISIBLE);
+            } else {
+                // Déjà lu : grisé, comme sur WEBTOON
+                v.findViewById(R.id.eContent).setAlpha(0.42f);
+                name.setTextColor(ContextCompat.getColor(act, R.color.text_soft));
             }
             boolean inProgress = current && progress != null && progress.chapter == e.chapter
                     && progress.pct > 0.02f && !progress.finished();
@@ -275,7 +286,7 @@ final class EpisodesTab {
             }
             v.setOnLongClickListener(x -> {
                 PopupMenu pm = new PopupMenu(act, x);
-                pm.getMenu().add("Retirer de l'historique");
+                pm.getMenu().add("Marquer comme non lu");
                 pm.setOnMenuItemClickListener(it -> {
                     host.confirmDelete(e);
                     return true;
@@ -296,6 +307,19 @@ final class EpisodesTab {
             btn.setTag(R.id.anim_press, Boolean.TRUE);
         }
         return v;
+    }
+
+    /** Appui long sur un chapitre pas encore lu → le marquer comme lu. */
+    private boolean markRead(View anchor, double chapter) {
+        PopupMenu pm = new PopupMenu(act, anchor);
+        pm.getMenu().add("Marquer comme lu");
+        pm.setOnMenuItemClickListener(it -> {
+            db.insertRead(title, chapter, System.currentTimeMillis(), "manuel");
+            host.onEpisodesChanged();
+            return true;
+        });
+        pm.show();
+        return true;
     }
 
     private void open(String url) {

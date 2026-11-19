@@ -9,6 +9,7 @@ import android.view.Gravity;
 import android.view.HapticFeedbackConstants;
 import android.view.LayoutInflater;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.view.animation.AccelerateInterpolator;
 import android.view.animation.DecelerateInterpolator;
@@ -122,9 +123,16 @@ public final class Banner {
                 action.run();
             });
         }
-        ((GradientDrawable) iconBg.getBackground().mutate()).setColor(color);
+        // Pastille teintée (couleur à 18 %) + icône dans la couleur : plus doux qu'un rond plein.
+        ((GradientDrawable) iconBg.getBackground().mutate()).setColor((color & 0x00FFFFFF) | 0x2E000000);
+        icon.setColorFilter(lighter(color));
 
         float density = service.getResources().getDisplayMetrics().density;
+        // Largeur fixe : écran − marges (440 dp max) → le bouton ne se fait jamais écraser.
+        int screenW = service.getResources().getDisplayMetrics().widthPixels;
+        ViewGroup.LayoutParams blp = banner.getLayoutParams();
+        blp.width = (int) Math.min(screenW - 24 * density, 440 * density);
+        banner.setLayoutParams(blp);
         WindowManager.LayoutParams lp = new WindowManager.LayoutParams(
                 WindowManager.LayoutParams.WRAP_CONTENT,
                 WindowManager.LayoutParams.WRAP_CONTENT,
@@ -135,7 +143,7 @@ public final class Banner {
                         | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
                 PixelFormat.TRANSLUCENT);
         lp.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
-        lp.y = (int) (36 * density);
+        lp.y = (int) (24 * density);
         wm.addView(root, lp);
         current = root;
 
@@ -164,6 +172,15 @@ public final class Banner {
                     if (current == shown) removeNow();
                 }).start();
         if (visibleMs > 0) handler.postDelayed(hideTask, visibleMs);
+    }
+
+    /** Version plus claire d'une couleur (icône sur fond sombre). */
+    private static int lighter(int c) {
+        int r = (c >> 16) & 0xFF, g = (c >> 8) & 0xFF, b = c & 0xFF;
+        r += (255 - r) * 35 / 100;
+        g += (255 - g) * 35 / 100;
+        b += (255 - b) * 35 / 100;
+        return 0xFF000000 | (r << 16) | (g << 8) | b;
     }
 
     private void removeNow() {

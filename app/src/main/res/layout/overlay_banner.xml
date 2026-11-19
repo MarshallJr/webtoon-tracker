@@ -1,26 +1,33 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Bannière en haut de l'écran (ajouté, déjà lu, série…).
+  Largeur fixée par le code (écran − marges, 440 dp max) : le texte prend la place restante
+  et le bouton garde toujours sa taille, sur une seule ligne.
+-->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="wrap_content"
     android:layout_height="wrap_content"
-    android:padding="8dp">
+    android:clipToPadding="false"
+    android:padding="12dp">
 
     <LinearLayout
         android:id="@+id/banner"
-        android:layout_width="wrap_content"
+        android:layout_width="360dp"
         android:layout_height="wrap_content"
         android:background="@drawable/bg_banner"
-        android:elevation="6dp"
+        android:elevation="10dp"
         android:gravity="center_vertical"
+        android:minHeight="64dp"
         android:orientation="horizontal"
-        android:paddingStart="8dp"
-        android:paddingTop="8dp"
-        android:paddingEnd="20dp"
-        android:paddingBottom="8dp">
+        android:paddingStart="12dp"
+        android:paddingTop="10dp"
+        android:paddingEnd="12dp"
+        android:paddingBottom="10dp">
 
         <FrameLayout
             android:id="@+id/iconBg"
-            android:layout_width="38dp"
-            android:layout_height="38dp"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
             android:background="@drawable/bg_circle">
 
             <ImageView
@@ -32,46 +39,50 @@
         </FrameLayout>
 
         <LinearLayout
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginStart="12dp"
+            android:layout_weight="1"
             android:orientation="vertical">
 
             <TextView
                 android:id="@+id/bTitle"
-                android:layout_width="wrap_content"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:maxWidth="260dp"
-                android:maxLines="1"
                 android:ellipsize="end"
+                android:fontFamily="sans-serif"
+                android:maxLines="1"
                 android:textColor="#FFFFFF"
-                android:textSize="14sp"
+                android:textSize="15sp"
                 android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/bSubtitle"
-                android:layout_width="wrap_content"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:maxWidth="260dp"
-                android:maxLines="1"
+                android:layout_marginTop="1dp"
                 android:ellipsize="end"
-                android:textColor="#CCFFFFFF"
-                android:textSize="12sp" />
+                android:maxLines="1"
+                android:textColor="#B3ABCB"
+                android:textSize="13sp" />
         </LinearLayout>
 
         <TextView
             android:id="@+id/bAction"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="12dp"
-            android:background="@drawable/bg_widget_pill"
-            android:fontFamily="sans-serif-black"
+            android:layout_height="36dp"
+            android:layout_marginStart="10dp"
+            android:background="@drawable/bg_banner_action"
+            android:ellipsize="none"
+            android:fontFamily="sans-serif"
+            android:gravity="center"
+            android:maxLines="1"
             android:paddingStart="14dp"
-            android:paddingTop="8dp"
             android:paddingEnd="14dp"
-            android:paddingBottom="8dp"
+            android:singleLine="true"
             android:textColor="#1A1203"
-            android:textSize="13sp"
+            android:textSize="13.5sp"
+            android:textStyle="bold"
             android:visibility="gone" />
     </LinearLayout>
 </FrameLayout>

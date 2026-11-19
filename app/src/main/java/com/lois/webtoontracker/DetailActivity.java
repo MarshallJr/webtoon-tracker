@@ -949,8 +949,8 @@ public class DetailActivity extends AppCompatActivity {
 
     private void confirmDeleteEntry(DbHelper.Entry e) {
         new MaterialAlertDialogBuilder(this)
-                .setMessage("Retirer le chapitre " + Detector.formatChapter(e.chapter) + " de l'historique ?")
-                .setPositiveButton("Retirer", (d, w) -> {
+                .setMessage("Marquer le chapitre " + Detector.formatChapter(e.chapter) + " comme non lu ?")
+                .setPositiveButton("Non lu", (d, w) -> {
                     db.deleteEntry(e.id);
                     ChapterThumbs.delete(this, title, e.chapter);
                     NoteWriter.writeAsync(this);

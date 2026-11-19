@@ -469,7 +469,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="6dp"
                         android:gravity="center"
-                        android:text="Appui long sur un épisode pour le retirer"
+                        android:text="Appui long sur un épisode pour le marquer lu / non lu"
                         android:textColor="@color/text_soft"
                         android:textSize="12sp" />
                 </LinearLayout>
