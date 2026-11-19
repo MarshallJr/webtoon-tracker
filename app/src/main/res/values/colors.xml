@@ -12,4 +12,7 @@
     <color name="text_soft">#6E6A85</color>
     <color name="chart_grid">#1F17142B</color>
     <color name="icon_bg">#140C2C</color>
+    <color name="hairline">#0F17142B</color>
+    <color name="shadow">#336D4AFF</color>
+    <color name="shadow_strong">#806D4AFF</color>
 </resources>

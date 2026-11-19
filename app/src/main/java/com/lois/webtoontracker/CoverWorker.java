@@ -60,10 +60,18 @@ public class CoverWorker extends Worker {
         return now - p.getLong(key(title), 0) > RETRY_MS;
     }
 
+    /** Tags automatiques : seulement si la série n'a encore aucun tag (on ne touche jamais aux tiens). */
+    private static boolean needsTags(DbHelper.Series s, SharedPreferences p, long now) {
+        if (!s.tags.isEmpty()) return false;
+        return now - p.getLong("tags_" + key(s.title), 0) > RETRY_MS;
+    }
+
     private static boolean hasWork(Context ctx) {
         SharedPreferences p = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         long now = System.currentTimeMillis();
-        for (DbHelper.Series s : DbHelper.get(ctx).getSeries()) if (needsCover(ctx, s.title, p, now)) return true;
+        for (DbHelper.Series s : DbHelper.get(ctx).getSeries()) {
+            if (needsCover(ctx, s.title, p, now) || needsTags(s, p, now)) return true;
+        }
         return false;
     }
 
@@ -80,17 +88,25 @@ public class CoverWorker extends Worker {
         for (DbHelper.Series s : DbHelper.get(ctx).getSeries()) {
             if (isStopped()) break;
             long now = System.currentTimeMillis();
-            if (!needsCover(ctx, s.title, p, now)) continue;
-            p.edit().putLong(key(s.title), now).apply();
+            boolean wantCover = needsCover(ctx, s.title, p, now);
+            boolean wantTags = needsTags(s, p, now);
+            if (!wantCover && !wantTags) continue;
+            if (wantCover) p.edit().putLong(key(s.title), now).apply();
+            if (wantTags) p.edit().putLong("tags_" + key(s.title), now).apply();
             try {
-                String url = findCoverUrl(s.title);
-                if (url == null) continue;
-                Bitmap b = BitmapFactory.decodeStream(new java.io.ByteArrayInputStream(download(url)));
+                AniInfo info = lookup(s.title);
+                Thread.sleep(800); // reste poli avec l'API (limite ~90 requêtes/min)
+                if (info == null) continue;
+                if (wantTags && !info.tags.isEmpty()) {
+                    DbHelper.get(ctx).setTags(s.title, info.tags);
+                    found++;
+                }
+                if (!wantCover || info.coverUrl == null) continue;
+                Bitmap b = BitmapFactory.decodeStream(new java.io.ByteArrayInputStream(download(info.coverUrl)));
                 if (b == null) continue;
                 Covers.savePoster(ctx, s.title, b);
                 Covers.setCustom(ctx, s.title, true); // la couverture officielle n'est plus remplacée par une capture
                 found++;
-                Thread.sleep(800); // reste poli avec l'API (limite ~90 requêtes/min)
             } catch (InterruptedException e) {
                 break;
             } catch (Exception ignored) {
@@ -98,17 +114,24 @@ public class CoverWorker extends Worker {
             }
         }
         if (found > 0) {
+            NoteWriter.write(ctx); // fichier note + sauvegarde auto avec les nouveaux tags
             WidgetProvider.updateAll(ctx);
             ctx.sendBroadcast(new Intent(ReadingTrackerService.ACTION_UPDATED).setPackage(ctx.getPackageName()));
         }
         return Result.success();
     }
 
-    /** Recherche AniList (GraphQL public, sans clé) → URL de la couverture, ou null. */
-    static String findCoverUrl(String title) throws Exception {
+    static final class AniInfo {
+        String coverUrl;
+        String tags = "";
+    }
+
+    /** Recherche AniList (GraphQL public, sans clé) : couverture + genres + tags + statut. */
+    static AniInfo lookup(String title) throws Exception {
         JSONObject vars = new JSONObject().put("s", title);
         JSONObject body = new JSONObject()
-                .put("query", "query($s:String){Media(search:$s,type:MANGA){coverImage{extraLarge large}}}")
+                .put("query", "query($s:String){Media(search:$s,type:MANGA){coverImage{extraLarge large}"
+                        + " genres status tags{name rank isMediaSpoiler}}}")
                 .put("variables", vars);
 
         HttpURLConnection c = (HttpURLConnection) new URL("https://graphql.anilist.co").openConnection();
@@ -130,11 +153,15 @@ public class CoverWorker extends Worker {
             JSONObject media = new JSONObject(json).optJSONObject("data");
             media = media == null ? null : media.optJSONObject("Media");
             if (media == null) return null;
+            AniInfo info = new AniInfo();
             JSONObject img = media.optJSONObject("coverImage");
-            if (img == null) return null;
-            String u = img.optString("extraLarge", "");
-            if (u.isEmpty() || "null".equals(u)) u = img.optString("large", "");
-            return u.isEmpty() || "null".equals(u) ? null : u;
+            if (img != null) {
+                String u = img.optString("extraLarge", "");
+                if (u.isEmpty() || "null".equals(u)) u = img.optString("large", "");
+                info.coverUrl = u.isEmpty() || "null".equals(u) ? null : u;
+            }
+            info.tags = AutoTags.build(media);
+            return info;
         } finally {
             c.disconnect();
         }

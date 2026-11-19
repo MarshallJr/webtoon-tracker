@@ -172,10 +172,12 @@ public class MainActivity extends AppCompatActivity {
     private void refresh() {
         try {
             boolean on = isServiceEnabled();
-            statusPill.setText(on ? "●  Analyse en fond active" : "○  Analyse désactivée — toucher pour activer");
+            statusPill.setText(on ? "Analyse active" : "Analyse désactivée · activer");
+            android.graphics.drawable.Drawable dot = statusPill.getCompoundDrawablesRelative()[0];
+            if (dot != null) dot.mutate().setTint(on ? 0xFF3DDC84 : 0xFFFF6B6B);
 
             int h = Calendar.getInstance().get(Calendar.HOUR_OF_DAY);
-            greeting.setText(h < 5 || h >= 18 ? "Bonsoir 🌙 Bonne lecture" : "Bonjour ☀️ Bonne lecture");
+            greeting.setText(h < 5 || h >= 18 ? "Bonsoir 🌙" : "Bonjour ☀️");
 
             DbHelper db = DbHelper.get(this);
             List<DbHelper.Series> series = db.getSeries();

@@ -120,11 +120,17 @@ public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.VH> {
         DbHelper.Series s = shown.get(position);
         h.title.setText(s.title);
         bindCover(h.avatar, h.cover, s.title);
-        h.chapter.setText("Ch. " + Detector.formatChapter(s.lastChapter));
+        h.chapter.setText(Detector.formatChapter(s.lastChapter));
         CharSequence when = DateUtils.getRelativeTimeSpanString(
                 s.lastReadAt, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS);
-        String tags = s.tags.isEmpty() ? "" : " · " + s.tags;
-        h.subtitle.setText(s.count + (s.count > 1 ? " chapitres" : " chapitre") + " · " + when + tags);
+        h.subtitle.setText(s.count + (s.count > 1 ? " chapitres lus" : " chapitre lu") + " · " + when);
+        h.tagLine.setText(s.tags.replace(", ", "  ·  "));
+        h.tagLine.setVisibility(s.tags.isEmpty() ? View.GONE : View.VISIBLE);
+        // petite animation d'apparition
+        h.itemView.setAlpha(0f);
+        h.itemView.setTranslationY(18f);
+        h.itemView.animate().alpha(1f).translationY(0f).setDuration(260)
+                .setStartDelay(Math.min(position, 8) * 30L).start();
         h.itemView.setOnClickListener(v -> onClick.on(s));
         h.itemView.setOnLongClickListener(v -> {
             onLongClick.on(s);
@@ -138,7 +144,7 @@ public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.VH> {
     }
 
     static class VH extends RecyclerView.ViewHolder {
-        final TextView title, subtitle, chapter, avatar;
+        final TextView title, subtitle, chapter, avatar, tagLine;
         final android.widget.ImageView cover;
 
         VH(View v) {
@@ -147,6 +153,7 @@ public class SeriesAdapter extends RecyclerView.Adapter<SeriesAdapter.VH> {
             subtitle = v.findViewById(R.id.subtitle);
             chapter = v.findViewById(R.id.chapter);
             avatar = v.findViewById(R.id.avatar);
+            tagLine = v.findViewById(R.id.tagLine);
             cover = v.findViewById(R.id.cover);
         }
     }

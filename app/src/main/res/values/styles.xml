@@ -5,8 +5,9 @@
         <item name="android:layout_height">wrap_content</item>
         <item name="android:text">0</item>
         <item name="android:textColor">#FFFFFF</item>
-        <item name="android:textSize">28sp</item>
-        <item name="android:textStyle">bold</item>
+        <item name="android:textSize">30sp</item>
+        <item name="android:fontFamily">sans-serif-black</item>
+        <item name="android:letterSpacing">-0.02</item>
     </style>
 
     <style name="StatLabel">
@@ -19,5 +20,28 @@
     <style name="RoundedCover">
         <item name="cornerFamily">rounded</item>
         <item name="cornerSize">16dp</item>
+    </style>
+
+    <!-- Bouton rond de l'en-tête, avec ombre légère -->
+    <style name="HeaderIcon">
+        <item name="android:layout_width">42dp</item>
+        <item name="android:layout_height">42dp</item>
+        <item name="android:layout_marginStart">8dp</item>
+        <item name="android:background">@drawable/bg_icon_button</item>
+        <item name="android:padding">10dp</item>
+        <item name="android:scaleType">fitCenter</item>
+        <item name="android:elevation">3dp</item>
+        <item name="android:outlineSpotShadowColor">@color/shadow</item>
+        <item name="android:outlineAmbientShadowColor">@color/shadow</item>
+        <item name="android:tint">@color/text_main</item>
+    </style>
+
+    <style name="SectionTitle">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:textColor">@color/text_main</item>
+        <item name="android:textSize">17sp</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:letterSpacing">-0.01</item>
     </style>
 </resources>
