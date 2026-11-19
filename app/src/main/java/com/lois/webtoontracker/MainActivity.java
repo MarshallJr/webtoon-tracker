@@ -52,10 +52,7 @@ public class MainActivity extends AppCompatActivity {
     private ActivityResultLauncher<String[]> pickRestore;
     private TextView backupStatusView; // dans la boîte Réglages quand elle est ouverte
     private ActivityResultLauncher<String> notifPermission;
-    private com.google.android.material.materialswitch.MaterialSwitch alertsSwitchView;
     private String selectedTag = null;
-    private ActivityResultLauncher<androidx.activity.result.PickVisualMediaRequest> pickCover;
-    private String coverTarget;
     private List<List<String>> duplicates = new java.util.ArrayList<>();
 
     private final BroadcastReceiver updateReceiver = new BroadcastReceiver() {
@@ -88,7 +85,7 @@ public class MainActivity extends AppCompatActivity {
 
         RecyclerView list = findViewById(R.id.seriesList);
         list.setLayoutManager(new LinearLayoutManager(this));
-        adapter = new SeriesAdapter(this::showHistory, this::confirmDeleteSeries);
+        adapter = new SeriesAdapter(s -> DetailActivity.open(this, s.title), this::confirmDeleteSeries);
         list.setAdapter(adapter);
 
         statusPill.setOnClickListener(v -> {
@@ -114,24 +111,10 @@ public class MainActivity extends AppCompatActivity {
         findViewById(R.id.addButton).setOnClickListener(v -> showAddDialog(null));
         findViewById(R.id.heroCard).setOnClickListener(v -> startActivity(new Intent(this, StatsActivity.class)));
         findViewById(R.id.dupButton).setOnClickListener(v -> showMergeSuggestions());
-        pickCover = registerForActivityResult(new ActivityResultContracts.PickVisualMedia(), uri -> {
-            if (uri == null || coverTarget == null) return;
-            String t = coverTarget;
-            runIo(() -> {
-                Covers.saveFromUri(this, t, uri);
-                Covers.setCustom(this, t, true);
-                WidgetProvider.updateAll(this);
-                return "Miniature mise à jour 🖼";
-            });
-        });
         notifPermission = registerForActivityResult(new ActivityResultContracts.RequestPermission(), granted -> {
-            if (granted) {
-                setAlerts(true);
-            } else {
-                Toast.makeText(this, "Sans l'autorisation de notifications, impossible de t'alerter", Toast.LENGTH_LONG).show();
-                if (alertsSwitchView != null) alertsSwitchView.setChecked(false);
-            }
+            if (!granted) Toast.makeText(this, "Sans l'autorisation de notifications, impossible de t'alerter", Toast.LENGTH_LONG).show();
         });
+        Follow.sync(this);
 
         ((EditText) findViewById(R.id.searchInput)).addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) {}
@@ -323,19 +306,11 @@ public class MainActivity extends AppCompatActivity {
             sendBroadcast(new Intent(ReadingTrackerService.ACTION_TEST_BANNER).setPackage(getPackageName()));
         });
 
-        alertsSwitchView = v.findViewById(R.id.alertsSwitch);
         TextView alertsInfo = v.findViewById(R.id.alertsInfo);
-        alertsSwitchView.setChecked(p.getBoolean(ChapterCheckWorker.KEY_ALERTS, false));
+        int followed = DbHelper.get(this).countFollowed();
+        ((TextView) v.findViewById(R.id.alertsTitle)).setText("🔔 Alertes nouveaux chapitres · "
+                + followed + (followed > 1 ? " séries suivies" : " série suivie"));
         alertsInfo.setText(alertsDescription());
-        alertsSwitchView.setOnCheckedChangeListener((b, checked) -> {
-            if (checked && android.os.Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(this,
-                    android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
-                notifPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS);
-                return;
-            }
-            setAlerts(checked);
-            alertsInfo.setText(alertsDescription());
-        });
         v.findViewById(R.id.alertsCheckNow).setOnClickListener(b -> {
             ChapterCheckWorker.checkNow(this);
             Toast.makeText(this, "Vérification lancée (quelques secondes)", Toast.LENGTH_SHORT).show();
@@ -357,75 +332,23 @@ public class MainActivity extends AppCompatActivity {
                 .setPositiveButton("OK", null)
                 .setOnDismissListener(d -> {
                     backupStatusView = null;
-                    alertsSwitchView = null;
                 })
                 .show();
     }
 
     // ------------------------------------------------------------------ Alertes nouveaux chapitres
 
-    private void setAlerts(boolean on) {
-        getSharedPreferences(NoteWriter.PREFS, MODE_PRIVATE).edit()
-                .putBoolean(ChapterCheckWorker.KEY_ALERTS, on).apply();
-        if (on) {
-            ChapterCheckWorker.createChannel(this);
-            ChapterCheckWorker.enable(this);
-            ChapterCheckWorker.checkNow(this); // mémorise le dernier épisode actuel de chaque série
-        } else {
-            ChapterCheckWorker.disable(this);
-        }
-    }
-
     private String alertsDescription() {
         SharedPreferences p = getSharedPreferences(NoteWriter.PREFS, MODE_PRIVATE);
         long last = p.getLong("last_check", 0);
-        return "Environ 2 fois par jour, l'appli regarde si un chapitre plus récent que ton dernier lu "
+        return "Active la cloche 🔔 dans la page d'une série pour la surveiller. "
+                + "Environ 2 fois par jour, l'appli regarde si un chapitre plus récent que ton dernier lu "
                 + "est sorti en anglais ou en français, sur MangaDex (scans + sites officiels), "
                 + "MangaUpdates (toutes les sorties, tous groupes) et WEBTOON. "
                 + "La notification te dit où le lire et ouvre le chapitre en un appui. "
                 + "Seulement avec du réseau et une batterie non faible."
                 + (last > 0 ? "\nDernière vérification : "
                 + new SimpleDateFormat("dd/MM HH:mm", Locale.FRANCE).format(new Date(last)) : "");
-    }
-
-    private void showLinkDialog(DbHelper.Series s) {
-        EditText input = new EditText(this);
-        input.setHint("https://www.webtoons.com/fr/…/list?title_no=…");
-        input.setSingleLine(true);
-        ClipboardManager cm = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
-        if (cm != null && cm.hasPrimaryClip() && cm.getPrimaryClip().getItemCount() > 0) {
-            CharSequence clip = cm.getPrimaryClip().getItemAt(0).getText();
-            if (clip != null && clip.toString().contains("webtoons.com")) input.setText(clip);
-        }
-        int pad = (int) (24 * getResources().getDisplayMetrics().density);
-        LinearLayout box = new LinearLayout(this);
-        box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(pad, pad / 3, pad, 0);
-        TextView help = new TextView(this);
-        help.setText("Ouvre la série sur webtoons.com (ou dans l'appli WEBTOON → Partager → Copier le lien), puis colle le lien ici.");
-        help.setTextColor(ContextCompat.getColor(this, R.color.text_soft));
-        box.addView(help);
-        box.addView(input);
-
-        new MaterialAlertDialogBuilder(this)
-                .setTitle("⚡ Alertes pour « " + s.title + " »")
-                .setView(box)
-                .setPositiveButton("Lier", (d, w) -> {
-                    String[] parsed = Detector.parseSeriesLink(input.getText().toString());
-                    if (parsed == null) {
-                        Toast.makeText(this, "Lien non reconnu (il doit contenir title_no=…)", Toast.LENGTH_LONG).show();
-                        return;
-                    }
-                    DbHelper.get(this).linkWebtoons(s.title, parsed[0], parsed[1]);
-                    NoteWriter.writeAsync(this);
-                    boolean on = getSharedPreferences(NoteWriter.PREFS, MODE_PRIVATE)
-                            .getBoolean(ChapterCheckWorker.KEY_ALERTS, false);
-                    if (on) ChapterCheckWorker.checkNow(this);
-                    Toast.makeText(this, on ? "Série liée ✅ Tu seras alerté des nouveaux chapitres"
-                            : "Série liée ✅ Active les alertes dans ⚙️ Réglages", Toast.LENGTH_LONG).show();
-                })
-                .setNegativeButton("Annuler", null)
-                .show();
     }
 
     // ------------------------------------------------------------------ Nouveaux chapitres
@@ -522,6 +445,10 @@ public class MainActivity extends AppCompatActivity {
                 sites.addView(c);
             }
             row.findViewById(R.id.uResume).setOnClickListener(x -> Resume.open(this, top.title));
+            row.setOnClickListener(x -> {
+                sheet.dismiss();
+                DetailActivity.open(this, top.title);
+            });
             box.addView(row);
         }
 
@@ -541,35 +468,6 @@ public class MainActivity extends AppCompatActivity {
         scroll.addView(box);
         sheet.setContentView(scroll);
         sheet.show();
-    }
-
-    // ------------------------------------------------------------------ Miniatures
-
-    private void showCoverMenu(DbHelper.Series s) {
-        String[] items = {
-                "🖼 Choisir une image dans la galerie",
-                "🔄 Revenir à la miniature automatique",
-                "🗑 Supprimer la miniature"};
-        new MaterialAlertDialogBuilder(this)
-                .setTitle("Miniature · " + s.title)
-                .setItems(items, (d, w) -> {
-                    if (w == 0) {
-                        coverTarget = s.title;
-                        pickCover.launch(new androidx.activity.result.PickVisualMediaRequest.Builder()
-                                .setMediaType(ActivityResultContracts.PickVisualMedia.ImageOnly.INSTANCE).build());
-                    } else {
-                        Covers.delete(this, s.title); // supprime aussi le verrou "image perso"
-                        getSharedPreferences("covers_meta", MODE_PRIVATE).edit()
-                                .putLong("try_" + s.title.toLowerCase(Locale.ROOT), w == 1 ? 0 : System.currentTimeMillis())
-                                .apply();
-                        WidgetProvider.updateAll(this);
-                        refresh();
-                        Toast.makeText(this, w == 1 ? "La miniature va être recherchée automatiquement"
-                                : "Miniature supprimée", Toast.LENGTH_SHORT).show();
-                    }
-                })
-                .setNegativeButton("Annuler", null)
-                .show();
     }
 
     // ------------------------------------------------------------------ Tags
@@ -606,46 +504,6 @@ public class MainActivity extends AppCompatActivity {
         c.setText(label);
         c.setChecked(checked);
         return c;
-    }
-
-    private void showTagEditor(DbHelper.Series s) {
-        java.util.Set<String> all = new java.util.TreeSet<>(String.CASE_INSENSITIVE_ORDER);
-        java.util.Collections.addAll(all, SUGGESTED_TAGS);
-        all.addAll(DbHelper.get(this).allTags());
-        List<String> current = Titles.splitTags(s.tags);
-
-        int pad = (int) (20 * getResources().getDisplayMetrics().density);
-        LinearLayout box = new LinearLayout(this);
-        box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(pad, pad / 3, pad, 0);
-        com.google.android.material.chip.ChipGroup group = new com.google.android.material.chip.ChipGroup(this);
-        for (String t : all) {
-            boolean on = false;
-            for (String c : current) if (c.equalsIgnoreCase(t)) on = true;
-            group.addView(makeChip(group, t, on));
-        }
-        box.addView(group);
-        EditText custom = new EditText(this);
-        custom.setHint("Autre tag (ex : Webtoon du dimanche)");
-        custom.setSingleLine(true);
-        box.addView(custom);
-
-        new MaterialAlertDialogBuilder(this)
-                .setTitle("🏷 Tags · " + s.title)
-                .setView(box)
-                .setPositiveButton("Enregistrer", (d, w) -> {
-                    StringBuilder sb = new StringBuilder();
-                    for (int i = 0; i < group.getChildCount(); i++) {
-                        com.google.android.material.chip.Chip c = (com.google.android.material.chip.Chip) group.getChildAt(i);
-                        if (c.isChecked()) sb.append(c.getText()).append(',');
-                    }
-                    sb.append(custom.getText());
-                    DbHelper.get(this).setTags(s.title, sb.toString());
-                    NoteWriter.writeAsync(this);
-                    refresh();
-                })
-                .setNegativeButton("Annuler", null)
-                .show();
     }
 
     // ------------------------------------------------------------------ Fusion des doublons
@@ -692,30 +550,6 @@ public class MainActivity extends AppCompatActivity {
                     refresh();
                 })
                 .setNegativeButton("Plus tard", null)
-                .show();
-    }
-
-    private void showMergePicker(DbHelper.Series s) {
-        List<String> others = new java.util.ArrayList<>();
-        for (DbHelper.Series o : DbHelper.get(this).getSeries()) if (!o.title.equalsIgnoreCase(s.title)) others.add(o.title);
-        if (others.isEmpty()) {
-            Toast.makeText(this, "Aucune autre série à fusionner", Toast.LENGTH_SHORT).show();
-            return;
-        }
-        String[] items = others.toArray(new String[0]);
-        new MaterialAlertDialogBuilder(this)
-                .setTitle("Fusionner « " + s.title + " » avec…")
-                .setItems(items, (d, w) -> new MaterialAlertDialogBuilder(this)
-                        .setMessage("Les chapitres de « " + items[w] + " » seront rangés dans « " + s.title + " ».")
-                        .setPositiveButton("Fusionner", (d2, w2) -> {
-                            DbHelper.get(this).mergeSeries(items[w], s.title);
-                            Covers.merge(this, items[w], s.title);
-                            NoteWriter.writeAsync(this);
-                            refresh();
-                        })
-                        .setNegativeButton("Annuler", null)
-                        .show())
-                .setNegativeButton("Annuler", null)
                 .show();
     }
 
@@ -805,134 +639,7 @@ public class MainActivity extends AppCompatActivity {
         startActivity(Intent.createChooser(send, "Envoyer le récap vers…"));
     }
 
-    // ------------------------------------------------------------------ Historique (bottom sheet)
-
-    private void showHistory(DbHelper.Series s) {
-        BottomSheetDialog sheet = new BottomSheetDialog(this);
-        View v = getLayoutInflater().inflate(R.layout.sheet_history, null);
-        sheet.setContentView(v);
-
-        SeriesAdapter.bindCover(v.findViewById(R.id.sAvatar), v.findViewById(R.id.sCover), s.title);
-        v.findViewById(R.id.sCoverButton).setOnClickListener(b -> {
-            sheet.dismiss();
-            showCoverMenu(s);
-        });
-        ((TextView) v.findViewById(R.id.sTitle)).setText(s.title);
-        ((TextView) v.findViewById(R.id.sSubtitle)).setText("Dernier : chapitre "
-                + Detector.formatChapter(s.lastChapter) + " · " + s.count
-                + (s.count > 1 ? " chapitres lus" : " chapitre lu"));
-
-        List<DbHelper.Entry> entries = DbHelper.get(this).getHistory(s.title);
-        RecyclerView rv = v.findViewById(R.id.sList);
-        rv.setLayoutManager(new LinearLayoutManager(this));
-        rv.setAdapter(new HistoryAdapter(entries, e -> {
-            sheet.dismiss();
-            confirmDeleteEntry(s, e);
-        }));
-
-        List<DbHelper.Release> fresh = DbHelper.get(this).newReleases(s.title);
-        com.google.android.material.button.MaterialButton newBtn = v.findViewById(R.id.sNew);
-        if (!fresh.isEmpty()) {
-            newBtn.setVisibility(View.VISIBLE);
-            newBtn.setText("🔔 Ch. " + Detector.formatChapter(fresh.get(0).chapter) + " dispo · où le lire ?");
-            newBtn.setOnClickListener(b -> {
-                sheet.dismiss();
-                showUpdates(s.title);
-            });
-        }
-        TextView tagsView = v.findViewById(R.id.sTags);
-        tagsView.setText(s.tags.isEmpty() ? "" : "🏷 " + s.tags);
-        tagsView.setVisibility(s.tags.isEmpty() ? View.GONE : View.VISIBLE);
-        DbHelper.Meta meta = DbHelper.get(this).getMeta(s.title);
-        ((TextView) v.findViewById(R.id.sLinkButton)).setText(
-                meta != null && meta.titleNo != null ? "⚡ Lié ✓" : "⚡ Alertes");
-        v.findViewById(R.id.sResume).setOnClickListener(b -> {
-            sheet.dismiss();
-            Resume.open(this, s.title);
-        });
-        v.findViewById(R.id.sTagButton).setOnClickListener(b -> {
-            sheet.dismiss();
-            showTagEditor(s);
-        });
-        v.findViewById(R.id.sMergeButton).setOnClickListener(b -> {
-            sheet.dismiss();
-            showMergePicker(s);
-        });
-        v.findViewById(R.id.sLinkButton).setOnClickListener(b -> {
-            sheet.dismiss();
-            showLinkDialog(s);
-        });
-
-        v.findViewById(R.id.sAdd).setOnClickListener(b -> {
-            sheet.dismiss();
-            showAddDialog(s.title);
-        });
-        v.findViewById(R.id.sDelete).setOnClickListener(b -> {
-            sheet.dismiss();
-            confirmDeleteSeries(s);
-        });
-        sheet.show();
-    }
-
-    interface OnEntry {
-        void on(DbHelper.Entry e);
-    }
-
-    static class HistoryAdapter extends RecyclerView.Adapter<HistoryAdapter.H> {
-        private final List<DbHelper.Entry> items;
-        private final OnEntry onClick;
-        private final SimpleDateFormat fmt = new SimpleDateFormat("EEE d MMM yyyy · HH:mm", Locale.FRANCE);
-
-        HistoryAdapter(List<DbHelper.Entry> items, OnEntry onClick) {
-            this.items = items;
-            this.onClick = onClick;
-        }
-
-        @NonNull
-        @Override
-        public H onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-            return new H(LayoutInflater.from(parent.getContext()).inflate(R.layout.item_history, parent, false));
-        }
-
-        @Override
-        public void onBindViewHolder(@NonNull H h, int position) {
-            DbHelper.Entry e = items.get(position);
-            h.chapter.setText("Ch. " + Detector.formatChapter(e.chapter));
-            h.date.setText(fmt.format(new Date(e.readAt)));
-            h.source.setText(e.source == null ? "" : e.source);
-            h.itemView.setOnClickListener(v -> onClick.on(e));
-        }
-
-        @Override
-        public int getItemCount() {
-            return items.size();
-        }
-
-        static class H extends RecyclerView.ViewHolder {
-            final TextView chapter, date, source;
-
-            H(View v) {
-                super(v);
-                chapter = v.findViewById(R.id.hChapter);
-                date = v.findViewById(R.id.hDate);
-                source = v.findViewById(R.id.hSource);
-            }
-        }
-    }
-
     // ------------------------------------------------------------------ Dialogues
-
-    private void confirmDeleteEntry(DbHelper.Series s, DbHelper.Entry e) {
-        new MaterialAlertDialogBuilder(this)
-                .setMessage("Supprimer le chapitre " + Detector.formatChapter(e.chapter) + " de « " + s.title + " » ?")
-                .setPositiveButton("Supprimer", (d, w) -> {
-                    DbHelper.get(this).deleteEntry(e.id);
-                    NoteWriter.writeAsync(this);
-                    refresh();
-                })
-                .setNegativeButton("Annuler", null)
-                .show();
-    }
 
     private void confirmDeleteSeries(DbHelper.Series s) {
         new MaterialAlertDialogBuilder(this)
@@ -941,6 +648,7 @@ public class MainActivity extends AppCompatActivity {
                 .setPositiveButton("Supprimer", (d, w) -> {
                     DbHelper.get(this).deleteSeries(s.title);
                     Covers.delete(this, s.title);
+                    Follow.sync(this);
                     NoteWriter.writeAsync(this);
                     refresh();
                 })

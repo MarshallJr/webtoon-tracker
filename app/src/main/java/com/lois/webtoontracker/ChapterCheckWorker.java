@@ -75,7 +75,6 @@ public class ChapterCheckWorker extends Worker {
     // ------------------------------------------------------------------ Travail
 
     private static final long SEARCH_RETRY_MS = 7L * 24 * 3600 * 1000;
-    private static final long ACTIVE_MS = 180L * 24 * 3600 * 1000; // séries lues ces 6 derniers mois
 
     @NonNull
     @Override
@@ -88,9 +87,8 @@ public class ChapterCheckWorker extends Worker {
 
         for (DbHelper.Series s : db.getSeries()) {
             if (isStopped()) break;
-            if (now - s.lastReadAt > ACTIVE_MS) continue;
             DbHelper.Meta m = db.getMeta(s.title);
-            if (m == null) m = new DbHelper.Meta();
+            if (m == null || !m.follow) continue;   // 🔔 seulement les séries que tu as choisies
             String tryKey = "src_" + s.title.toLowerCase(java.util.Locale.ROOT);
             boolean canSearch = now - tries.getLong(tryKey, 0) > SEARCH_RETRY_MS;
             java.util.List<DbHelper.Release> rel = new java.util.ArrayList<>();

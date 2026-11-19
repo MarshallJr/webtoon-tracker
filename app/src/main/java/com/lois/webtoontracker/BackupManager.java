@@ -64,6 +64,9 @@ public final class BackupManager {
             o.put("titleNo", m.titleNo == null ? "" : m.titleNo);
             o.put("rssBase", m.rssBase == null ? "" : m.rssBase);
             o.put("rssLastEp", m.rssLastEp);
+            o.put("follow", m.follow);
+            o.put("rating", m.rating);
+            o.put("note", m.note == null ? "" : m.note);
             metas.put(o);
         }
 
@@ -137,6 +140,9 @@ public final class BackupManager {
                     m.rssBase = emptyToNull(o.optString("rssBase"));
                     m.rssLastEp = o.optLong("rssLastEp", 0);
                 }
+                if (o.optBoolean("follow", false)) m.follow = true;
+                if (m.rating == 0) m.rating = o.optInt("rating", 0);
+                if (m.note == null || m.note.isEmpty()) m.note = emptyToNull(o.optString("note"));
                 db.saveMeta(m);
             }
         }

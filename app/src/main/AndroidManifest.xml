@@ -27,6 +27,10 @@
             android:name=".StatsActivity"
             android:exported="false" />
 
+        <activity
+            android:name=".DetailActivity"
+            android:exported="false" />
+
         <receiver
             android:name=".WidgetProvider"
             android:exported="false">

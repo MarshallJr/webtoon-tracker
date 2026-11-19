@@ -16,7 +16,7 @@ import java.util.TreeSet;
 public class DbHelper extends SQLiteOpenHelper {
 
     private static final String DB_NAME = "webtoons.db";
-    private static final int DB_VERSION = 3;
+    private static final int DB_VERSION = 4;
     private static DbHelper instance;
 
     public static synchronized DbHelper get(Context ctx) {
@@ -39,6 +39,16 @@ public class DbHelper extends SQLiteOpenHelper {
         db.execSQL("CREATE UNIQUE INDEX idx_reads_unique ON reads(title COLLATE NOCASE, chapter)");
         createMeta(db);
         upgradeTo3(db);
+        upgradeTo4(db);
+    }
+
+    /** v4 : cloche (suivi des nouveaux chapitres), note perso, fiche détaillée en cache. */
+    private void upgradeTo4(SQLiteDatabase db) {
+        db.execSQL("ALTER TABLE series_meta ADD COLUMN follow INTEGER DEFAULT 0");
+        db.execSQL("ALTER TABLE series_meta ADD COLUMN rating INTEGER DEFAULT 0");
+        db.execSQL("ALTER TABLE series_meta ADD COLUMN note TEXT");
+        db.execSQL("ALTER TABLE series_meta ADD COLUMN details_json TEXT");
+        db.execSQL("ALTER TABLE series_meta ADD COLUMN details_at INTEGER DEFAULT 0");
     }
 
     /** v3 : sorties de chapitres trouvées sur les sources (MangaDex, MangaUpdates, Webtoon). */
@@ -72,6 +82,7 @@ public class DbHelper extends SQLiteOpenHelper {
     public void onUpgrade(SQLiteDatabase db, int oldV, int newV) {
         if (oldV < 2) createMeta(db); // v1 → v2 : on garde toutes les lectures
         if (oldV < 3) upgradeTo3(db);
+        if (oldV < 4) upgradeTo4(db);
     }
 
     // ------------------------------------------------------------------ Modèles
@@ -110,6 +121,10 @@ public class DbHelper extends SQLiteOpenHelper {
         public String title, tags, lastUrl, lastPkg, titleNo, rssBase, mdxId, muId;
         public long rssLastEp;
         public double notifiedCh;
+        public boolean follow;
+        public int rating;
+        public String note, detailsJson;
+        public long detailsAt;
     }
 
     /** Un chapitre disponible quelque part (site + langue). */
@@ -240,7 +255,8 @@ public class DbHelper extends SQLiteOpenHelper {
 
     public Meta getMeta(String title) {
         try (Cursor c = getReadableDatabase().rawQuery(
-                "SELECT title, tags, last_url, last_pkg, title_no, rss_base, rss_last_ep, mdx_id, mu_id, notified_ch FROM series_meta " +
+                "SELECT title, tags, last_url, last_pkg, title_no, rss_base, rss_last_ep, mdx_id, mu_id, notified_ch, " +
+                        "follow, rating, note, details_json, details_at FROM series_meta " +
                         "WHERE title = ? COLLATE NOCASE", new String[]{title})) {
             if (!c.moveToFirst()) return null;
             Meta m = new Meta();
@@ -254,6 +270,11 @@ public class DbHelper extends SQLiteOpenHelper {
             m.mdxId = c.getString(7);
             m.muId = c.getString(8);
             m.notifiedCh = c.getDouble(9);
+            m.follow = c.getInt(10) == 1;
+            m.rating = c.getInt(11);
+            m.note = c.getString(12);
+            m.detailsJson = c.getString(13);
+            m.detailsAt = c.getLong(14);
             return m;
         }
     }
@@ -281,6 +302,11 @@ public class DbHelper extends SQLiteOpenHelper {
         v.put("mdx_id", m.mdxId);
         v.put("mu_id", m.muId);
         v.put("notified_ch", m.notifiedCh);
+        v.put("follow", m.follow ? 1 : 0);
+        v.put("rating", m.rating);
+        v.put("note", m.note);
+        v.put("details_json", m.detailsJson);
+        v.put("details_at", m.detailsAt);
         db.insertWithOnConflict("series_meta", null, v, SQLiteDatabase.CONFLICT_REPLACE);
     }
 
@@ -380,6 +406,45 @@ public class DbHelper extends SQLiteOpenHelper {
             }
         }
         return out;
+    }
+
+    // ------------------------------------------------------------------ Cloche, note, fiche
+
+    public synchronized void setFollow(String title, boolean on) {
+        Meta m = metaOrNew(title);
+        m.follow = on;
+        if (on) m.notifiedCh = lastRead(title); // on ne signale que ce qui sortira après ton dernier lu
+        saveMeta(m);
+    }
+
+    public boolean isFollowed(String title) {
+        Meta m = getMeta(title);
+        return m != null && m.follow;
+    }
+
+    public int countFollowed() {
+        try (Cursor c = getReadableDatabase().rawQuery("SELECT COUNT(*) FROM series_meta WHERE follow = 1", null)) {
+            return c.moveToFirst() ? c.getInt(0) : 0;
+        }
+    }
+
+    public synchronized void setRating(String title, int stars) {
+        Meta m = metaOrNew(title);
+        m.rating = stars;
+        saveMeta(m);
+    }
+
+    public synchronized void setNote(String title, String note) {
+        Meta m = metaOrNew(title);
+        m.note = note;
+        saveMeta(m);
+    }
+
+    public synchronized void setDetails(String title, String json) {
+        Meta m = metaOrNew(title);
+        m.detailsJson = json;
+        m.detailsAt = System.currentTimeMillis();
+        saveMeta(m);
     }
 
     public synchronized void setNotified(String title, double ch) {

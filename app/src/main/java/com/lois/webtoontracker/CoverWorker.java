@@ -69,7 +69,8 @@ public class CoverWorker extends Worker {
     /** Lien webtoons.com automatique (pour les alertes nouveaux chapitres). */
     private static boolean needsLink(Context ctx, DbHelper.Series s, SharedPreferences p, long now) {
         DbHelper.Meta m = DbHelper.get(ctx).getMeta(s.title);
-        if (m != null && m.titleNo != null) return false;
+        if (m == null || !m.follow) return false;          // lien utile seulement pour les séries 🔔
+        if (m.titleNo != null) return false;
         return now - p.getLong("link_" + key(s.title), 0) > RETRY_MS;
     }
 
@@ -124,8 +125,7 @@ public class CoverWorker extends Worker {
             }
         }
         if (found > 0) {
-            if (ctx.getSharedPreferences(NoteWriter.PREFS, Context.MODE_PRIVATE)
-                    .getBoolean(ChapterCheckWorker.KEY_ALERTS, false)) {
+            if (DbHelper.get(ctx).countFollowed() > 0) {
                 ChapterCheckWorker.checkNow(ctx); // mémorise le dernier épisode des séries tout juste liées
             }
             NoteWriter.write(ctx); // fichier note + sauvegarde auto avec les nouveaux tags
