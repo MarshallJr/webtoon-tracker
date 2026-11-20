@@ -192,8 +192,8 @@ public class DbHelper extends SQLiteOpenHelper {
                 new Object[]{title, chapter, now - gapMs});
         db.execSQL("UPDATE reads SET last_at = ? WHERE title = ? COLLATE NOCASE AND chapter = ?",
                 new Object[]{now, title, chapter});
-        if (url != null) {
-            db.execSQL("UPDATE reads SET url = ? WHERE title = ? COLLATE NOCASE AND chapter = ? AND url IS NULL",
+        if (url != null) {   // le site où tu l'as relu en dernier
+            db.execSQL("UPDATE reads SET url = ? WHERE title = ? COLLATE NOCASE AND chapter = ?",
                     new Object[]{url, title, chapter});
         }
     }

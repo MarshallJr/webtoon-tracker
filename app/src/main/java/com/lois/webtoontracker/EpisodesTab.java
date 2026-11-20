@@ -239,8 +239,7 @@ final class EpisodesTab {
             // Pas encore lu : en clair
             date.setText(r.chapter > furthest ? "À lire" : "Pas lu");
             btn.setText("Lire");
-            String url = ChapterLinks.urlFor(meta, entries, r.chapter);
-            action = url == null ? null : () -> open(url);
+            action = linkAction(meta, entries, r.chapter);
             v.setOnLongClickListener(x -> markRead(x, r.chapter));
         } else {
             DbHelper.Entry e = r.entry;
@@ -281,8 +280,7 @@ final class EpisodesTab {
                 btn.setTextColor(0xFFFFFFFF);
                 action = () -> Resume.open(act, title);
             } else {
-                String url = ChapterLinks.urlFor(meta, entries, e.chapter);
-                action = url == null ? null : () -> open(url);
+                action = linkAction(meta, entries, e.chapter);
             }
             v.setOnLongClickListener(x -> {
                 PopupMenu pm = new PopupMenu(act, x);
@@ -307,6 +305,21 @@ final class EpisodesTab {
             btn.setTag(R.id.anim_press, Boolean.TRUE);
         }
         return v;
+    }
+
+    /**
+     * Ouvre le chapitre sur le site du dernier chapitre consulté (même site, numéro changé).
+     * Si ce site ne permet pas de deviner l'adresse : la page de la série sur ce site.
+     */
+    private Runnable linkAction(DbHelper.Meta meta, List<DbHelper.Entry> entries, double chapter) {
+        ChapterLinks.Link link = ChapterLinks.linkFor(act, title, meta, entries, chapter);
+        if (link == null) return null;
+        if (!link.seriesPage) return () -> open(link.url);
+        return () -> {
+            Toast.makeText(act, "Adresse du ch. " + Detector.formatChapter(chapter) + " impossible à deviner sur "
+                    + link.host() + " : page de la série", Toast.LENGTH_LONG).show();
+            open(link.url);
+        };
     }
 
     /** Appui long sur un chapitre pas encore lu → le marquer comme lu. */

@@ -316,6 +316,7 @@ public class ReadingTrackerService extends AccessibilityService {
         boolean newSeries = !db.seriesExists(r.title);
         long now = System.currentTimeMillis();
         boolean isNew = db.insertRead(r.title, r.chapter, now, r.source, r.url);
+        ChapterLinks.rememberVisit(this, r.title, r.url, r.chapter); // le site à réutiliser pour les autres chapitres
         db.rememberSource(r); // pour "Reprendre" et les alertes, même si le chapitre était déjà lu
         if (!isNew) {
             db.markReopened(r.title, r.chapter, now, r.url, NotifyPolicy.SESSION_GAP_MS); // relecture
