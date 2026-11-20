@@ -256,13 +256,12 @@ public class ReadingTrackerService extends AccessibilityService {
                 at = fallback;
                 Progress.save(this, title, r.chapter, fallback);
             }
-            // Vignette : jusqu'à 3 essais au milieu du chapitre (30 → 70 %), espacés d'au moins 10 % ;
-            // on garde la plus belle (début de scène, couleurs, contraste). Le début du chapitre
-            // (page de titre, bandeau du site) est évité.
+            // Vignette : on analyse une capture tous les ~7 % du chapitre (8 → 95 %, 12 au plus) ;
+            // le sélecteur garde la meilleure (une seule scène, sans texte ni vide, visages favorisés).
             String key = title.toLowerCase(Locale.ROOT) + "#" + r.chapter;
             float[] st = midShots.get(key);
             if (st == null) st = new float[]{-1f, 0f};
-            if (at >= 0.30f && at <= 0.72f && st[1] < 3 && Math.abs(at - st[0]) >= 0.10f
+            if (at >= 0.08f && at <= 0.95f && st[1] < 12 && Math.abs(at - st[0]) >= 0.07f
                     && DbHelper.get(this).getReadAt(title, r.chapter) >= 0) {
                 st[0] = at;
                 st[1]++;
