@@ -128,6 +128,26 @@ public class ChapterCheckWorker extends Worker {
                 }
             } catch (Exception ignored) {
             }
+            // 4. Le site où tu lis (scans) : l'adresse du chapitre suivant existe-t-elle ?
+            try {
+                double last = db.lastRead(s.title);
+                String known = null;
+                double knownCh = 0;
+                for (DbHelper.Entry e : db.getHistory(s.title)) {   // du plus récent au plus ancien
+                    if (e.url != null && !e.url.contains("webtoons.com")) {
+                        known = e.url;
+                        knownCh = e.chapter;
+                        break;
+                    }
+                }
+                if (known == null && m.lastUrl != null && !m.lastUrl.contains("webtoons.com")) {
+                    known = m.lastUrl;      // lu avant la v4.3 : l'adresse du dernier chapitre
+                    knownCh = last;
+                }
+                DbHelper.Release r = ReleaseSources.siteLatest(s.title, known, knownCh, last);
+                if (r != null) rel.add(r);
+            } catch (Exception ignored) {
+            }
             if (canSearch) tries.edit().putLong(tryKey, now).apply();
 
             for (DbHelper.Release r : rel) db.saveRelease(r);

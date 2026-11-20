@@ -1,5 +1,7 @@
 package com.lois.webtoontracker;
 
+import java.util.regex.Pattern;
+
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -186,6 +188,77 @@ public final class ReleaseSources {
         r.label = "WEBTOON";
         r.foundAt = System.currentTimeMillis();
         return r;
+    }
+
+    // ------------------------------------------------------------------ Le site où tu lis
+
+    /**
+     * Le site où tu lis cette série : on essaie directement l'adresse du chapitre suivant
+     * (ex. …/demonic-emperor-chapter-936/ → …-937/). Beaucoup de sites de scans publient avant
+     * que MangaDex / MangaUpdates ne soient à jour, et leur liste publique peut même être en retard
+     * (chapitres « à débloquer »). On avance tant que les chapitres existent (5 au plus).
+     *
+     * @param knownUrl adresse d'un chapitre lu, knownCh son numéro, from le dernier chapitre lu
+     */
+    public static DbHelper.Release siteLatest(String title, String knownUrl, double knownCh, double from) throws Exception {
+        if (knownUrl == null || from != Math.floor(from)) return null;
+        DbHelper.Release best = null;
+        for (int i = 1; i <= 5; i++) {
+            double ch = from + i;
+            String url = ChapterLinks.guess(knownUrl, knownCh, ch);
+            if (url == null || !chapterPageExists(url, ch)) break;
+            best = new DbHelper.Release();
+            best.title = title;
+            best.source = "Site";
+            best.chapter = ch;
+            best.url = url;
+            String host = host(url);
+            best.label = host;
+            best.lang = host.matches("(?i)^(fr|french)[-.].*|.*[-.]fr$|.*scan-?vf.*|.*(fr)scans?\\..*") ? "FR"
+                    : host.matches("(?i)^(en|english)[-.].*") ? "EN" : "";
+            best.foundAt = System.currentTimeMillis();
+            Thread.sleep(600);
+        }
+        return best;
+    }
+
+    /**
+     * La page existe vraiment : réponse 200, l'adresse finale contient toujours le numéro (pas de
+     * renvoi vers l'accueil) et le titre de la page annonce bien ce chapitre (pas une page « introuvable »).
+     */
+    static boolean chapterPageExists(String url, double ch) {
+        HttpURLConnection c = null;
+        try {
+            c = (HttpURLConnection) new URL(url).openConnection();
+            c.setConnectTimeout(10000);
+            c.setReadTimeout(15000);
+            c.setInstanceFollowRedirects(true);
+            c.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Mobile Safari/537.36");
+            c.setRequestProperty("Accept", "text/html,application/xhtml+xml");
+            c.setRequestProperty("Accept-Language", "fr,en;q=0.8");
+            if (c.getResponseCode() != 200) return false;
+            String n = Detector.formatChapter(ch);
+            if (!c.getURL().toString().contains(n)) return false;
+            String head;
+            try (InputStream in = c.getInputStream()) {
+                byte[] buf = new byte[96 * 1024];
+                int len = 0, r;
+                while (len < buf.length && (r = in.read(buf, len, buf.length - len)) > 0) len += r;
+                head = new String(buf, 0, len, StandardCharsets.UTF_8);
+            }
+            Matcher t = Pattern.compile("(?is)<title[^>]*>(.*?)</title>").matcher(head);
+            String pageTitle = t.find() ? t.group(1) : "";
+            if (pageTitle.matches("(?is).*(not found|introuvable|404|error|erreur).*")) return false;
+            Pattern num = Pattern.compile("(?i)(chap(?:ter|itre)?|ch\\.?|[ée]pisode|ep\\.?)\\s*[-#:]?\\s*0*"
+                    + Pattern.quote(n) + "(?![0-9]|\\.[0-9])");
+            if (num.matcher(pageTitle).find()) return true;
+            Matcher h1 = Pattern.compile("(?is)<h1[^>]*>(.*?)</h1>").matcher(head);
+            return h1.find() && num.matcher(h1.group(1).replaceAll("<[^>]+>", " ")).find();
+        } catch (Exception e) {
+            return false;   // site injoignable, protégé, etc. : on ne prévient pas
+        } finally {
+            if (c != null) c.disconnect();
+        }
     }
 
     // ------------------------------------------------------------------ HTTP
