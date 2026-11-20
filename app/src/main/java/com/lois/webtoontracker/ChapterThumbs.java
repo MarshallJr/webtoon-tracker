@@ -99,6 +99,34 @@ public final class ChapterThumbs {
         }
     }
 
+    /** Vignette officielle (WEBTOON) : recadrée au format, jamais remplacée par une capture. */
+    public static boolean saveOfficial(Context ctx, String title, double chapter, Bitmap src) {
+        try {
+            float scale = Math.max(W / (float) src.getWidth(), H / (float) src.getHeight());
+            int cw = Math.min(src.getWidth(), Math.round(W / scale)), ch = Math.min(src.getHeight(), Math.round(H / scale));
+            int cx = (src.getWidth() - cw) / 2, cy = Math.max(0, (src.getHeight() - ch) / 3);
+            Bitmap out = Bitmap.createScaledBitmap(Bitmap.createBitmap(src, cx, cy, cw, ch), W, H, true);
+            File d = dir(ctx, title);
+            if (!d.exists() && !d.mkdirs()) return false;
+            File f = file(ctx, title, chapter);
+            try (FileOutputStream fos = new FileOutputStream(f)) {
+                out.compress(Bitmap.CompressFormat.JPEG, 88, fos);
+            }
+            ctx.getSharedPreferences("thumb_scores", Context.MODE_PRIVATE).edit()
+                    .putFloat(f.getAbsolutePath(), WebtoonThumbs.OFFICIAL).apply();
+            CACHE.remove(f.getAbsolutePath());
+            return true;
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    static float scoreOf(Context ctx, String title, double chapter) {
+        File f = file(ctx, title, chapter);
+        if (!f.exists()) return -1f;
+        return ctx.getSharedPreferences("thumb_scores", Context.MODE_PRIVATE).getFloat(f.getAbsolutePath(), 0f);
+    }
+
     /**
      * Début d'une scène : on cherche, dans la moitié haute de l'écran, une marge unie (≥ ~1 % de
      * l'écran) suivie d'image ; la vignette commence juste en dessous. Null si rien de net.

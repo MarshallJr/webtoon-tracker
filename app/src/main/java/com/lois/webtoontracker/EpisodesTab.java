@@ -154,6 +154,16 @@ final class EpisodesTab {
         }
         animateNext = false;
 
+        // Vignettes officielles WEBTOON pour les épisodes affichés (si la série y existe).
+        List<Double> visible = new ArrayList<>();
+        for (int i = 0; i < n; i++) visible.add(rows.get(i).chapter);
+        final String t = title;
+        io.execute(() -> {
+            if (WebtoonThumbs.fetch(act, t, visible)) act.runOnUiThread(() -> {
+                if (t.equals(this.title) && !act.isFinishing()) bind(t);
+            });
+        });
+
         TextView more = act.findViewById(R.id.eMore);
         int left = rows.size() - n;
         more.setVisibility(left > 0 ? View.VISIBLE : View.GONE);
@@ -204,11 +214,11 @@ final class EpisodesTab {
         String ch = Detector.formatChapter(r.chapter);
         name.setText("Épisode " + ch);
 
-        // Vignette : capture du chapitre si on l'a, sinon la couverture avec le numéro.
+        // Vignette : officielle WEBTOON ou capture du chapitre si on l'a, sinon fond flouté + numéro.
         thumb.setImageBitmap(strip);
         num.setText(ch);
         num.setVisibility(View.VISIBLE);
-        if (r.entry != null) {
+        {
             final String t = title;
             io.execute(() -> {
                 Bitmap b = ChapterThumbs.get(act, t, r.chapter);
