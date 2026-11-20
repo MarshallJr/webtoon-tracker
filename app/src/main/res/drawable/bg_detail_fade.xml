@@ -1,4 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
-<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
-    <gradient android:angle="270" android:startColor="#33000000" android:centerColor="#00000000" android:endColor="@color/screen_bg" />
-</shape>
+<!-- Fondu du bandeau : léger voile en haut (boutons lisibles), image nette au milieu,
+     puis fondu progressif jusqu'à la couleur du fond, sans marche visible. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:bottom="200dp">
+        <shape android:shape="rectangle">
+            <gradient android:angle="270" android:startColor="#59000000" android:endColor="#00000000" />
+        </shape>
+    </item>
+    <item android:top="110dp">
+        <shape android:shape="rectangle">
+            <gradient android:angle="270" android:startColor="#00000000" android:centerColor="@color/screen_bg_half" android:centerY="0.55" android:endColor="@color/screen_bg" />
+        </shape>
+    </item>
+</layer-list>

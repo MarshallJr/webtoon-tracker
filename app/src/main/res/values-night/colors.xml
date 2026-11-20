@@ -25,4 +25,5 @@
     <color name="hairline_strong">#40FFFFFF</color>
     <color name="episode_current">#1C1A2A</color>
     <color name="episode_fold">#4A4370</color>
+    <color name="screen_bg_half">#990E0D16</color>
 </resources>

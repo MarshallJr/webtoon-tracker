@@ -305,12 +305,10 @@ public class DetailActivity extends AppCompatActivity {
             bg.setBackgroundColor(SeriesAdapter.colorFor(title));
             return;
         }
-        bg.setImageBitmap(cover);
-        // Léger flou : la couverture agrandie reste belle, sans pixels visibles.
-        if (Build.VERSION.SDK_INT >= 31) {
-            bg.setRenderEffect(RenderEffect.createBlurEffect(dp(5), dp(5), Shader.TileMode.CLAMP));
-        }
-        bg.setAlpha(0.9f);
+        // Flou calculé une fois sur l'image (et non un effet en direct qui débordait du bandeau
+        // en laissant une ligne claire sous le titre). Fondu vers le fond géré par dHeaderFade.
+        bg.setImageBitmap(ImageFx.blur(cover, 140, 2));
+        bg.setAlpha(0.92f);
     }
 
     private void bindTags(DbHelper.Series s) {

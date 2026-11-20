@@ -256,12 +256,18 @@ public class ReadingTrackerService extends AccessibilityService {
                 at = fallback;
                 Progress.save(this, title, r.chapter, fallback);
             }
-            // Vignette plus parlante : reprise une fois qu'on est entré dans le chapitre (~20 %),
-            // pour éviter l'en-tête ou la page de titre du début.
+            // Vignette : jusqu'à 3 essais au milieu du chapitre (30 → 70 %), espacés d'au moins 10 % ;
+            // on garde la plus belle (début de scène, couleurs, contraste). Le début du chapitre
+            // (page de titre, bandeau du site) est évité.
             String key = title.toLowerCase(Locale.ROOT) + "#" + r.chapter;
-            if (at >= 0.18f && at <= 0.7f && !betterThumb.contains(key) && DbHelper.get(this).getReadAt(title, r.chapter) >= 0) {
-                betterThumb.add(key);
-                captureChapterThumb(title, r.chapter);
+            float[] st = midShots.get(key);
+            if (st == null) st = new float[]{-1f, 0f};
+            if (at >= 0.30f && at <= 0.72f && st[1] < 3 && Math.abs(at - st[0]) >= 0.10f
+                    && DbHelper.get(this).getReadAt(title, r.chapter) >= 0) {
+                st[0] = at;
+                st[1]++;
+                midShots.put(key, st);
+                shoot(title, r.chapter, false, true, null);
             }
         }));
     }
@@ -352,13 +358,13 @@ public class ReadingTrackerService extends AccessibilityService {
             captureChapterThumb(title, chapter, then);   // la vignette du chapitre, elle, est toujours prise
             return;
         }
-        shoot(title, chapter, true, then);
+        shoot(title, chapter, true, false, then);
     }
 
     // ------------------------------------------------------------------ Vignettes de chapitres
 
-    /** Chapitres dont la vignette a été reprise plus loin dans la lecture (une fois chacun). */
-    private final java.util.Set<String> betterThumb = new java.util.HashSet<>();
+    /** Essais de vignette au milieu de chaque chapitre : [dernière position, nombre d'essais]. */
+    private final java.util.Map<String, float[]> midShots = new java.util.HashMap<>();
     private long lastThumbShot;
 
     private void captureChapterThumb(String title, double chapter) {
@@ -367,7 +373,7 @@ public class ReadingTrackerService extends AccessibilityService {
 
     /** @param after lancé (sur le fil IO) une fois la capture faite — ou tout de suite si on s'en passe. */
     private void captureChapterThumb(String title, double chapter, Runnable after) {
-        shoot(title, chapter, false, after);
+        shoot(title, chapter, false, false, after);
     }
 
     /**
@@ -389,7 +395,7 @@ public class ReadingTrackerService extends AccessibilityService {
      * Seulement si une case de webtoon est bien au centre de l'écran (pas les boutons « Suivant »,
      * pas un écran de veille), et au plus une toutes les 1,5 s.
      */
-    private void shoot(String title, double chapter, boolean withCover, Runnable after) {
+    private void shoot(String title, double chapter, boolean withCover, boolean mid, Runnable after) {
         Runnable done = () -> {
             if (after != null) io.execute(after);
         };
@@ -420,7 +426,7 @@ public class ReadingTrackerService extends AccessibilityService {
                             if (hw != null) {
                                 android.graphics.Bitmap sw = hw.copy(android.graphics.Bitmap.Config.ARGB_8888, false);
                                 if (withCover) Covers.saveFromScreenshot(ReadingTrackerService.this, title, sw, panel);
-                                if (chapter >= 0) ChapterThumbs.saveFromScreenshot(ReadingTrackerService.this, title, chapter, sw, panel);
+                                if (chapter >= 0) ChapterThumbs.saveFromScreenshot(ReadingTrackerService.this, title, chapter, sw, panel, mid);
                             }
                             hb.close();
                         } catch (Throwable t) {
