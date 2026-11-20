@@ -9,8 +9,9 @@ package com.lois.webtoontracker;
  *  2. pas de texte : ni bulles, ni encarts de narration, ni gros effets sonores (zones à traits
  *     noirs sur blanc ou blancs sur noir, très contrastées et sans couleur) ;
  *  3. pas de vide : peu de blanc (fond de bulle, marge), peu de noir ;
- *  4. parmi ce qui reste : le plus coloré, contrasté et détaillé, avec un bonus pour les tons
- *     chair (les visages font les meilleures vignettes, comme sur WEBTOON) et pour les grands cadres.
+ *  4. un PERSONNAGE de préférence : zone de peau avec des traits dedans (yeux, bouche, sourcils —
+ *     un mur beige n'en a pas), bien centrée dans le cadre (pas un visage coupé au bord) ;
+ *  5. puis le plus coloré, contrasté et détaillé ; cadres larges privilégiés (zoom limité à 80 %).
  *
  * Travaille sur une version réduite (180 px de large) avec des tables de sommes cumulées :
  * des centaines de cadrages sont évalués en quelques millisecondes. Sans dépendance Android
@@ -54,6 +55,7 @@ public final class ThumbPicker {
 
         // --- Cartes par pixel
         int[] white = new int[n], black = new int[n], edge = new int[n], skin = new int[n];
+        int[] skinX = new int[n], skinY = new int[n];
         for (int y = 0; y < h; y++) {
             for (int x = 0; x < w; x++) {
                 int i = y * w + x;
@@ -64,8 +66,14 @@ public final class ThumbPicker {
                 int gy = y > 0 && y < h - 1 ? Math.abs(lum[i + w] - lum[i - w]) : 0;
                 edge[i] = gx + gy > 70 ? 1 : 0;
                 skin[i] = isSkin(argb[i]) ? 1 : 0;
+                skinX[i] = skin[i] * x;
+                skinY[i] = skin[i] * y;
             }
         }
+        // Traits du visage : contours situés DANS ou au bord d'une zone de peau.
+        int[] skinZone = dilate(skin, w, h, 2);
+        int[] faceEdge = new int[n];
+        for (int i = 0; i < n; i++) faceEdge[i] = edge[i] & skinZone[i];
 
         // --- Texte : petites cellules très contrastées, presque sans couleur, faites de noir ET de blanc
         int cs = 5;
@@ -116,6 +124,8 @@ public final class ThumbPicker {
         // --- Tables de sommes cumulées
         Sat sWhite = new Sat(white, w, h), sBlack = new Sat(black, w, h), sEdge = new Sat(edge, w, h);
         Sat sSkin = new Sat(skin, w, h), sText = new Sat(text, w, h);
+        Sat sZone = new Sat(skinZone, w, h), sFaceEdge = new Sat(faceEdge, w, h);
+        LSat sSkinX = new LSat(skinX, w, h, false), sSkinY = new LSat(skinY, w, h, false);
         LSat sL = new LSat(lum, w, h, false), sL2 = new LSat(lum, w, h, true);
         LSat sRg = new LSat(rgA, w, h, false), sRg2 = new LSat(rgA, w, h, true);
         LSat sYb = new LSat(ybA, w, h, false), sYb2 = new LSat(ybA, w, h, true);
@@ -123,7 +133,7 @@ public final class ThumbPicker {
 
         Pick best = new Pick();
         best.score = Float.NEGATIVE_INFINITY;
-        float[] fracs = {1.0f, 0.82f, 0.66f};
+        float[] fracs = {1.0f, 0.9f, 0.8f};   // pas trop de zoom
         for (float f : fracs) {
             int cw = Math.round(w * f), ch = Math.round(cw / ASPECT);
             if (ch >= h) continue;
@@ -136,9 +146,14 @@ public final class ThumbPicker {
                     float whiteF = sWhite.sum(x, y, cw, ch) / area;
                     float blackF = sBlack.sum(x, y, cw, ch) / area;
                     float textF = sText.sum(x, y, cw, ch) / area;
-                    if (whiteF > 0.30f || blackF > 0.45f || textF > 0.05f) continue;
+                    if (whiteF > 0.38f || blackF > 0.38f || textF > 0.03f) continue;
                     float edgeF = sEdge.sum(x, y, cw, ch) / area;
+                    if (edgeF < 0.035f) continue;                               // flou, aplat : rien à montrer
                     float skinF = sSkin.sum(x, y, cw, ch) / area;
+                    double face = character(skinF, sZone.sum(x, y, cw, ch), sFaceEdge.sum(x, y, cw, ch),
+                            sSkin.sum(x, y, cw, ch), sSkinX.sum(x, y, cw, ch), sSkinY.sum(x, y, cw, ch), x, y, cw, ch);
+                    // Un fond clair est accepté derrière un vrai personnage (gros plan), pas autour de rien.
+                    if (whiteF > 0.22f + 0.16f * face) continue;
                     double mL = sL.sum(x, y, cw, ch) / area, vL = sL2.sum(x, y, cw, ch) / area - mL * mL;
                     double mRg = sRg.sum(x, y, cw, ch) / area, vRg = sRg2.sum(x, y, cw, ch) / area - mRg * mRg;
                     double mYb = sYb.sum(x, y, cw, ch) / area, vYb = sYb2.sum(x, y, cw, ch) / area - mYb * mYb;
@@ -146,10 +161,9 @@ public final class ThumbPicker {
                     double colorful = Math.sqrt(Math.max(0, vRg) + Math.max(0, vYb)) + 0.3 * Math.sqrt(mRg * mRg + mYb * mYb);
                     double contrast = Math.sqrt(Math.max(0, vL));
                     double detail = Math.min(edgeF, 0.22f) / 0.22f;          // assez de dessin, sans privilégier le bruit
-                    double skinBonus = Math.min(skinF, 0.22f) / 0.22f;
-                    double s = colorful * 0.9 + contrast * 0.7 + mS * 0.25
-                            + detail * 18 + skinBonus * 26 + (f - 0.66f) * 20
-                            - whiteF * 110 - blackF * 50 - textF * 500;
+                    double s = colorful * 0.7 + contrast * 0.5 + mS * 0.2
+                            + detail * 14 + face * 95 + (f - 0.8f) * 60
+                            - whiteF * 90 - blackF * 60 - textF * 700;
                     if (s > best.score) {
                         best.score = (float) s;
                         best.left = offX + Math.round(x * scale);
@@ -157,7 +171,8 @@ public final class ThumbPicker {
                         best.width = Math.round(cw * scale);
                         best.height = Math.round(ch * scale);
                         best.why = String.format(java.util.Locale.ROOT,
-                                "f=%.2f blanc=%.2f noir=%.2f texte=%.3f peau=%.2f coul=%.0f contr=%.0f", f, whiteF, blackF, textF, skinF, colorful, contrast);
+                                "f=%.2f blanc=%.2f noir=%.2f texte=%.3f peau=%.2f perso=%.2f coul=%.0f contr=%.0f",
+                                f, whiteF, blackF, textF, skinF, face, colorful, contrast);
                     }
                 }
             }
@@ -169,14 +184,32 @@ public final class ThumbPicker {
         return best;
     }
 
-    /** Teinte « peau » de manhwa : orangé clair, peu saturé, lumineux. */
+    /**
+     * Présence d'un personnage dans le cadre (0 → 1) :
+     * assez de peau (sans que le cadre ne soit QUE de la peau), des traits à l'intérieur
+     * (yeux, bouche… : distingue un visage d'un mur beige), et une peau centrée (pas coupée au bord).
+     */
+    static double character(float skinF, int zone, int faceEdges, int skinPx, double sumX, double sumY,
+                            int x, int y, int cw, int ch) {
+        if (skinF < 0.025f || skinPx == 0 || zone == 0) return 0;
+        double amount = Math.min(skinF, 0.28f) / 0.28f;
+        if (skinF > 0.55f) amount *= 0.5;                       // zoom sur une joue : trop près
+        double features = Math.min(faceEdges / (double) zone, 0.16) / 0.16;
+        double cx = sumX / skinPx, cy = sumY / skinPx;
+        double dx = Math.abs(cx - (x + cw / 2.0)) / (cw / 2.0), dy = Math.abs(cy - (y + ch / 2.0)) / (ch / 2.0);
+        double centered = Math.max(0, 1 - Math.max(dx, dy) * 0.9);
+        double v = amount * 0.4 + features * 0.4 + centered * 0.2;
+        return features < 0.25 ? v * 0.3 : v;                  // de la peau sans traits : sans doute un décor
+    }
+
+    /** Teinte « peau » de manhwa (claire à mate) : orangé, peu saturé. */
     static boolean isSkin(int c) {
         int r = (c >> 16) & 0xFF, g = (c >> 8) & 0xFF, b = c & 0xFF;
-        if (r < 150 || r <= g || g <= b) return false;
+        if (r < 110 || r <= g || g <= b) return false;
         int max = r, min = b;
         float s = (max - min) / (float) max;
         float hue = 60f * (g - b) / (max - min);       // r est le max : teinte entre 0 et 60°
-        return s > 0.10f && s < 0.55f && hue > 8 && hue < 45 && r - b > 25;
+        return s > 0.10f && s < 0.62f && hue > 6 && hue < 45 && r - b > 22;
     }
 
     private static int[] dilate(int[] m, int w, int h, int r) {

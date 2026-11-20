@@ -22,6 +22,8 @@ import java.util.Locale;
 public final class ChapterThumbs {
 
     static final int W = 330, H = 236;   // ≈ 104 × 74 dp à l'écran
+    /** En dessous, on préfère le fond flouté à une image moyenne. */
+    static final float MIN_SCORE = 45f;
 
     private static final LruCache<String, Bitmap> CACHE = new LruCache<String, Bitmap>(6 * 1024 * 1024) {
         @Override
@@ -88,7 +90,7 @@ public final class ChapterThumbs {
             int[] px = new int[sw * sh];
             small.getPixels(px, 0, sw, 0, 0, sw, sh);
             ThumbPicker.Pick pick = ThumbPicker.pick(px, sw, sh, aw / (float) sw, left, top);
-            if (pick.score <= 0 || pick.width <= 0) return false;
+            if (pick.score < MIN_SCORE || pick.width <= 0) return false;   // rien d'assez beau sur cet écran
             int cl = Math.max(0, pick.left), ct = Math.max(0, pick.top);
             int cw = Math.min(pick.width, w - cl), ch = Math.min(pick.height, h - ct);
             Bitmap out = Bitmap.createScaledBitmap(Bitmap.createBitmap(screen, cl, ct, cw, ch), W, H, true);
@@ -113,19 +115,21 @@ public final class ChapterThumbs {
     }
 
     /**
-     * Notes des vignettes (v2 : nouvelle échelle du sélecteur). Les vignettes officielles
+     * Notes des vignettes (v3 : sélecteur « personnage d'abord »). Les vignettes officielles
      * notées avant sont reprises ; les anciennes captures repartent de zéro (donc remplacées).
      */
     static android.content.SharedPreferences scores(Context ctx) {
-        android.content.SharedPreferences v2 = ctx.getSharedPreferences("thumb_scores_v2", Context.MODE_PRIVATE);
-        if (!v2.getBoolean("_migrated", false)) {
-            android.content.SharedPreferences.Editor ed = v2.edit();
-            for (java.util.Map.Entry<String, ?> e : ctx.getSharedPreferences("thumb_scores", Context.MODE_PRIVATE).getAll().entrySet()) {
-                if (e.getValue() instanceof Float && (Float) e.getValue() >= WebtoonThumbs.OFFICIAL) ed.putFloat(e.getKey(), (Float) e.getValue());
+        android.content.SharedPreferences cur = ctx.getSharedPreferences("thumb_scores_v3", Context.MODE_PRIVATE);
+        if (!cur.getBoolean("_migrated", false)) {
+            android.content.SharedPreferences.Editor ed = cur.edit();
+            for (String old : new String[]{"thumb_scores", "thumb_scores_v2"}) {
+                for (java.util.Map.Entry<String, ?> e : ctx.getSharedPreferences(old, Context.MODE_PRIVATE).getAll().entrySet()) {
+                    if (e.getValue() instanceof Float && (Float) e.getValue() >= WebtoonThumbs.OFFICIAL) ed.putFloat(e.getKey(), (Float) e.getValue());
+                }
             }
             ed.putBoolean("_migrated", true).apply();
         }
-        return v2;
+        return cur;
     }
 
     /** Vignette officielle (WEBTOON) : recadrée au format, jamais remplacée par une capture. */
