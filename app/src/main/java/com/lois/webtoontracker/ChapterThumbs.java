@@ -68,14 +68,91 @@ public final class ChapterThumbs {
         return b;
     }
 
+    // Paliers de qualité : une vignette n'est remplacée que par une meilleure (palier, puis note).
+    static final float TIER_CHARACTER = 3000f;   // personnage, règles strictes
+    static final float TIER_SCENE = 2000f;       // belle scène sans personnage, règles strictes
+    static final float TIER_RELAXED = 1000f;     // repli : un peu de texte ou de vide toléré
+    static final float TIER_ANY = 0f;            // dernier recours : la bande du milieu
+
+    /** Résultat d'analyse : la vignette prête et sa note composée (palier + note). */
+    static final class Result {
+        Bitmap thumb;
+        float score;
+        String why;
+    }
+
     /**
-     * Capture d'écran → vignette du chapitre, cadrée par {@link ThumbPicker} : une seule scène,
-     * sans texte ni bulle, sans grands vides, la plus colorée / détaillée (visages favorisés).
-     * Pendant la lecture, plusieurs captures sont analysées ; seule la meilleure est gardée.
+     * Cherche la meilleure vignette dans une zone d'image (capture d'écran ou page du chapitre).
+     * Strict d'abord ; sinon souple ; sinon la bande du milieu — toujours une image (sauf écran noir).
+     */
+    static Result analyse(Bitmap img, int left, int top, int right, int bottom) {
+        int aw = right - left, ah = bottom - top;
+        if (aw < 50 || ah < 50) return null;
+        int sw = ThumbPicker.SW2, sh = Math.max(8, Math.round(ah * sw / (float) aw));
+        Bitmap small = Bitmap.createScaledBitmap(Bitmap.createBitmap(img, left, top, aw, ah), sw, sh, true);
+        int[] px = new int[sw * sh];
+        small.getPixels(px, 0, sw, 0, 0, sw, sh);
+        float scale = aw / (float) sw;
+        float tier;
+        ThumbPicker.Pick p = ThumbPicker.pick(px, sw, sh, scale, left, top, ThumbPicker.STRICT);
+        if (p.width > 0 && p.hasChar && p.score >= MIN_SCORE) tier = TIER_CHARACTER;
+        else if (p.width > 0 && p.score >= 30) tier = TIER_SCENE;
+        else {
+            p = ThumbPicker.pick(px, sw, sh, scale, left, top, ThumbPicker.RELAXED);
+            tier = p.width > 0 && p.score > 0 ? TIER_RELAXED : -1;
+        }
+        Result r = new Result();
+        if (tier < 0) {
+            // Dernier recours : la bande la plus « remplie » au milieu de la zone.
+            int bh = Math.min(ah, Math.round(aw / ThumbPicker.ASPECT));
+            int bw = Math.round(bh * ThumbPicker.ASPECT);
+            p = new ThumbPicker.Pick();
+            p.left = left + (aw - bw) / 2;
+            p.top = top + (ah - bh) / 2;
+            p.width = bw;
+            p.height = bh;
+            p.score = 1;
+            p.why = "bande du milieu";
+            tier = TIER_ANY;
+        }
+        int cl = Math.max(0, p.left), ct = Math.max(0, p.top);
+        int cw = Math.min(p.width, img.getWidth() - cl), ch = Math.min(p.height, img.getHeight() - ct);
+        if (cw < 20 || ch < 20) return null;
+        r.thumb = Bitmap.createScaledBitmap(Bitmap.createBitmap(img, cl, ct, cw, ch), W, H, true);
+        if (looksBad(r.thumb)) return null;
+        r.score = tier + Math.min(Math.max(p.score, 0), 999);
+        r.why = p.why;
+        return r;
+    }
+
+    /** Enregistre si c'est mieux que la vignette actuelle (ou s'il n'y en a pas). */
+    static boolean saveIfBetter(Context ctx, String title, double chapter, Result r) {
+        if (r == null || r.thumb == null) return false;
+        try {
+            File f = file(ctx, title, chapter);
+            android.content.SharedPreferences scores = scores(ctx);
+            String sk = f.getAbsolutePath();
+            if (f.exists() && scores.getFloat(sk, 0f) >= r.score) return false;
+            File d = dir(ctx, title);
+            if (!d.exists() && !d.mkdirs()) return false;
+            try (FileOutputStream fos = new FileOutputStream(f)) {
+                r.thumb.compress(Bitmap.CompressFormat.JPEG, 86, fos);
+            }
+            scores.edit().putFloat(sk, r.score).apply();
+            CACHE.remove(sk);
+            return true;
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    /**
+     * Capture d'écran pendant la lecture → vignette (une seule scène, sans texte, personnage d'abord).
+     * Plusieurs captures sont analysées par chapitre ; seule la meilleure reste. Il y a TOUJOURS
+     * une image (repli souple), remplacée dès qu'une capture fait mieux.
      *
      * @param panel colonne de la case au centre (bornes), ou null si inconnue
-     * @param mid   capture prise pendant la lecture (sinon : au tout début, notée plus bas)
-     * @return false si rien de présentable, ou moins bien que la vignette déjà gardée
+     * @param mid   capture prise pendant la lecture (sinon : au tout début, notée un peu plus bas)
      */
     public static boolean saveFromScreenshot(Context ctx, String title, double chapter, Bitmap screen, Rect panel, boolean mid) {
         try {
@@ -85,49 +162,30 @@ public final class ChapterThumbs {
                 left = Math.max(0, panel.left);
                 right = Math.min(w, panel.right);
             }
-            int top = Math.round(h * 0.06f), bottom = Math.round(h * 0.94f);   // sans barres du haut / du bas
-            int aw = right - left, ah = bottom - top;
-            int sw = ThumbPicker.SW2, sh = Math.round(ah * sw / (float) aw);
-            Bitmap small = Bitmap.createScaledBitmap(Bitmap.createBitmap(screen, left, top, aw, ah), sw, sh, true);
-            int[] px = new int[sw * sh];
-            small.getPixels(px, 0, sw, 0, 0, sw, sh);
-            ThumbPicker.Pick pick = ThumbPicker.pick(px, sw, sh, aw / (float) sw, left, top);
-            if (pick.score < MIN_SCORE || pick.width <= 0) return false;   // rien d'assez beau sur cet écran
-            if (!pick.hasChar && pick.score < MIN_SCORE_NO_CHARACTER) return false; // sans personnage : seulement si superbe
-            int cl = Math.max(0, pick.left), ct = Math.max(0, pick.top);
-            int cw = Math.min(pick.width, w - cl), ch = Math.min(pick.height, h - ct);
-            Bitmap out = Bitmap.createScaledBitmap(Bitmap.createBitmap(screen, cl, ct, cw, ch), W, H, true);
-            if (looksBad(out)) return false;
-
-            File f = file(ctx, title, chapter);
-            android.content.SharedPreferences scores = scores(ctx);
-            String sk = f.getAbsolutePath();
-            float score = mid ? pick.score : pick.score * 0.7f;   // le tout début (page de titre…) compte moins
-            if (f.exists() && scores.getFloat(sk, 0f) >= score) return false;
-            File d = dir(ctx, title);
-            if (!d.exists() && !d.mkdirs()) return false;
-            try (FileOutputStream fos = new FileOutputStream(f)) {
-                out.compress(Bitmap.CompressFormat.JPEG, 86, fos);
-            }
-            scores.edit().putFloat(sk, score).apply();
-            CACHE.remove(sk);
-            return true;
+            Result r = analyse(screen, left, Math.round(h * 0.06f), right, Math.round(h * 0.94f)); // sans barres
+            if (r == null) return false;
+            if (!mid) r.score -= 300;   // tout début du chapitre (page de titre, bandeau du site) : moins bien
+            return saveIfBetter(ctx, title, chapter, r);
         } catch (Throwable t) {
             return false;
         }
     }
 
     /**
-     * Notes des vignettes (v3 : sélecteur « personnage d'abord »). Les vignettes officielles
+     * Notes des vignettes (v5 : paliers + note). Les vignettes officielles
      * notées avant sont reprises ; les anciennes captures repartent de zéro (donc remplacées).
      */
     static android.content.SharedPreferences scores(Context ctx) {
-        android.content.SharedPreferences cur = ctx.getSharedPreferences("thumb_scores_v4", Context.MODE_PRIVATE);
+        android.content.SharedPreferences cur = ctx.getSharedPreferences("thumb_scores_v5", Context.MODE_PRIVATE);
         if (!cur.getBoolean("_migrated", false)) {
             android.content.SharedPreferences.Editor ed = cur.edit();
-            for (String old : new String[]{"thumb_scores", "thumb_scores_v2", "thumb_scores_v3"}) {
+            for (String old : new String[]{"thumb_scores", "thumb_scores_v2", "thumb_scores_v3", "thumb_scores_v4"}) {
                 for (java.util.Map.Entry<String, ?> e : ctx.getSharedPreferences(old, Context.MODE_PRIVATE).getAll().entrySet()) {
-                    if (e.getValue() instanceof Float && (Float) e.getValue() >= WebtoonThumbs.OFFICIAL) ed.putFloat(e.getKey(), (Float) e.getValue());
+                    if (!(e.getValue() instanceof Float)) continue;
+                    float v = (Float) e.getValue();
+                    if (v >= WebtoonThumbs.OFFICIAL) ed.putFloat(e.getKey(), v);
+                    // v4 n'enregistrait que des vignettes passant les règles strictes : on les garde bien placées
+                    else if (old.equals("thumb_scores_v4") && v > 0) ed.putFloat(e.getKey(), 2500f + Math.min(v, 499f));
                 }
             }
             ed.putBoolean("_migrated", true).apply();

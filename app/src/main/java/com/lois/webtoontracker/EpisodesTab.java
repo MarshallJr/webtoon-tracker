@@ -159,7 +159,10 @@ final class EpisodesTab {
         for (int i = 0; i < n; i++) visible.add(rows.get(i).chapter);
         final String t = title;
         io.execute(() -> {
-            if (WebtoonThumbs.fetch(act, t, visible)) act.runOnUiThread(() -> {
+            // 1. vignettes officielles (WEBTOON) ; 2. sinon images tirées des pages du chapitre sur ton site
+            boolean changed = WebtoonThumbs.fetch(act, t, visible);
+            if (SiteThumbs.fetch(act, t, visible)) changed = true;
+            if (changed) act.runOnUiThread(() -> {
                 if (t.equals(this.title) && !act.isFinishing()) bind(t);
             });
         });

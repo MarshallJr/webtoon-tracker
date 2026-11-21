@@ -42,7 +42,14 @@ public final class ThumbPicker {
      * @param offX   décalage X de la zone dans la capture d'origine
      * @param offY   décalage Y
      */
+    /** Règles strictes (vignette idéale) ou souples (repli : mieux qu'aucune image). */
+    public static final boolean STRICT = true, RELAXED = false;
+
     public static Pick pick(int[] argb2, int w2, int h2, float scale2, int offX, int offY) {
+        return pick(argb2, w2, h2, scale2, offX, offY, STRICT);
+    }
+
+    public static Pick pick(int[] argb2, int w2, int h2, float scale2, int offX, int offY, boolean strict) {
         // Texte et bulles : cherchés en double résolution (les lettres des bulles sont fines).
         int w = w2 / 2, h = h2 / 2;
         float scale = scale2 * 2;
@@ -125,7 +132,9 @@ public final class ThumbPicker {
         Pick best = new Pick();
         best.score = Float.NEGATIVE_INFINITY;
         boolean bestHasChar = false;
-        float[] fracs = {1.0f, 0.9f, 0.8f};   // pas trop de zoom
+        float[] fracs = strict ? new float[]{1.0f, 0.9f, 0.8f} : new float[]{1.0f, 0.9f, 0.8f, 0.7f};   // pas trop de zoom
+        float maxText = strict ? 0.012f : 0.07f, maxBlack = strict ? 0.38f : 0.55f, minEdge = strict ? 0.035f : 0.02f;
+        float whiteBase = strict ? 0.22f : 0.40f, paperBase = strict ? 0.25f : 0.45f;
         for (float f : fracs) {
             int cw = Math.round(w * f), ch = Math.round(cw / ASPECT);
             if (ch >= h) continue;
@@ -138,15 +147,15 @@ public final class ThumbPicker {
                     float whiteF = sWhite.sum(x, y, cw, ch) / area;
                     float blackF = sBlack.sum(x, y, cw, ch) / area;
                     float textF = sText.sum(x, y, cw, ch) / area;
-                    if (whiteF > 0.38f || blackF > 0.38f || textF > 0.012f) continue;   // (quasi) aucun texte
+                    if (whiteF > whiteBase + 0.16f || blackF > maxBlack || textF > maxText) continue;   // (quasi) aucun texte
                     float edgeF = sEdge.sum(x, y, cw, ch) / area;
-                    if (edgeF < 0.035f) continue;                               // flou, aplat : rien à montrer
+                    if (edgeF < minEdge) continue;                              // flou, aplat : rien à montrer
                     float skinF = sSkin.sum(x, y, cw, ch) / area;
                     double face = character(skinF, sZone.sum(x, y, cw, ch), sFaceEdge.sum(x, y, cw, ch),
                             sSkin.sum(x, y, cw, ch), sSkinX.sum(x, y, cw, ch), sSkinY.sum(x, y, cw, ch), x, y, cw, ch);
                     // Un fond clair est accepté derrière un vrai personnage (gros plan), pas autour de rien.
                     float paperF = sPaper.sum(x, y, cw, ch) / area;
-                    if (whiteF > 0.22f + 0.16f * face || paperF > 0.25f + 0.12f * face) continue;
+                    if (whiteF > whiteBase + 0.16f * face || paperF > paperBase + 0.12f * face) continue;
                     double mL = sL.sum(x, y, cw, ch) / area, vL = sL2.sum(x, y, cw, ch) / area - mL * mL;
                     double mRg = sRg.sum(x, y, cw, ch) / area, vRg = sRg2.sum(x, y, cw, ch) / area - mRg * mRg;
                     double mYb = sYb.sum(x, y, cw, ch) / area, vYb = sYb2.sum(x, y, cw, ch) / area - mYb * mYb;
