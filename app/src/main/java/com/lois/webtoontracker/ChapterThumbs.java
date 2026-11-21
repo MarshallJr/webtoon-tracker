@@ -24,6 +24,8 @@ public final class ChapterThumbs {
     static final int W = 330, H = 236;   // ≈ 104 × 74 dp à l'écran
     /** En dessous, on préfère le fond flouté à une image moyenne. */
     static final float MIN_SCORE = 45f;
+    /** Sans personnage, il faut une image vraiment belle (paysage, scène d'action très colorée). */
+    static final float MIN_SCORE_NO_CHARACTER = 75f;
 
     private static final LruCache<String, Bitmap> CACHE = new LruCache<String, Bitmap>(6 * 1024 * 1024) {
         @Override
@@ -85,12 +87,13 @@ public final class ChapterThumbs {
             }
             int top = Math.round(h * 0.06f), bottom = Math.round(h * 0.94f);   // sans barres du haut / du bas
             int aw = right - left, ah = bottom - top;
-            int sw = ThumbPicker.SW, sh = Math.round(ah * sw / (float) aw);
+            int sw = ThumbPicker.SW2, sh = Math.round(ah * sw / (float) aw);
             Bitmap small = Bitmap.createScaledBitmap(Bitmap.createBitmap(screen, left, top, aw, ah), sw, sh, true);
             int[] px = new int[sw * sh];
             small.getPixels(px, 0, sw, 0, 0, sw, sh);
             ThumbPicker.Pick pick = ThumbPicker.pick(px, sw, sh, aw / (float) sw, left, top);
             if (pick.score < MIN_SCORE || pick.width <= 0) return false;   // rien d'assez beau sur cet écran
+            if (!pick.hasChar && pick.score < MIN_SCORE_NO_CHARACTER) return false; // sans personnage : seulement si superbe
             int cl = Math.max(0, pick.left), ct = Math.max(0, pick.top);
             int cw = Math.min(pick.width, w - cl), ch = Math.min(pick.height, h - ct);
             Bitmap out = Bitmap.createScaledBitmap(Bitmap.createBitmap(screen, cl, ct, cw, ch), W, H, true);
@@ -119,10 +122,10 @@ public final class ChapterThumbs {
      * notées avant sont reprises ; les anciennes captures repartent de zéro (donc remplacées).
      */
     static android.content.SharedPreferences scores(Context ctx) {
-        android.content.SharedPreferences cur = ctx.getSharedPreferences("thumb_scores_v3", Context.MODE_PRIVATE);
+        android.content.SharedPreferences cur = ctx.getSharedPreferences("thumb_scores_v4", Context.MODE_PRIVATE);
         if (!cur.getBoolean("_migrated", false)) {
             android.content.SharedPreferences.Editor ed = cur.edit();
-            for (String old : new String[]{"thumb_scores", "thumb_scores_v2"}) {
+            for (String old : new String[]{"thumb_scores", "thumb_scores_v2", "thumb_scores_v3"}) {
                 for (java.util.Map.Entry<String, ?> e : ctx.getSharedPreferences(old, Context.MODE_PRIVATE).getAll().entrySet()) {
                     if (e.getValue() instanceof Float && (Float) e.getValue() >= WebtoonThumbs.OFFICIAL) ed.putFloat(e.getKey(), (Float) e.getValue());
                 }
