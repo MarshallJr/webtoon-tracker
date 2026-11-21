@@ -304,6 +304,72 @@ public final class ChapterThumbs {
         return 0xFF000000 | (r << 16) | (g << 8) | b;
     }
 
+    /** Empreinte d'image (8 × 8, plus clair / plus sombre que la moyenne) : repère les doublons. */
+    static long aHash(Bitmap b) {
+        Bitmap s = Bitmap.createScaledBitmap(b, 8, 8, true);
+        int[] l = new int[64];
+        int sum = 0;
+        for (int i = 0; i < 64; i++) {
+            int c = s.getPixel(i % 8, i / 8);
+            l[i] = (((c >> 16) & 0xFF) * 3 + ((c >> 8) & 0xFF) * 6 + (c & 0xFF)) / 10;
+            sum += l[i];
+        }
+        int mean = sum / 64;
+        long h = 0;
+        for (int i = 0; i < 64; i++) if (l[i] > mean) h |= 1L << i;
+        return h;
+    }
+
+    /**
+     * Ménage : une même image sur 3 chapitres ou plus d'une série n'est pas une vraie vignette
+     * (ex. la pièce d'un chapitre payant récupérée sur le site) → supprimée, l'épisode est réessayé.
+     */
+    public static int cleanupDuplicates(Context ctx) {
+        int removed = 0;
+        File root = new File(ctx.getFilesDir(), "chapters");
+        File[] series = root.listFiles();
+        if (series == null) return 0;
+        android.content.SharedPreferences sc = scores(ctx);
+        android.content.SharedPreferences tries = ctx.getSharedPreferences("site_thumbs", Context.MODE_PRIVATE);
+        android.content.SharedPreferences hashes = ctx.getSharedPreferences("site_thumb_hashes", Context.MODE_PRIVATE);
+        for (File d : series) {
+            File[] files = d.listFiles();
+            if (files == null) continue;
+            java.util.List<File> fs = new java.util.ArrayList<>();
+            java.util.List<Long> hs = new java.util.ArrayList<>();
+            for (File f : files) {
+                if (!f.getName().endsWith(".jpg") || sc.getFloat(f.getAbsolutePath(), 0f) >= WebtoonThumbs.OFFICIAL) continue;
+                BitmapFactory.Options o = new BitmapFactory.Options();
+                o.inSampleSize = 4;
+                Bitmap b = BitmapFactory.decodeFile(f.getAbsolutePath(), o);
+                if (b == null) continue;
+                fs.add(f);
+                hs.add(aHash(b));
+            }
+            boolean[] drop = new boolean[fs.size()];
+            for (int i = 0; i < fs.size(); i++) {
+                int same = 0;
+                for (int j = 0; j < fs.size(); j++) if (Long.bitCount(hs.get(i) ^ hs.get(j)) <= 6) same++;
+                if (same >= 3) drop[i] = true;
+            }
+            android.content.SharedPreferences.Editor se = sc.edit(), te = tries.edit(), he = hashes.edit();
+            for (int i = 0; i < fs.size(); i++) {
+                if (!drop[i]) continue;
+                File f = fs.get(i);
+                String ch = f.getName().substring(0, f.getName().length() - 4);
+                if (f.delete()) removed++;
+                se.remove(f.getAbsolutePath());
+                te.remove(d.getName() + "#" + ch);
+                he.remove(d.getName() + "#" + ch);
+            }
+            se.apply();
+            te.apply();
+            he.apply();
+        }
+        CACHE.evictAll();
+        return removed;
+    }
+
     /** Fusion / renommage de série : les vignettes suivent. */
     public static void move(Context ctx, String from, String to) {
         try {
@@ -333,6 +399,15 @@ public final class ChapterThumbs {
             CACHE.evictAll();
         } catch (Throwable ignored) {
         }
+    }
+
+    static void deleteIfNotOfficial(Context ctx, String title, double chapter) {
+        File f = file(ctx, title, chapter);
+        android.content.SharedPreferences sc = scores(ctx);
+        if (sc.getFloat(f.getAbsolutePath(), 0f) >= WebtoonThumbs.OFFICIAL) return;
+        sc.edit().remove(f.getAbsolutePath()).apply();
+        CACHE.remove(f.getAbsolutePath());
+        f.delete();
     }
 
     public static void delete(Context ctx, String title, double chapter) {

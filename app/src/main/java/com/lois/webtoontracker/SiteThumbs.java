@@ -45,6 +45,8 @@ final class SiteThumbs {
             "https?:(?:\\\\?/){2}[^\"'\\s<>()]+?\\.(?:jpe?g|png|webp)(?:\\?[^\"'\\s<>()]*)?", Pattern.CASE_INSENSITIVE);
     private static final Pattern NOT_PANEL = Pattern.compile(
             "(?i)(logo|avatar|icon|banner|(?<![a-z])ads?[/_-]|gravatar|emoji|favicon|button|discord|patreon|cover|thumb|sprite|loading|placeholder"
+                    + "|coin|lock|premium|vip|unlock|price|reward|gift|badge|medal|token|wallet|bonus"   // chapitres payants
+                    + "|/themes?/|/plugins?/|/assets?/|/static/|/icons?/"                                 // décor du site
                     + "|-\\d{2,4}x\\d{2,4}\\.)");   // -200x300.jpg : miniatures WordPress (autres séries)
 
     /** @return true si au moins une vignette a été ajoutée ou améliorée */
@@ -78,7 +80,7 @@ final class SiteThumbs {
     private static boolean fromChapterPage(Context ctx, String title, double chapter, String pageUrl) throws Exception {
         String html = new String(bytes(pageUrl, pageUrl, 3_000_000), StandardCharsets.UTF_8);
         List<String> images = chapterImages(html, pageUrl);
-        if (images.size() < 3) return false;
+        if (images.size() < 5) return false;
         ChapterThumbs.Result best = null;
         // 3 images au milieu du chapitre (le début : page de titre ; la fin : crédits, pub du site)
         for (float at : new float[]{0.35f, 0.55f, 0.75f}) {
@@ -88,7 +90,28 @@ final class SiteThumbs {
             if (best != null && best.score >= ChapterThumbs.TIER_CHARACTER + 120) break;   // déjà très bien
             Thread.sleep(300);
         }
-        return ChapterThumbs.saveIfBetter(ctx, title, chapter, best);
+        if (best == null) return false;
+        // Même image que pour un autre chapitre : c'est une image du site (pièce « à débloquer »,
+        // bandeau…), pas le contenu du chapitre.
+        long hash = ChapterThumbs.aHash(best.thumb);
+        SharedPreferences hp = ctx.getSharedPreferences("site_thumb_hashes", Context.MODE_PRIVATE);
+        String sk = Titles.key(title);
+        for (Map.Entry<String, ?> e : hp.getAll().entrySet()) {
+            if (!e.getKey().startsWith(sk + "#") || e.getKey().equals(sk + "#" + Detector.formatChapter(chapter))) continue;
+            if (e.getValue() instanceof Long && Long.bitCount((Long) e.getValue() ^ hash) <= 6) {
+                // l'autre chapitre avait reçu la même image du site : on la lui retire aussi
+                String other = e.getKey().substring(sk.length() + 1);
+                try {
+                    ChapterThumbs.deleteIfNotOfficial(ctx, title, Double.parseDouble(other));
+                } catch (NumberFormatException ignored) {
+                }
+                hp.edit().remove(e.getKey()).apply();
+                return false;
+            }
+        }
+        boolean saved = ChapterThumbs.saveIfBetter(ctx, title, chapter, best);
+        if (saved) hp.edit().putLong(sk + "#" + Detector.formatChapter(chapter), hash).apply();
+        return saved;
     }
 
     /**
@@ -109,7 +132,9 @@ final class SiteThumbs {
         // relatives dans <img src="/…"> : rares sur ces sites, ignorées
         List<String> best = new ArrayList<>();
         for (List<String> g : groups.values()) if (g.size() > best.size()) best = g;
-        return best.size() >= 3 ? best : new ArrayList<>();
+        // Un chapitre, c'est une vraie suite d'images (au moins 5) ; en dessous, c'est le décor du site
+        // ou une page « chapitre à débloquer ».
+        return best.size() >= 5 ? best : new ArrayList<>();
     }
 
     /** Télécharge une image du chapitre et l'analyse par morceaux d'environ deux écrans de haut. */

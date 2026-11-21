@@ -160,6 +160,7 @@ public class MainActivity extends AppCompatActivity {
         new Thread(() -> {
             if (Repair.run(this) > 0) runOnUiThread(this::refresh); // titres incohérents corrigés
             CoverWorker.cleanupBadImages(this);                       // images prises sur l'écran de veille
+            CoverWorker.cleanupDuplicateThumbs(this);                 // même image sur plusieurs chapitres
         }).start();
         Anim.pressAll(root);
     }

@@ -53,6 +53,14 @@ public class CoverWorker extends Worker {
         if (covers > 0) enqueueIfNeeded(ctx);
     }
 
+    /** Une fois : retire les vignettes identiques sur plusieurs chapitres (images du site, pas du chapitre). */
+    public static void cleanupDuplicateThumbs(Context ctx) {
+        SharedPreferences flags = ctx.getSharedPreferences("repairs", Context.MODE_PRIVATE);
+        if (flags.getBoolean("dup_thumbs_v1", false)) return;
+        ChapterThumbs.cleanupDuplicates(ctx);
+        flags.edit().putBoolean("dup_thumbs_v1", true).apply();
+    }
+
     public static void enqueueIfNeeded(Context ctx) {
         try {
             if (!hasWork(ctx)) return;
