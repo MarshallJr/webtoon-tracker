@@ -441,6 +441,8 @@ public class DetailActivity extends AppCompatActivity {
     // ------------------------------------------------------------------ Langues & sources
 
     private boolean editionsLoading;
+    /** Dernière recherche lancée automatiquement (jamais plus d'une toutes les 5 min, même si elle échoue). */
+    private long editionsTriedAt;
 
     /**
      * Carte « Langues & sources » : les éditions officielles (et autorisées) de la série, dans toutes
@@ -493,7 +495,8 @@ public class DetailActivity extends AppCompatActivity {
                 : "Vérifié " + DateUtils.getRelativeTimeSpanString(m.editionsAt, System.currentTimeMillis(),
                 DateUtils.MINUTE_IN_MILLIS).toString().toLowerCase(Locale.FRANCE)
                 + " · sources : AniList, MangaDex, WEBTOON · appui long : pourquoi cette source");
-        if (!loading && System.currentTimeMillis() - m.editionsAt > Editions.STALE_MS) refreshEditions(false);
+        long now = System.currentTimeMillis();
+        if (!loading && now - m.editionsAt > Editions.STALE_MS && now - editionsTriedAt > 5 * 60_000) refreshEditions(false);
     }
 
     /** « 🇰🇷 🇬🇧 🇪🇸 · plus avancée : ch. 36 🇬🇧 » */
@@ -610,6 +613,7 @@ public class DetailActivity extends AppCompatActivity {
     private void refreshEditions(boolean userAsked) {
         if (editionsLoading) return;
         editionsLoading = true;
+        editionsTriedAt = System.currentTimeMillis();
         new Thread(() -> {
             int n = -1;
             try {
