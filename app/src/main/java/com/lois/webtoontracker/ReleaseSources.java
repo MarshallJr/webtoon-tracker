@@ -194,30 +194,43 @@ public final class ReleaseSources {
     /**
      * Le site où tu lis cette série : on essaie directement l'adresse du chapitre suivant
      * (ex. …/demonic-emperor-chapter-936/ → …-937/). Beaucoup de sites de scans publient avant
-     * que MangaDex / MangaUpdates ne soient à jour, et leur liste publique peut même être en retard
-     * (chapitres « à débloquer »). On avance tant que les chapitres existent (5 au plus).
+     * que MangaUpdates ne soit à jour. On avance tant que les chapitres existent (5 au plus).
+     * Un chapitre PAYANT sur ce site n'est pas annoncé comme disponible : il est noté comme payant,
+     * et tu seras prévenu quand il deviendra gratuit.
      *
      * @param knownUrl adresse d'un chapitre lu, knownCh son numéro, from le dernier chapitre lu
      */
-    public static DbHelper.Release siteLatest(String title, String knownUrl, double knownCh, double from) throws Exception {
+    public static DbHelper.Release siteLatest(android.content.Context ctx, String title, String knownUrl, double knownCh,
+                                              double from) throws Exception {
         if (knownUrl == null || from != Math.floor(from)) return null;
+        DbHelper db = DbHelper.get(ctx);
         DbHelper.Release best = null;
         for (int i = 1; i <= 5; i++) {
             double ch = from + i;
             String url = ChapterLinks.guess(knownUrl, knownCh, ch);
-            if (url == null || !chapterPageExists(url, ch)) break;
+            if (url == null) break;
+            Paywall.Probe p = Paywall.probe(url, ch, knownUrl, knownCh);
+            String host = host(url);
+            long now = System.currentTimeMillis();
+            if (p.state == Paywall.MISSING || (p.state == Paywall.UNKNOWN && !p.announced)) break;
+            if (p.state == Paywall.LOCKED_STATE) {
+                db.saveLock(title, ChapterLinks.host(url), ch, url, p.freeAt, now);
+                Thread.sleep(600);
+                continue;   // payant ici : le suivant peut exister (payant lui aussi)
+            }
+            db.markFreed(title, ChapterLinks.host(url), ch, now);   // était payant ? il ne l'est plus
             best = new DbHelper.Release();
             best.title = title;
             best.source = "Site";
             best.chapter = ch;
             best.url = url;
-            String host = host(url);
             best.label = host;
             best.lang = host.matches("(?i)^(fr|french)[-.].*|.*[-.]fr$|.*scan-?vf.*|.*(fr)scans?\\..*") ? "FR"
                     : host.matches("(?i)^(en|english)[-.].*") ? "EN" : "";
-            best.foundAt = System.currentTimeMillis();
+            best.foundAt = now;
             Thread.sleep(600);
         }
+        if (best != null || db.countActiveLocks() > 0) Follow.sync(ctx);
         return best;
     }
 

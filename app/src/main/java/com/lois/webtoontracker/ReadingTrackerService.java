@@ -197,6 +197,16 @@ public class ReadingTrackerService extends AccessibilityService {
         saveDebug(pkg, nodes, r);
 
         if (r == null) return;
+
+        // Écran de paiement ? (message de verrou visible) → vérifié sur le fil IO (cases à l'écran ou non).
+        String screenText = Paywall.join(nodes);
+        if (Paywall.textSaysLocked(screenText) && now - lastLockCheck > 2000) {
+            lastLockCheck = now;
+            final Detector.Result lockTarget = r;
+            final String lockPkg = pkg;
+            io.execute(() -> safe("Paiement", () -> checkLock(lockTarget, screenText, lockPkg)));
+        }
+
         if (pending != null && pending.sameAs(r)) return; // toujours le même chapitre → on attend
 
         if (pendingCommit != null) handler.removeCallbacks(pendingCommit);
@@ -318,9 +328,27 @@ public class ReadingTrackerService extends AccessibilityService {
     private void record(Detector.Result r) {
         DbHelper db = DbHelper.get(this);
         r.title = db.resolveTitle(r.title);
+        // Écran de paiement à la place du chapitre : ce n'est pas une lecture.
+        if (!lockedRecently(r)) {
+            AccessibilityNodeInfo root = getRootInActiveWindow();
+            if (root != null) {
+                List<Detector.TextNode> nodes = new ArrayList<>();
+                collect(root, nodes, 0);
+                String text = Paywall.join(nodes);
+                if (Paywall.textSaysLocked(text)) {
+                    checkLock(r, text, root.getPackageName() == null ? null : root.getPackageName().toString());
+                }
+            }
+        }
+        if (lockedRecently(r)) return;
+
         boolean newSeries = !db.seriesExists(r.title);
         long now = System.currentTimeMillis();
         boolean isNew = db.insertRead(r.title, r.chapter, now, r.source, r.url);
+        if (isNew) {
+            recordedKey = lockKeyOf(r.title, r.chapter);
+            recordedAt = SystemClock.uptimeMillis();
+        }
         ChapterLinks.rememberVisit(this, r.title, r.url, r.chapter); // le site à réutiliser pour les autres chapitres
         db.rememberSource(r); // pour "Reprendre" et les alertes, même si le chapitre était déjà lu
         if (!isNew) {
@@ -341,6 +369,77 @@ public class ReadingTrackerService extends AccessibilityService {
             sendBroadcast(new Intent(ACTION_UPDATED).setPackage(getPackageName()));
             showBannerFor(d, r);
         });
+    }
+
+    // ------------------------------------------------------------------ Chapitres payants
+
+    /** Dernier écran de paiement confirmé : « titre#chapitre » et moment (horloge système). */
+    private volatile String lockKey;
+    private volatile long lockSeenAt;
+    private long lastLockCheck;
+    /** Dernière lecture enregistrée comme NOUVELLE (annulée si un écran de paiement apparaît ensuite). */
+    private volatile String recordedKey;
+    private volatile long recordedAt;
+    private final java.util.Map<String, Long> lockBanners = new java.util.HashMap<>();
+
+    private static String lockKeyOf(String title, double chapter) {
+        return Titles.key(title) + "#" + Detector.formatChapter(chapter);
+    }
+
+    private boolean lockedRecently(Detector.Result r) {
+        return lockKey != null && lockKey.equals(lockKeyOf(r.title, r.chapter))
+                && SystemClock.uptimeMillis() - lockSeenAt < 120_000;
+    }
+
+    /**
+     * Un message de verrou est affiché (fil IO). C'est un écran de paiement seulement s'il n'y a presque
+     * pas de cases à l'écran — sinon le message parle d'un autre chapitre (« suivant à débloquer »…).
+     * Alors : le chapitre n'est pas compté comme lu (ou la lecture enregistrée il y a peu est annulée),
+     * il est noté comme payant sur ce site, et une bannière le dit.
+     */
+    private void checkLock(Detector.Result r, String text, String pkg) {
+        Panels.Snapshot s = Panels.take(this);
+        if (s != null && s.count >= 5) return;
+        DbHelper db = DbHelper.get(this);
+        String title = db.resolveTitle(r.title);
+        String key = lockKeyOf(title, r.chapter);
+        lockKey = key;
+        lockSeenAt = SystemClock.uptimeMillis();
+
+        long now = System.currentTimeMillis();
+        long in = Paywall.freeInMs(text);
+        String host = r.url != null ? ChapterLinks.host(r.url) : pkg;
+        if (host == null) host = "appli";
+        db.saveLock(title, host, r.chapter, r.url, in > 0 ? now + in : 0, now);
+        Follow.sync(this);   // vérification périodique : te prévenir quand il devient gratuit
+
+        boolean undone = false;
+        if (key.equals(recordedKey) && SystemClock.uptimeMillis() - recordedAt < 15 * 60_000) {
+            db.undoRead(title, r.chapter);
+            ChapterThumbs.deleteIfNotOfficial(this, title, r.chapter);
+            recordedKey = null;
+            undone = true;
+            NoteWriter.write(this);
+        }
+        WidgetProvider.updateAll(this);
+        sendBroadcast(new Intent(ACTION_UPDATED).setPackage(getPackageName()));
+
+        // Une bannière par chapitre (de nouveau après 30 min si tu y reviens).
+        Long last = lockBanners.get(key);
+        if (banner == null || (last != null && now - last < 30 * 60_000)) return;
+        lockBanners.put(key, now);
+        String when = in > 0 ? "gratuit " + inWords(in) : "je te préviens dès qu'il est gratuit";
+        banner.show(NotifyPolicy.Kind.LOCKED, "Chapitre " + Detector.formatChapter(r.chapter) + " payant ici",
+                (undone ? "Retiré de tes lectures · " : "Pas compté comme lu · ") + when, 5500, 0);
+    }
+
+    /** « dans ~2 j », « dans ~5 h », « dans ~20 min » */
+    static String inWords(long ms) {
+        long min = Math.max(1, ms / 60_000);
+        if (min < 90) return "dans ~" + min + " min";
+        long h = Math.round(min / 60.0);
+        if (h < 36) return "dans ~" + h + " h";
+        return "dans ~" + Math.round(h / 24.0) + " j";
     }
 
     // ------------------------------------------------------------------ Miniatures
@@ -399,7 +498,8 @@ public class ReadingTrackerService extends AccessibilityService {
             if (after != null) io.execute(after);
         };
         long now = SystemClock.uptimeMillis();
-        if (android.os.Build.VERSION.SDK_INT < 30 || now - lastThumbShot < 1500 || !screenShowsReading()) {
+        boolean paywall = lockKey != null && now - lockSeenAt < 5000;   // jamais l'écran de paiement en vignette
+        if (android.os.Build.VERSION.SDK_INT < 30 || now - lastThumbShot < 1500 || paywall || !screenShowsReading()) {
             done.run();
             return;
         }

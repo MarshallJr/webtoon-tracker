@@ -464,6 +464,53 @@
                     android:orientation="vertical"
                     android:visibility="gone">
 
+                    <!-- Chapitres payants repérés sur le site où tu lis -->
+                    <LinearLayout
+                        android:id="@+id/eLockCard"
+                        style="@style/DetailCard"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:visibility="gone">
+
+                        <FrameLayout
+                            android:layout_width="40dp"
+                            android:layout_height="40dp"
+                            android:background="@drawable/bg_lock_circle">
+
+                            <ImageView
+                                android:layout_width="20dp"
+                                android:layout_height="20dp"
+                                android:layout_gravity="center"
+                                android:contentDescription="@null"
+                                android:src="@drawable/ic_lock"
+                                android:tint="@color/ed_paid_text" />
+                        </FrameLayout>
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="12dp"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:id="@+id/eLockTitle"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:fontFamily="sans-serif-medium"
+                                android:textColor="@color/text_main"
+                                android:textSize="14.5sp" />
+
+                            <TextView
+                                android:id="@+id/eLockSub"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="1dp"
+                                android:textColor="@color/text_soft"
+                                android:textSize="12.5sp" />
+                        </LinearLayout>
+                    </LinearLayout>
+
                     <!-- « J'avais lu les premiers chapitres avant l'appli » -->
                     <LinearLayout
                         android:id="@+id/eBackfill"

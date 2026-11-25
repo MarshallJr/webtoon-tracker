@@ -16,7 +16,7 @@ import java.util.TreeSet;
 public class DbHelper extends SQLiteOpenHelper {
 
     private static final String DB_NAME = "webtoons.db";
-    private static final int DB_VERSION = 7;
+    private static final int DB_VERSION = 8;
     private static DbHelper instance;
 
     public static synchronized DbHelper get(Context ctx) {
@@ -46,6 +46,22 @@ public class DbHelper extends SQLiteOpenHelper {
         upgradeTo5(db);
         upgradeTo6(db);
         upgradeTo7(db);
+        upgradeTo8(db);
+    }
+
+    /** v8 : chapitres payants repérés sur les sites où tu lis (pour te prévenir quand ils deviennent gratuits). */
+    private void upgradeTo8(SQLiteDatabase db) {
+        db.execSQL("CREATE TABLE IF NOT EXISTS locks (" +
+                "title TEXT NOT NULL COLLATE NOCASE," +
+                "host TEXT NOT NULL," +
+                "chapter REAL NOT NULL," +
+                "url TEXT," +
+                "free_at INTEGER DEFAULT 0," +
+                "seen_at INTEGER DEFAULT 0," +
+                "checked_at INTEGER DEFAULT 0," +
+                "freed_at INTEGER DEFAULT 0," +
+                "notified INTEGER DEFAULT 0," +
+                "PRIMARY KEY (title, host, chapter))");
     }
 
     /**
@@ -132,6 +148,7 @@ public class DbHelper extends SQLiteOpenHelper {
         if (oldV < 5) upgradeTo5(db);
         if (oldV < 6) upgradeTo6(db);
         if (oldV < 7) upgradeTo7(db);
+        if (oldV < 8) upgradeTo8(db);
     }
 
     // ------------------------------------------------------------------ Modèles
@@ -231,6 +248,18 @@ public class DbHelper extends SQLiteOpenHelper {
             if (SourceRegistry.FREE.equals(model)) return Boolean.TRUE;
             if (SourceRegistry.PAID.equals(model)) return Boolean.FALSE;
             return null;
+        }
+    }
+
+    /** Un chapitre payant repéré sur un site (ou une appli) où tu lis. */
+    public static final class Lock {
+        public String title, host, url;
+        public double chapter;
+        public long freeAt, seenAt, checkedAt, freedAt;
+        public boolean notified;
+
+        public boolean active() {
+            return freedAt == 0;
         }
     }
 
@@ -400,6 +429,7 @@ public class DbHelper extends SQLiteOpenHelper {
         SQLiteDatabase db = getWritableDatabase();
         db.delete("releases", "title = ? COLLATE NOCASE", new String[]{title});
         db.delete("editions", "title = ? COLLATE NOCASE", new String[]{title});
+        db.delete("locks", "title = ? COLLATE NOCASE", new String[]{title});
         db.delete("reads", "title = ? COLLATE NOCASE", new String[]{title});
         db.delete("series_meta", "title = ? COLLATE NOCASE", new String[]{title});
     }
@@ -419,6 +449,8 @@ public class DbHelper extends SQLiteOpenHelper {
             db.delete("releases", "title = ? COLLATE NOCASE", new String[]{from});
             db.execSQL("UPDATE OR IGNORE editions SET title = ? WHERE title = ? COLLATE NOCASE", new Object[]{into, from});
             db.delete("editions", "title = ? COLLATE NOCASE", new String[]{from});
+            db.execSQL("UPDATE OR IGNORE locks SET title = ? WHERE title = ? COLLATE NOCASE", new Object[]{into, from});
+            db.delete("locks", "title = ? COLLATE NOCASE", new String[]{from});
             db.delete("reads", "title = ? COLLATE NOCASE", new String[]{from});
 
             Meta a = getMeta(from), b = getMeta(into);
@@ -718,6 +750,121 @@ public class DbHelper extends SQLiteOpenHelper {
         saveMeta(m);
     }
 
+    // ------------------------------------------------------------------ Chapitres payants
+
+    /** Chapitre payant repéré (ou toujours payant) : on garde la 1re date de repérage. */
+    public synchronized void saveLock(String title, String host, double chapter, String url, long freeAt, long now) {
+        if (title == null || host == null) return;
+        SQLiteDatabase db = getWritableDatabase();
+        ContentValues v = new ContentValues();
+        v.put("title", title);
+        v.put("host", host);
+        v.put("chapter", chapter);
+        v.put("url", url);
+        v.put("free_at", Math.max(0, freeAt));
+        v.put("seen_at", now);
+        v.put("checked_at", now);
+        v.put("freed_at", 0);
+        v.put("notified", 0);
+        if (db.insertWithOnConflict("locks", null, v, SQLiteDatabase.CONFLICT_IGNORE) == -1) {
+            db.execSQL("UPDATE locks SET checked_at = ?, freed_at = 0, notified = 0, url = IFNULL(?, url), " +
+                            "free_at = CASE WHEN ? > 0 THEN ? ELSE free_at END " +
+                            "WHERE title = ? COLLATE NOCASE AND host = ? AND chapter = ?",
+                    new Object[]{now, url, freeAt, freeAt, title, host, chapter});
+        }
+    }
+
+    /** Le site l'a rendu gratuit. */
+    public synchronized void markFreed(String title, String host, double chapter, long now) {
+        getWritableDatabase().execSQL("UPDATE locks SET freed_at = ?, checked_at = ? " +
+                "WHERE title = ? COLLATE NOCASE AND host = ? AND chapter = ? AND freed_at = 0", new Object[]{now, now, title, host, chapter});
+    }
+
+    public synchronized void markLockNotified(String title, String host, double chapter) {
+        getWritableDatabase().execSQL("UPDATE locks SET notified = 1 WHERE title = ? COLLATE NOCASE AND host = ? AND chapter = ?",
+                new Object[]{title, host, chapter});
+    }
+
+    public synchronized void touchLock(String title, String host, double chapter, long now, long freeAt) {
+        getWritableDatabase().execSQL("UPDATE locks SET checked_at = ?, free_at = CASE WHEN ? > 0 THEN ? ELSE free_at END " +
+                "WHERE title = ? COLLATE NOCASE AND host = ? AND chapter = ?", new Object[]{now, freeAt, freeAt, title, host, chapter});
+    }
+
+    public synchronized void deleteLock(String title, String host, double chapter) {
+        getWritableDatabase().delete("locks", "title = ? COLLATE NOCASE AND host = ? AND chapter = ?",
+                new String[]{title, host, String.valueOf(chapter)});
+    }
+
+    private static Lock lockFrom(Cursor c) {
+        Lock l = new Lock();
+        l.title = c.getString(0);
+        l.host = c.getString(1);
+        l.chapter = c.getDouble(2);
+        l.url = c.getString(3);
+        l.freeAt = c.getLong(4);
+        l.seenAt = c.getLong(5);
+        l.checkedAt = c.getLong(6);
+        l.freedAt = c.getLong(7);
+        l.notified = c.getInt(8) == 1;
+        return l;
+    }
+
+    private static final String LOCK_COLS = "title, host, chapter, url, free_at, seen_at, checked_at, freed_at, notified";
+
+    /** Verrous d'une série (actifs, et débloqués depuis moins de 14 jours), du plus petit chapitre au plus grand. */
+    public List<Lock> getLocks(String title) {
+        List<Lock> out = new ArrayList<>();
+        long since = System.currentTimeMillis() - 14L * 24 * 3600 * 1000;
+        try (Cursor c = getReadableDatabase().rawQuery("SELECT " + LOCK_COLS + " FROM locks WHERE title = ? COLLATE NOCASE " +
+                "AND (freed_at = 0 OR freed_at > ?) ORDER BY chapter", new String[]{title, String.valueOf(since)})) {
+            while (c.moveToNext()) out.add(lockFrom(c));
+        }
+        return out;
+    }
+
+    /** Tous les verrous encore actifs (pour la vérification périodique). */
+    public List<Lock> activeLocks() {
+        List<Lock> out = new ArrayList<>();
+        try (Cursor c = getReadableDatabase().rawQuery("SELECT " + LOCK_COLS + " FROM locks WHERE freed_at = 0 " +
+                "ORDER BY title, host, chapter", null)) {
+            while (c.moveToNext()) out.add(lockFrom(c));
+        }
+        return out;
+    }
+
+    public int countActiveLocks() {
+        try (Cursor c = getReadableDatabase().rawQuery("SELECT COUNT(*) FROM locks WHERE freed_at = 0", null)) {
+            return c.moveToFirst() ? c.getInt(0) : 0;
+        }
+    }
+
+    /** Ménage : verrous débloqués depuis longtemps, ou de chapitres que tu as lus depuis. */
+    public synchronized void purgeLocks(long now) {
+        SQLiteDatabase db = getWritableDatabase();
+        db.execSQL("DELETE FROM locks WHERE freed_at > 0 AND freed_at < ?", new Object[]{now - 14L * 24 * 3600 * 1000});
+        db.execSQL("DELETE FROM locks WHERE seen_at > 0 AND seen_at < ? AND freed_at = 0", new Object[]{now - 90L * 24 * 3600 * 1000});
+        db.execSQL("DELETE FROM locks WHERE EXISTS (SELECT 1 FROM reads r WHERE r.title = locks.title COLLATE NOCASE " +
+                "AND r.chapter = locks.chapter)");
+    }
+
+    /**
+     * Annule une lecture enregistrée par erreur (écran de paiement) : la ligne disparaît et
+     * « Reprendre » revient sur le dernier chapitre vraiment lu.
+     */
+    public synchronized void undoRead(String title, double chapter) {
+        SQLiteDatabase db = getWritableDatabase();
+        db.delete("reads", "title = ? COLLATE NOCASE AND chapter = ?", new String[]{title, String.valueOf(chapter)});
+        Meta m = getMeta(title);
+        if (m == null) return;
+        try (Cursor c = db.rawQuery("SELECT url FROM reads WHERE title = ? COLLATE NOCASE AND url IS NOT NULL " +
+                "ORDER BY chapter DESC LIMIT 1", new String[]{title})) {
+            if (c.moveToFirst()) {
+                m.lastUrl = c.getString(0);
+                saveMeta(db, m);
+            }
+        }
+    }
+
     // ------------------------------------------------------------------ Cloche, note, fiche
 
     public synchronized void setFollow(String title, boolean on) {
@@ -810,6 +957,7 @@ public class DbHelper extends SQLiteOpenHelper {
             db.execSQL("UPDATE series_meta SET title = ? WHERE title = ? COLLATE NOCASE", new Object[]{to, from});
             db.execSQL("UPDATE releases SET title = ? WHERE title = ? COLLATE NOCASE", new Object[]{to, from});
             db.execSQL("UPDATE editions SET title = ? WHERE title = ? COLLATE NOCASE", new Object[]{to, from});
+            db.execSQL("UPDATE locks SET title = ? WHERE title = ? COLLATE NOCASE", new Object[]{to, from});
         } else {
             mergeSeries(from, to);
         }

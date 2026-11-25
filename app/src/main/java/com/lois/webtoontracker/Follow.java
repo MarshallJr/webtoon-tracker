@@ -19,9 +19,11 @@ public final class Follow {
         }
     }
 
-    /** Active / coupe la vérification périodique selon qu'il reste des séries suivies. */
+    /** Active / coupe la vérification périodique selon qu'il reste des séries suivies ou des chapitres payants. */
     public static void sync(Context ctx) {
-        if (DbHelper.get(ctx).countFollowed() > 0) {
+        // Séries suivies 🔔, ou chapitres payants repérés (pour te prévenir quand ils deviennent gratuits).
+        DbHelper db = DbHelper.get(ctx);
+        if (db.countFollowed() > 0 || db.countActiveLocks() > 0) {
             ChapterCheckWorker.createChannel(ctx);
             ChapterCheckWorker.enable(ctx);
         } else {

@@ -118,6 +118,15 @@ final class EpisodesTab {
         // Éditions officielles (« Langues & sources ») : leurs chapitres comptent aussi dans la liste.
         List<DbHelper.Edition> editions = meta != null && meta.editionsOn ? db.getEditions(title) : new ArrayList<>();
         for (DbHelper.Edition e : editions) latest = Math.max(latest, e.latest);
+        // Chapitres payants repérés sur le site où tu lis (celui qu'ouvre le bouton « Lire »).
+        String site = currentSite(meta, entries, furthest);
+        java.util.Map<Double, DbHelper.Lock> locks = new java.util.HashMap<>();
+        for (DbHelper.Lock l : db.getLocks(title)) {
+            if ((site != null && !site.equals(l.host)) || read.containsKey(l.chapter)) continue;
+            DbHelper.Lock cur = locks.get(l.chapter);
+            if (cur == null || (!cur.active() && l.active())) locks.put(l.chapter, l);
+            latest = Math.max(latest, l.chapter);
+        }
         java.util.TreeSet<Double> all = new java.util.TreeSet<>(read.keySet());
         all.addAll(fresh.keySet());
         if (latest <= 3000) for (int c = 1; c <= (int) Math.floor(latest); c++) all.add((double) c);
@@ -143,6 +152,7 @@ final class EpisodesTab {
         count.setText(c);
         ((TextView) act.findViewById(R.id.eSort)).setText(newest ? "Plus récents" : "Plus anciens");
         bindBackfill(entries);
+        bindLockCard(locks);
 
         // Liste
         LinearLayout list = act.findViewById(R.id.eList);
@@ -151,7 +161,7 @@ final class EpisodesTab {
         Bitmap strip = ChapterThumbs.placeholder(act, title);
         int n = Math.min(shown, rows.size());
         for (int i = 0; i < n; i++) {
-            View v = rowView(list, rows.get(i), furthest, progress, meta, entries, strip, editions);
+            View v = rowView(list, rows.get(i), furthest, progress, meta, entries, strip, editions, locks);
             list.addView(v);
             if (animateNext && i < 10) Anim.enter(v, i);
         }
@@ -209,7 +219,8 @@ final class EpisodesTab {
     // ------------------------------------------------------------------ Une ligne
 
     private View rowView(LinearLayout parent, Row r, double furthest, Progress progress, DbHelper.Meta meta,
-                         List<DbHelper.Entry> entries, Bitmap strip, List<DbHelper.Edition> editions) {
+                         List<DbHelper.Entry> entries, Bitmap strip, List<DbHelper.Edition> editions,
+                         java.util.Map<Double, DbHelper.Lock> locks) {
         View v = LayoutInflater.from(act).inflate(R.layout.item_episode, parent, false);
         v.setTag(R.id.anim_press, Boolean.TRUE); // ligne pleine largeur : effet d'appui classique (pas de zoom)
         TextView name = v.findViewById(R.id.eName), badge = v.findViewById(R.id.eBadge);
@@ -250,6 +261,38 @@ final class EpisodesTab {
             btn.setTextColor(0xFFFFFFFF);
             String url = r.release.url;
             action = url == null ? null : () -> open(url);
+            v.setOnLongClickListener(x -> markRead(x, r.chapter));
+            bindAlso(v, r.chapter, editions);
+        } else if (r.entry == null && locks.get(r.chapter) != null) {
+            // Payant sur ton site (ou débloqué depuis peu)
+            DbHelper.Lock l = locks.get(r.chapter);
+            Runnable go = linkAction(meta, entries, r.chapter);
+            if (go == null && l.url != null && l.url.startsWith("http")) go = () -> open(l.url);
+            final Runnable openIt = go;
+            long now = System.currentTimeMillis();
+            badge.setVisibility(View.VISIBLE);
+            extra.setVisibility(View.VISIBLE);
+            if (l.active()) {
+                badge.setText("PAYANT");
+                badge.setTextColor(ContextCompat.getColor(act, R.color.ed_paid_text));
+                date.setText("Payant sur " + l.host);
+                extra.setText(l.freeAt > now ? "Gratuit " + ReadingTrackerService.inWords(l.freeAt - now)
+                        : "Je te préviens dès qu'il est gratuit");
+                extra.setTextColor(ContextCompat.getColor(act, R.color.text_soft));
+                btn.setText("Payant");
+                btn.setTextColor(ContextCompat.getColor(act, R.color.ed_paid_text));
+                action = () -> showLockDialog(l, openIt);
+            } else {
+                badge.setText("GRATUIT");
+                badge.setTextColor(ContextCompat.getColor(act, R.color.online));
+                date.setText("Payant avant · " + l.host);
+                extra.setText("Gratuit depuis le " + dayFmt.format(new Date(l.freedAt)));
+                extra.setTextColor(ContextCompat.getColor(act, R.color.online));
+                btn.setText("Lire");
+                btn.setBackgroundResource(R.drawable.bg_episode_btn_new);
+                btn.setTextColor(0xFFFFFFFF);
+                action = openIt;
+            }
             v.setOnLongClickListener(x -> markRead(x, r.chapter));
             bindAlso(v, r.chapter, editions);
         } else if (r.entry == null) {
@@ -379,6 +422,92 @@ final class EpisodesTab {
                 return true;
             });
             pm.show();
+        });
+    }
+
+    // ------------------------------------------------------------------ Chapitres payants
+
+    /** Le site qu'ouvre « Lire » pour la suite (le dernier où tu as lu cette série). */
+    private String currentSite(DbHelper.Meta meta, List<DbHelper.Entry> entries, double furthest) {
+        ChapterLinks.Link link = ChapterLinks.linkFor(act, title, meta, entries, Math.floor(furthest) + 1);
+        return link == null ? null : link.host();
+    }
+
+    /** « 4 chapitres payants sur en-thunderscans.com · 33 → 36 · je te préviens dès qu'ils sont gratuits » */
+    private void bindLockCard(java.util.Map<Double, DbHelper.Lock> locks) {
+        View card = act.findViewById(R.id.eLockCard);
+        List<DbHelper.Lock> active = new ArrayList<>();
+        for (DbHelper.Lock l : locks.values()) if (l.active()) active.add(l);
+        if (active.isEmpty()) {
+            card.setVisibility(View.GONE);
+            return;
+        }
+        active.sort((a, b) -> Double.compare(a.chapter, b.chapter));
+        DbHelper.Lock first = active.get(0), last = active.get(active.size() - 1);
+        int n = active.size();
+        ((TextView) act.findViewById(R.id.eLockTitle)).setText(n + (n > 1 ? " chapitres payants" : " chapitre payant")
+                + " sur " + first.host);
+        long now = System.currentTimeMillis();
+        DbHelper.Lock soon = null;
+        for (DbHelper.Lock l : active) if (l.freeAt > now && (soon == null || l.freeAt < soon.freeAt)) soon = l;
+        String range = n == 1 ? "Ch. " + Detector.formatChapter(first.chapter)
+                : "Ch. " + Detector.formatChapter(first.chapter) + " → " + Detector.formatChapter(last.chapter);
+        ((TextView) act.findViewById(R.id.eLockSub)).setText(range + " · " + (soon != null
+                ? "le " + Detector.formatChapter(soon.chapter) + " devient gratuit " + ReadingTrackerService.inWords(soon.freeAt - now)
+                : (n > 1 ? "je te préviens dès qu'ils deviennent gratuits" : "je te préviens dès qu'il devient gratuit")));
+        card.setVisibility(View.VISIBLE);
+    }
+
+    private void showLockDialog(DbHelper.Lock l, Runnable openAnyway) {
+        long now = System.currentTimeMillis();
+        String msg = "Repéré le " + dayFmt.format(new Date(l.seenAt)) + " sur " + l.host + ". Il n'est pas compté comme lu.\n\n"
+                + (l.freeAt > now ? "Le site annonce qu'il sera gratuit " + ReadingTrackerService.inWords(l.freeAt - now) + ". " : "")
+                + "Je le revérifie régulièrement et je te préviens dès qu'il devient gratuit.";
+        MaterialAlertDialogBuilder b = new MaterialAlertDialogBuilder(act)
+                .setTitle("Chapitre " + Detector.formatChapter(l.chapter) + " · payant")
+                .setMessage(msg)
+                .setPositiveButton("OK", null)
+                .setNeutralButton("Vérifier maintenant", (d, w) -> verifyLock(l));
+        if (openAnyway != null) b.setNegativeButton("Ouvrir quand même", (d, w) -> openAnyway.run());
+        b.show();
+    }
+
+    private void verifyLock(DbHelper.Lock l) {
+        if (l.url == null || !l.url.startsWith("http")) {
+            Toast.makeText(act, "Vérification impossible : chapitre repéré dans une appli", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        Toast.makeText(act, "Vérification…", Toast.LENGTH_SHORT).show();
+        final String t = title;
+        io.execute(() -> {
+            String ctl = null;
+            double ctlCh = 0;
+            for (DbHelper.Entry e : db.getHistory(t)) {
+                if (e.url != null && l.host.equals(ChapterLinks.host(e.url))) {
+                    ctl = e.url;
+                    ctlCh = e.chapter;
+                    break;
+                }
+            }
+            Paywall.Probe p = Paywall.probe(l.url, l.chapter, ctl, ctlCh);
+            long now = System.currentTimeMillis();
+            String msg;
+            if (p.state == Paywall.FREE) {
+                db.markFreed(t, l.host, l.chapter, now);
+                db.markLockNotified(t, l.host, l.chapter);
+                msg = "Le ch. " + Detector.formatChapter(l.chapter) + " est gratuit maintenant 🎉";
+            } else if (p.state == Paywall.LOCKED_STATE) {
+                db.touchLock(t, l.host, l.chapter, now, p.freeAt);
+                msg = "Toujours payant" + (p.freeAt > now ? " · gratuit " + ReadingTrackerService.inWords(p.freeAt - now) : "");
+            } else {
+                msg = "Impossible de vérifier depuis l'appli : ce site construit ses pages par script. "
+                        + "Je te préviendrai si tu le rouvres gratuit.";
+            }
+            final String m = msg;
+            act.runOnUiThread(() -> {
+                Toast.makeText(act, m, Toast.LENGTH_LONG).show();
+                if (t.equals(this.title) && !act.isFinishing()) bind(t);
+            });
         });
     }
 

@@ -109,6 +109,8 @@ public final class Banner {
                 color = 0xFF5B6CFF; iconRes = R.drawable.ic_eye; break;
             case RESUME:
                 color = 0xFF6D4AFF; iconRes = R.drawable.ic_bookmark; break;
+            case LOCKED:
+                color = 0xFFFFA62B; iconRes = R.drawable.ic_lock; break;
             case ADDED:
             default:
                 color = 0xFF00B26A; iconRes = R.drawable.ic_check; break;

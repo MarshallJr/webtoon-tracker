@@ -85,6 +85,12 @@ public class ChapterCheckWorker extends Worker {
         long now = System.currentTimeMillis();
         int found = 0;
 
+        // 0. Chapitres payants repérés sur tes sites : sont-ils devenus gratuits ?
+        try {
+            found += checkLocks(ctx, db);
+        } catch (Exception ignored) {
+        }
+
         for (DbHelper.Series s : db.getSeries()) {
             if (isStopped()) break;
             DbHelper.Meta m = db.getMeta(s.title);
@@ -144,7 +150,7 @@ public class ChapterCheckWorker extends Worker {
                     known = m.lastUrl;      // lu avant la v4.3 : l'adresse du dernier chapitre
                     knownCh = last;
                 }
-                DbHelper.Release r = ReleaseSources.siteLatest(s.title, known, knownCh, last);
+                DbHelper.Release r = ReleaseSources.siteLatest(ctx, s.title, known, knownCh, last);
                 if (r != null) rel.add(r);
             } catch (Exception ignored) {
             }
@@ -171,6 +177,95 @@ public class ChapterCheckWorker extends Worker {
                 .putInt("last_check_found", found).apply();
         ctx.sendBroadcast(new Intent(ReadingTrackerService.ACTION_UPDATED).setPackage(ctx.getPackageName()));
         return Result.success();
+    }
+
+    /**
+     * Revérifie les chapitres payants encore verrouillés, du plus petit au plus grand (3 au plus par
+     * série et par site ; on s'arrête au premier encore payant). Ceux devenus gratuits → notification.
+     * @return nombre de séries pour lesquelles un chapitre est devenu gratuit
+     */
+    private int checkLocks(Context ctx, DbHelper db) throws InterruptedException {
+        long now = System.currentTimeMillis();
+        db.purgeLocks(now);
+        java.util.LinkedHashMap<String, java.util.List<DbHelper.Lock>> groups = new java.util.LinkedHashMap<>();
+        for (DbHelper.Lock l : db.activeLocks()) {
+            groups.computeIfAbsent(l.title.toLowerCase(java.util.Locale.ROOT) + "|" + l.host, k -> new java.util.ArrayList<>()).add(l);
+        }
+        java.util.LinkedHashMap<String, java.util.List<DbHelper.Lock>> freed = new java.util.LinkedHashMap<>();
+        for (java.util.List<DbHelper.Lock> g : groups.values()) {
+            if (isStopped()) break;
+            String title = g.get(0).title;
+            // Contrôle : un chapitre lu sur ce même site (sa page doit montrer ses images).
+            String ctl = null;
+            double ctlCh = 0;
+            for (DbHelper.Entry e : db.getHistory(title)) {
+                if (e.url != null && g.get(0).host.equals(ChapterLinks.host(e.url))) {
+                    ctl = e.url;
+                    ctlCh = e.chapter;
+                    break;
+                }
+            }
+            int checked = 0;
+            for (DbHelper.Lock l : g) {
+                if (checked >= 3 || l.url == null || !l.url.startsWith("http")) break;   // appli de lecture : pas de page à vérifier
+                Paywall.Probe p = Paywall.probe(l.url, l.chapter, ctl, ctlCh);
+                checked++;
+                if (p.state == Paywall.FREE) {
+                    db.markFreed(title, l.host, l.chapter, now);
+                    freed.computeIfAbsent(title, k -> new java.util.ArrayList<>()).add(l);
+                    Thread.sleep(500);
+                    continue;
+                }
+                if (p.state == Paywall.LOCKED_STATE) db.touchLock(title, l.host, l.chapter, now, p.freeAt);
+                break;   // encore payant (ou impossible à vérifier) : les suivants aussi
+            }
+            Thread.sleep(400);
+        }
+        for (java.util.Map.Entry<String, java.util.List<DbHelper.Lock>> e : freed.entrySet()) {
+            notifyFreed(ctx, e.getKey(), e.getValue());
+            double top = 0;
+            for (DbHelper.Lock l : e.getValue()) {
+                db.markLockNotified(l.title, l.host, l.chapter);
+                top = Math.max(top, l.chapter);
+            }
+            DbHelper.Meta m = db.getMeta(e.getKey());
+            if (m != null && top > m.notifiedCh) db.setNotified(e.getKey(), top);   // pas de 2e alerte « dispo » pour lui
+        }
+        if (db.countActiveLocks() == 0) Follow.sync(ctx);
+        return freed.size();
+    }
+
+    /** « 🔓 Chapitre 33 gratuit · sur en-thunderscans.com » avec un bouton Lire. */
+    private static void notifyFreed(Context ctx, String series, java.util.List<DbHelper.Lock> locks) {
+        if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(ctx,
+                Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return;
+        createChannel(ctx);
+        locks.sort((a, b) -> Double.compare(a.chapter, b.chapter));
+        DbHelper.Lock first = locks.get(0), last = locks.get(locks.size() - 1);
+        String chs = locks.size() == 1 ? "Chapitre " + Detector.formatChapter(first.chapter) + " gratuit"
+                : "Chapitres " + Detector.formatChapter(first.chapter) + " à " + Detector.formatChapter(last.chapter) + " gratuits";
+        String text = chs + " sur " + first.host;
+        Intent open = new Intent(ctx, MainActivity.class)
+                .putExtra(EXTRA_SHOW_UPDATES, series)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        PendingIntent pi = PendingIntent.getActivity(ctx, ("free" + series).hashCode(), open,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        NotificationCompat.Builder b = new NotificationCompat.Builder(ctx, CHANNEL)
+                .setSmallIcon(R.drawable.ic_notif)
+                .setColor(0xFFFFA62B)
+                .setContentTitle("🔓 " + series)
+                .setContentText(text)
+                .setStyle(new NotificationCompat.BigTextStyle().bigText(text + "\nIl était payant quand tu es tombé dessus."))
+                .setContentIntent(pi)
+                .setAutoCancel(true)
+                .setGroup("new_chapters");
+        if (first.url != null) {
+            Intent view = new Intent(Intent.ACTION_VIEW, Uri.parse(first.url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            PendingIntent vp = PendingIntent.getActivity(ctx, ("freeview" + series).hashCode(), view,
+                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+            b.addAction(0, "Lire le ch. " + Detector.formatChapter(first.chapter), vp);
+        }
+        NotificationManagerCompat.from(ctx).notify(("free" + series.toLowerCase()).hashCode(), b.build());
     }
 
     private static boolean isNone(String id) {
