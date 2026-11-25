@@ -10,8 +10,8 @@ android {
         applicationId 'com.lois.webtoontracker'
         minSdk 26
         targetSdk 35
-        versionCode 33
-        versionName '4.14'
+        versionCode 34
+        versionName '4.15'
     }
 
     // Clé de signature FIXE : sans elle, chaque build GitHub avait une clé différente

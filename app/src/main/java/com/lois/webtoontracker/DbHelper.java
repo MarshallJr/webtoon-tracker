@@ -16,7 +16,7 @@ import java.util.TreeSet;
 public class DbHelper extends SQLiteOpenHelper {
 
     private static final String DB_NAME = "webtoons.db";
-    private static final int DB_VERSION = 6;
+    private static final int DB_VERSION = 7;
     private static DbHelper instance;
 
     public static synchronized DbHelper get(Context ctx) {
@@ -45,6 +45,34 @@ public class DbHelper extends SQLiteOpenHelper {
         upgradeTo4(db);
         upgradeTo5(db);
         upgradeTo6(db);
+        upgradeTo7(db);
+    }
+
+    /**
+     * v7 : éditions officielles / autorisées de chaque série, dans toutes les langues (« Langues & sources »).
+     * Les chapitres hébergés par MangaDex (traductions de fans, non officielles) ne sont plus proposés.
+     */
+    private void upgradeTo7(SQLiteDatabase db) {
+        db.execSQL("ALTER TABLE series_meta ADD COLUMN editions_on INTEGER DEFAULT 0");
+        db.execSQL("ALTER TABLE series_meta ADD COLUMN editions_at INTEGER DEFAULT 0");
+        db.execSQL("CREATE TABLE IF NOT EXISTS editions (" +
+                "title TEXT NOT NULL COLLATE NOCASE," +
+                "url TEXT NOT NULL," +
+                "platform TEXT," +
+                "lang TEXT," +
+                "category INTEGER NOT NULL," +
+                "evidence TEXT," +
+                "proof TEXT," +
+                "latest REAL DEFAULT 0," +
+                "free_upto REAL DEFAULT 0," +
+                "model TEXT," +
+                "chapter_tpl TEXT," +
+                "ep_offset INTEGER DEFAULT 0," +
+                "chapters TEXT," +
+                "user_added INTEGER DEFAULT 0," +
+                "checked_at INTEGER DEFAULT 0," +
+                "PRIMARY KEY (title, url))");
+        db.execSQL("DELETE FROM releases WHERE source = 'MangaDex'");
     }
 
     /** v6 : lien de chaque chapitre (pour le rouvrir), nombre de lectures et dernière visite. */
@@ -103,6 +131,7 @@ public class DbHelper extends SQLiteOpenHelper {
         if (oldV < 4) upgradeTo4(db);
         if (oldV < 5) upgradeTo5(db);
         if (oldV < 6) upgradeTo6(db);
+        if (oldV < 7) upgradeTo7(db);
     }
 
     // ------------------------------------------------------------------ Modèles
@@ -153,6 +182,9 @@ public class DbHelper extends SQLiteOpenHelper {
         public String note, detailsJson;
         public long detailsAt;
         public int score;
+        /** « Langues & sources » activé pour cette série, et dernière recherche des éditions. */
+        public boolean editionsOn;
+        public long editionsAt;
     }
 
     /** Un chapitre disponible quelque part (site + langue). */
@@ -160,6 +192,46 @@ public class DbHelper extends SQLiteOpenHelper {
         public String title, source, lang, url, label;
         public double chapter;
         public long foundAt;
+    }
+
+    /**
+     * Une édition de la série : une plateforme, une langue. Seules les catégories 1 (officielle) et
+     * 2 (autorisée) sont enregistrées ; les sources inconnues ou non autorisées ne le sont jamais.
+     */
+    public static final class Edition {
+        public String title, url, platform, lang, evidence, proof, model, chapterTpl, chapters;
+        public int category, epOffset;
+        public double latest, freeUpto;   // 0 = inconnu
+        public boolean userAdded;
+        public long checkedAt;
+
+        /** Adresse du chapitre dans cette édition, si elle se devine (sinon null). */
+        public String chapterUrl(double ch) {
+            if (chapters != null && !chapters.isEmpty()) {
+                try {
+                    org.json.JSONObject o = new org.json.JSONObject(chapters);
+                    String u = o.optString(Detector.formatChapter(ch), "");
+                    if (!u.isEmpty()) return u;
+                } catch (Exception ignored) {
+                }
+            }
+            if (chapterTpl == null || ch != Math.floor(ch) || ch < 1 || (latest > 0 && ch > latest)) return null;
+            long ep = (long) ch + epOffset;
+            return ep < 1 ? null : chapterTpl.replace("{e}", String.valueOf(ep));
+        }
+
+        /** Le chapitre existe-t-il dans cette édition (numéro connu) ? */
+        public boolean has(double ch) {
+            return chapterUrl(ch) != null || (latest > 0 && ch <= latest);
+        }
+
+        /** Gratuit pour ce chapitre : true / false / null (inconnu). */
+        public Boolean freeFor(double ch) {
+            if (freeUpto > 0 && ch <= freeUpto) return Boolean.TRUE;
+            if (SourceRegistry.FREE.equals(model)) return Boolean.TRUE;
+            if (SourceRegistry.PAID.equals(model)) return Boolean.FALSE;
+            return null;
+        }
     }
 
     // ------------------------------------------------------------------ Lectures
@@ -327,6 +399,7 @@ public class DbHelper extends SQLiteOpenHelper {
         ChapterThumbs.deleteAll(appCtx, title);
         SQLiteDatabase db = getWritableDatabase();
         db.delete("releases", "title = ? COLLATE NOCASE", new String[]{title});
+        db.delete("editions", "title = ? COLLATE NOCASE", new String[]{title});
         db.delete("reads", "title = ? COLLATE NOCASE", new String[]{title});
         db.delete("series_meta", "title = ? COLLATE NOCASE", new String[]{title});
     }
@@ -344,6 +417,8 @@ public class DbHelper extends SQLiteOpenHelper {
         try {
             db.execSQL("UPDATE OR IGNORE reads SET title = ? WHERE title = ? COLLATE NOCASE", new Object[]{into, from});
             db.delete("releases", "title = ? COLLATE NOCASE", new String[]{from});
+            db.execSQL("UPDATE OR IGNORE editions SET title = ? WHERE title = ? COLLATE NOCASE", new Object[]{into, from});
+            db.delete("editions", "title = ? COLLATE NOCASE", new String[]{from});
             db.delete("reads", "title = ? COLLATE NOCASE", new String[]{from});
 
             Meta a = getMeta(from), b = getMeta(into);
@@ -368,6 +443,7 @@ public class DbHelper extends SQLiteOpenHelper {
                 if (m.score == 0) m.score = a.score;
                 if (m.mdxId == null) m.mdxId = a.mdxId;
                 if (m.muId == null) m.muId = a.muId;
+                m.editionsOn = m.editionsOn || a.editionsOn;
                 saveMeta(db, m);
                 db.delete("series_meta", "title = ? COLLATE NOCASE", new String[]{from});
             }
@@ -382,7 +458,7 @@ public class DbHelper extends SQLiteOpenHelper {
     public Meta getMeta(String title) {
         try (Cursor c = getReadableDatabase().rawQuery(
                 "SELECT title, tags, last_url, last_pkg, title_no, rss_base, rss_last_ep, mdx_id, mu_id, notified_ch, " +
-                        "follow, rating, note, details_json, details_at, score FROM series_meta " +
+                        "follow, rating, note, details_json, details_at, score, editions_on, editions_at FROM series_meta " +
                         "WHERE title = ? COLLATE NOCASE", new String[]{title})) {
             if (!c.moveToFirst()) return null;
             Meta m = new Meta();
@@ -402,6 +478,8 @@ public class DbHelper extends SQLiteOpenHelper {
             m.detailsJson = c.getString(13);
             m.detailsAt = c.getLong(14);
             m.score = c.getInt(15);
+            m.editionsOn = c.getInt(16) == 1;
+            m.editionsAt = c.getLong(17);
             return m;
         }
     }
@@ -435,6 +513,8 @@ public class DbHelper extends SQLiteOpenHelper {
         v.put("details_json", m.detailsJson);
         v.put("details_at", m.detailsAt);
         v.put("score", m.score);
+        v.put("editions_on", m.editionsOn ? 1 : 0);
+        v.put("editions_at", m.editionsAt);
         db.insertWithOnConflict("series_meta", null, v, SQLiteDatabase.CONFLICT_REPLACE);
     }
 
@@ -538,6 +618,106 @@ public class DbHelper extends SQLiteOpenHelper {
         return out;
     }
 
+    /** Supprime les sorties dont la source commence par ce préfixe (ex. « Édition » quand tu coupes « Langues & sources »). */
+    public synchronized void deleteReleases(String title, String sourcePrefix) {
+        getWritableDatabase().delete("releases", "title = ? COLLATE NOCASE AND source LIKE ?",
+                new String[]{title, sourcePrefix + "%"});
+    }
+
+    // ------------------------------------------------------------------ Éditions (Langues & sources)
+
+    public List<Edition> getEditions(String title) {
+        List<Edition> out = new ArrayList<>();
+        try (Cursor c = getReadableDatabase().rawQuery(
+                "SELECT title, url, platform, lang, category, evidence, proof, latest, free_upto, model, chapter_tpl, " +
+                        "ep_offset, chapters, user_added, checked_at FROM editions WHERE title = ? COLLATE NOCASE " +
+                        "ORDER BY category, latest DESC, lang", new String[]{title})) {
+            while (c.moveToNext()) {
+                Edition e = new Edition();
+                e.title = c.getString(0);
+                e.url = c.getString(1);
+                e.platform = c.getString(2);
+                e.lang = c.getString(3);
+                e.category = c.getInt(4);
+                e.evidence = c.getString(5);
+                e.proof = c.getString(6);
+                e.latest = c.getDouble(7);
+                e.freeUpto = c.getDouble(8);
+                e.model = c.getString(9);
+                e.chapterTpl = c.getString(10);
+                e.epOffset = c.getInt(11);
+                e.chapters = c.getString(12);
+                e.userAdded = c.getInt(13) == 1;
+                e.checkedAt = c.getLong(14);
+                out.add(e);
+            }
+        }
+        return out;
+    }
+
+    private static ContentValues values(Edition e) {
+        ContentValues v = new ContentValues();
+        v.put("title", e.title);
+        v.put("url", e.url);
+        v.put("platform", e.platform);
+        v.put("lang", e.lang);
+        v.put("category", e.category);
+        v.put("evidence", e.evidence);
+        v.put("proof", e.proof);
+        v.put("latest", e.latest);
+        v.put("free_upto", e.freeUpto);
+        v.put("model", e.model);
+        v.put("chapter_tpl", e.chapterTpl);
+        v.put("ep_offset", e.epOffset);
+        v.put("chapters", e.chapters);
+        v.put("user_added", e.userAdded ? 1 : 0);
+        v.put("checked_at", e.checkedAt);
+        return v;
+    }
+
+    /**
+     * Remplace les éditions trouvées automatiquement (celles que tu as ajoutées avec une preuve restent).
+     * Catégories 1 et 2 seulement : tout le reste est refusé ici, par sécurité.
+     */
+    public synchronized void replaceEditions(String title, List<Edition> found) {
+        SQLiteDatabase db = getWritableDatabase();
+        db.beginTransaction();
+        try {
+            db.delete("editions", "title = ? COLLATE NOCASE AND IFNULL(user_added, 0) = 0", new String[]{title});
+            for (Edition e : found) {
+                if (e.category != SourceRegistry.OFFICIAL && e.category != SourceRegistry.AUTHORIZED) continue;
+                e.title = title;
+                db.insertWithOnConflict("editions", null, values(e), SQLiteDatabase.CONFLICT_IGNORE);
+            }
+            db.setTransactionSuccessful();
+        } finally {
+            db.endTransaction();
+        }
+    }
+
+    public synchronized void addUserEdition(Edition e) {
+        if (e.category != SourceRegistry.AUTHORIZED) return;
+        e.userAdded = true;
+        getWritableDatabase().insertWithOnConflict("editions", null, values(e), SQLiteDatabase.CONFLICT_REPLACE);
+    }
+
+    public synchronized void deleteEdition(String title, String url) {
+        getWritableDatabase().delete("editions", "title = ? COLLATE NOCASE AND url = ?", new String[]{title, url});
+    }
+
+    public synchronized void setEditionsOn(String title, boolean on) {
+        Meta m = metaOrNew(title);
+        m.editionsOn = on;
+        if (!on) m.editionsAt = 0;
+        saveMeta(m);
+    }
+
+    public synchronized void setEditionsAt(String title, long at) {
+        Meta m = metaOrNew(title);
+        m.editionsAt = at;
+        saveMeta(m);
+    }
+
     // ------------------------------------------------------------------ Cloche, note, fiche
 
     public synchronized void setFollow(String title, boolean on) {
@@ -629,6 +809,7 @@ public class DbHelper extends SQLiteOpenHelper {
             db.execSQL("UPDATE reads SET title = ? WHERE title = ? COLLATE NOCASE", new Object[]{to, from});
             db.execSQL("UPDATE series_meta SET title = ? WHERE title = ? COLLATE NOCASE", new Object[]{to, from});
             db.execSQL("UPDATE releases SET title = ? WHERE title = ? COLLATE NOCASE", new Object[]{to, from});
+            db.execSQL("UPDATE editions SET title = ? WHERE title = ? COLLATE NOCASE", new Object[]{to, from});
         } else {
             mergeSeries(from, to);
         }

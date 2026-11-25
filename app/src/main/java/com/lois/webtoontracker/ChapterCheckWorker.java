@@ -152,6 +152,12 @@ public class ChapterCheckWorker extends Worker {
 
             for (DbHelper.Release r : rel) db.saveRelease(r);
 
+            // 5. Éditions officielles dans toutes les langues (« Langues & sources » activé pour cette série)
+            try {
+                Editions.refreshIfStale(ctx, s.title, 20L * 3600 * 1000);
+            } catch (Exception ignored) {
+            }
+
             // Nouveau = plus loin que ton dernier chapitre lu ET pas déjà signalé.
             java.util.List<DbHelper.Release> fresh = db.newReleases(s.title);
             if (!fresh.isEmpty() && fresh.get(0).chapter > m.notifiedCh) {

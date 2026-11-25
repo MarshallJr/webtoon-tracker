@@ -21,7 +21,7 @@ import java.util.regex.Matcher;
 
 /**
  * Où trouver le dernier chapitre d'une série, en anglais ou en français, quel que soit le site :
- *  - MangaDex      : chapitres EN / FR des équipes de scan (+ liens vers les sites officiels)
+ *  - MangaDex      : liens vers les chapitres publiés sur des services officiels (EN / FR)
  *  - MangaUpdates  : base qui suit TOUTES les sorties, tous groupes et tous sites confondus
  *  - Webtoon       : flux RSS officiel webtoons.com (si la série y est liée)
  * Toutes publiques et gratuites, sans compte ni clé.
@@ -75,9 +75,13 @@ public final class ReleaseSources {
         return NOT_FOUND;
     }
 
-    /** Dernier chapitre EN et FR sur MangaDex (ou sur le site officiel vers lequel MangaDex renvoie). */
+    /**
+     * Dernier chapitre EN et FR publié sur un service OFFICIEL vers lequel MangaDex renvoie
+     * (MANGA Plus, Comikey…). Les chapitres hébergés par MangaDex lui-même sont surtout des
+     * traductions de fans non officielles : ils ne sont plus proposés.
+     */
     public static List<DbHelper.Release> mangadexLatest(String title, String id) throws Exception {
-        String url = "https://api.mangadex.org/manga/" + id + "/feed?limit=50"
+        String url = "https://api.mangadex.org/manga/" + id + "/feed?limit=100"
                 + "&translatedLanguage%5B%5D=en&translatedLanguage%5B%5D=fr"
                 + "&order%5Bchapter%5D=desc&includeExternalUrl=1"
                 + "&contentRating%5B%5D=safe&contentRating%5B%5D=suggestive&contentRating%5B%5D=erotica";
@@ -88,6 +92,8 @@ public final class ReleaseSources {
             JSONObject ch = data.getJSONObject(i);
             JSONObject a = ch.optJSONObject("attributes");
             if (a == null) continue;
+            String ext = a.optString("externalUrl", "");
+            if (ext.isEmpty() || "null".equals(ext)) continue;   // hébergé par MangaDex : pas officiel
             double num;
             try {
                 num = Double.parseDouble(a.optString("chapter", ""));
@@ -102,16 +108,9 @@ public final class ReleaseSources {
             r.title = title;
             r.lang = lang;
             r.chapter = num;
-            String ext = a.optString("externalUrl", "");
-            if (!ext.isEmpty() && !"null".equals(ext)) {
-                r.url = ext;
-                r.source = "Officiel";
-                r.label = "Officiel · " + host(ext);
-            } else {
-                r.url = "https://mangadex.org/chapter/" + ch.getString("id");
-                r.source = "MangaDex";
-                r.label = "MangaDex";
-            }
+            r.url = ext;
+            r.source = "Officiel";
+            r.label = SourceRegistry.name(ext);
             r.foundAt = System.currentTimeMillis();
             best.put(lang, r);
         }

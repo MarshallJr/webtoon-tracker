@@ -115,6 +115,9 @@ final class EpisodesTab {
             fresh.put(r.chapter, r);
             latest = Math.max(latest, r.chapter);
         }
+        // Éditions officielles (« Langues & sources ») : leurs chapitres comptent aussi dans la liste.
+        List<DbHelper.Edition> editions = meta != null && meta.editionsOn ? db.getEditions(title) : new ArrayList<>();
+        for (DbHelper.Edition e : editions) latest = Math.max(latest, e.latest);
         java.util.TreeSet<Double> all = new java.util.TreeSet<>(read.keySet());
         all.addAll(fresh.keySet());
         if (latest <= 3000) for (int c = 1; c <= (int) Math.floor(latest); c++) all.add((double) c);
@@ -148,7 +151,7 @@ final class EpisodesTab {
         Bitmap strip = ChapterThumbs.placeholder(act, title);
         int n = Math.min(shown, rows.size());
         for (int i = 0; i < n; i++) {
-            View v = rowView(list, rows.get(i), furthest, progress, meta, entries, strip);
+            View v = rowView(list, rows.get(i), furthest, progress, meta, entries, strip, editions);
             list.addView(v);
             if (animateNext && i < 10) Anim.enter(v, i);
         }
@@ -206,7 +209,7 @@ final class EpisodesTab {
     // ------------------------------------------------------------------ Une ligne
 
     private View rowView(LinearLayout parent, Row r, double furthest, Progress progress, DbHelper.Meta meta,
-                         List<DbHelper.Entry> entries, Bitmap strip) {
+                         List<DbHelper.Entry> entries, Bitmap strip, List<DbHelper.Edition> editions) {
         View v = LayoutInflater.from(act).inflate(R.layout.item_episode, parent, false);
         v.setTag(R.id.anim_press, Boolean.TRUE); // ligne pleine largeur : effet d'appui classique (pas de zoom)
         TextView name = v.findViewById(R.id.eName), badge = v.findViewById(R.id.eBadge);
@@ -248,12 +251,14 @@ final class EpisodesTab {
             String url = r.release.url;
             action = url == null ? null : () -> open(url);
             v.setOnLongClickListener(x -> markRead(x, r.chapter));
+            bindAlso(v, r.chapter, editions);
         } else if (r.entry == null) {
             // Pas encore lu : en clair
             date.setText(r.chapter > furthest ? "À lire" : "Pas lu");
             btn.setText("Lire");
             action = linkAction(meta, entries, r.chapter);
             v.setOnLongClickListener(x -> markRead(x, r.chapter));
+            bindAlso(v, r.chapter, editions);
         } else {
             DbHelper.Entry e = r.entry;
             boolean current = e.chapter == furthest;
@@ -333,6 +338,48 @@ final class EpisodesTab {
                     + link.host() + " : page de la série", Toast.LENGTH_LONG).show();
             open(link.url);
         };
+    }
+
+    /**
+     * « Aussi en 🇪🇸 🇰🇷 » : les éditions officielles (ou autorisées) où ce chapitre existe.
+     * Un appui liste les langues ; chacune ouvre le chapitre (ou la série si l'adresse ne se devine pas).
+     */
+    private void bindAlso(View v, double ch, List<DbHelper.Edition> editions) {
+        if (editions == null || editions.isEmpty()) return;
+        List<DbHelper.Edition> here = new ArrayList<>();
+        for (DbHelper.Edition e : editions) if (e.has(ch)) here.add(e);
+        if (here.isEmpty()) return;
+        java.util.LinkedHashSet<String> flags = new java.util.LinkedHashSet<>();
+        for (DbHelper.Edition e : here) flags.add(SourceRegistry.flag(e.lang));
+        StringBuilder sb = new StringBuilder("Aussi en ");
+        int k = 0;
+        for (String f : flags) {
+            if (k++ == 4) {
+                sb.append(" +").append(flags.size() - 4);
+                break;
+            }
+            sb.append(f).append(' ');
+        }
+        TextView also = v.findViewById(R.id.eAlso);
+        also.setText(sb.toString().trim());
+        also.setVisibility(View.VISIBLE);
+        also.setOnClickListener(x -> {
+            PopupMenu pm = new PopupMenu(act, x);
+            for (int i = 0; i < here.size(); i++) {
+                DbHelper.Edition e = here.get(i);
+                Boolean free = e.freeFor(ch);
+                pm.getMenu().add(0, i, i, SourceRegistry.flag(e.lang) + "  " + SourceRegistry.langName(e.lang) + " · "
+                        + (e.platform == null ? SourceRegistry.name(e.url) : e.platform)
+                        + (free == null ? "" : free ? " · gratuit" : " · payant"));
+            }
+            pm.setOnMenuItemClickListener(it -> {
+                DbHelper.Edition e = here.get(it.getItemId());
+                String u = e.chapterUrl(ch);
+                open(u != null ? u : e.url);
+                return true;
+            });
+            pm.show();
+        });
     }
 
     /** Appui long sur un chapitre pas encore lu → le marquer comme lu. */

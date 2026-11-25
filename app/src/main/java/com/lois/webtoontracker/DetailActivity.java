@@ -289,6 +289,7 @@ public class DetailActivity extends AppCompatActivity {
         bindTracking(s);
         bindProgress(s);
         bindWhere();
+        bindEditions();
         bindStars();
         episodes.bind(title);
         DbHelper.Meta m = db.getMeta(title);
@@ -435,6 +436,252 @@ public class DetailActivity extends AppCompatActivity {
             c.setOnClickListener(v -> openUrl(r.url));
             g.addView(c);
         }
+    }
+
+    // ------------------------------------------------------------------ Langues & sources
+
+    private boolean editionsLoading;
+
+    /**
+     * Carte « Langues & sources » : les éditions officielles (et autorisées) de la série, dans toutes
+     * les langues, avec le dernier chapitre connu et s'il est gratuit ou payant. Activée série par série.
+     */
+    private void bindEditions() {
+        DbHelper.Meta m = db.getMeta(title);
+        boolean on = m != null && m.editionsOn;
+        MaterialSwitch sw = findViewById(R.id.dEdSwitch);
+        sw.setOnCheckedChangeListener(null);
+        sw.setChecked(on);
+        sw.setOnCheckedChangeListener((b, checked) -> toggleEditions(checked));
+        findViewById(R.id.dEdHeader).setOnClickListener(v -> sw.toggle());
+        TextView sub = findViewById(R.id.dEdSub);
+        LinearLayout list = findViewById(R.id.dEdList);
+        TextView status = findViewById(R.id.dEdStatus);
+        TextView add = findViewById(R.id.dEdAdd);
+        View progress = findViewById(R.id.dEdProgress);
+        list.removeAllViews();
+        boolean loading = on && (editionsLoading || Editions.isRunning(title));
+        progress.setVisibility(loading ? View.VISIBLE : View.GONE);
+        if (!on) {
+            sub.setText("Éditions officielles et autorisées, dans toutes les langues");
+            list.setVisibility(View.GONE);
+            status.setVisibility(View.GONE);
+            add.setVisibility(View.GONE);
+            return;
+        }
+        List<DbHelper.Edition> eds = db.getEditions(title);
+        list.setVisibility(View.VISIBLE);
+        add.setVisibility(loading ? View.GONE : View.VISIBLE);
+        add.setOnClickListener(v -> showAddSourceDialog());
+        if (eds.isEmpty()) {
+            sub.setText(loading ? "Recherche des éditions officielles…" : "Aucune édition officielle trouvée");
+            if (!loading && m.editionsAt > 0) {
+                TextView empty = new TextView(this);
+                empty.setText("Ni AniList ni MangaDex ne listent d'édition officielle pour cette série, "
+                        + "et WEBTOON ne la publie pas sous ce titre.");
+                empty.setTextColor(ContextCompat.getColor(this, R.color.text_soft));
+                empty.setTextSize(13.5f);
+                empty.setPadding(0, dp(6), 0, dp(4));
+                list.addView(empty);
+            }
+        } else {
+            sub.setText(editionsSummary(eds));
+            for (DbHelper.Edition e : eds) list.addView(editionRow(list, e));
+        }
+        status.setVisibility(m.editionsAt > 0 || loading ? View.VISIBLE : View.GONE);
+        status.setText(loading ? "Recherche sur AniList, MangaDex et WEBTOON…"
+                : "Vérifié " + DateUtils.getRelativeTimeSpanString(m.editionsAt, System.currentTimeMillis(),
+                DateUtils.MINUTE_IN_MILLIS).toString().toLowerCase(Locale.FRANCE)
+                + " · sources : AniList, MangaDex, WEBTOON · appui long : pourquoi cette source");
+        if (!loading && System.currentTimeMillis() - m.editionsAt > Editions.STALE_MS) refreshEditions(false);
+    }
+
+    /** « 🇰🇷 🇬🇧 🇪🇸 · plus avancée : ch. 36 🇬🇧 » */
+    private String editionsSummary(List<DbHelper.Edition> eds) {
+        StringBuilder flags = new StringBuilder();
+        Set<String> langs = new HashSet<>();
+        DbHelper.Edition top = null;
+        for (DbHelper.Edition e : eds) {
+            String l = e.lang == null ? "?" : e.lang;
+            if (langs.add(l) && langs.size() <= 7) flags.append(SourceRegistry.flag(e.lang)).append(' ');
+            if (e.latest > 0 && (top == null || e.latest > top.latest)) top = e;
+        }
+        String out = flags.toString().trim() + "  ·  " + langs.size() + (langs.size() > 1 ? " langues" : " langue");
+        if (top != null) out += "\nPlus avancée : ch. " + Detector.formatChapter(top.latest) + " " + SourceRegistry.flag(top.lang)
+                + " " + top.platform;
+        return out;
+    }
+
+    private View editionRow(LinearLayout parent, DbHelper.Edition e) {
+        View row = getLayoutInflater().inflate(R.layout.item_edition, parent, false);
+        ((TextView) row.findViewById(R.id.edFlag)).setText(SourceRegistry.flag(e.lang));
+        ((TextView) row.findViewById(R.id.edName)).setText(e.platform == null ? SourceRegistry.name(e.url) : e.platform);
+        TextView tag = row.findViewById(R.id.edTag);
+        boolean official = e.category == SourceRegistry.OFFICIAL;
+        tag.setText(official ? "OFFICIELLE" : "AUTORISÉE");
+        tint(tag, official ? R.color.badge_bg : R.color.ed_auth_bg, official ? R.color.badge_text : R.color.ed_auth_text);
+
+        StringBuilder d = new StringBuilder(SourceRegistry.langName(e.lang));
+        if (e.latest > 0) d.append(" · ch. ").append(Detector.formatChapter(e.latest));
+        if (SourceRegistry.FASTPASS.equals(e.model) && e.freeUpto > 0) d.append(" · suivants en Fast Pass (appli)");
+        else if (SourceRegistry.PREVIEW.equals(e.model)) d.append(" · derniers en avant-première payante");
+        else if (e.userAdded && e.evidence != null) d.append(" · ").append(e.evidence.toLowerCase(Locale.FRANCE));
+        ((TextView) row.findViewById(R.id.edDetail)).setText(d);
+
+        TextView badge = row.findViewById(R.id.edBadge);
+        String b = null;
+        int bg = R.color.badge_bg, fg = R.color.badge_text;
+        if (SourceRegistry.FREE.equals(e.model) || SourceRegistry.PREVIEW.equals(e.model)
+                || (SourceRegistry.FASTPASS.equals(e.model) && e.freeUpto > 0)) {
+            b = "Gratuit";
+            bg = R.color.ed_free_bg;
+            fg = R.color.ed_free_text;
+        } else if (SourceRegistry.WAIT.equals(e.model)) {
+            b = "Gratuit en attendant";
+        } else if (SourceRegistry.PAID.equals(e.model)) {
+            b = "Payant";
+            bg = R.color.ed_paid_bg;
+            fg = R.color.ed_paid_text;
+        }
+        if (b != null) {
+            badge.setText(b);
+            tint(badge, bg, fg);
+            badge.setVisibility(View.VISIBLE);
+        }
+        row.setOnClickListener(v -> openUrl(e.url));
+        row.setOnLongClickListener(v -> {
+            showEditionInfo(e);
+            return true;
+        });
+        return row;
+    }
+
+    private void tint(TextView v, int bgColor, int textColor) {
+        android.graphics.drawable.GradientDrawable g = new android.graphics.drawable.GradientDrawable();
+        g.setCornerRadius(dp(999));
+        g.setColor(ContextCompat.getColor(this, bgColor));
+        v.setBackground(g);
+        v.setTextColor(ContextCompat.getColor(this, textColor));
+    }
+
+    /** Appui long : pourquoi cette source est classée officielle / autorisée. */
+    private void showEditionInfo(DbHelper.Edition e) {
+        boolean official = e.category == SourceRegistry.OFFICIAL;
+        StringBuilder msg = new StringBuilder();
+        msg.append(official
+                ? "Édition officielle : publiée par l'éditeur ou une plateforme sous licence."
+                : "Source autorisée : publiée par l'auteur lui-même, ou citée par un canal officiel de la série.");
+        msg.append("\n\nPreuve : ").append(e.evidence == null ? "—" : e.evidence);
+        if (e.proof != null) msg.append("\n").append(e.proof);
+        msg.append("\n\nLangue : ").append(SourceRegistry.langName(e.lang));
+        if (e.latest > 0) {
+            msg.append("\nDernier chapitre connu : ").append(Detector.formatChapter(e.latest));
+            if (SourceRegistry.FASTPASS.equals(e.model)) {
+                msg.append(" (dernier épisode public du site ; les plus récents se paient en Fast Pass sur l'appli WEBTOON, "
+                        + "puis deviennent gratuits). La numérotation peut différer d'une langue à l'autre.");
+            }
+        }
+        MaterialAlertDialogBuilder dlg = new MaterialAlertDialogBuilder(this)
+                .setTitle(SourceRegistry.flag(e.lang) + "  " + (e.platform == null ? SourceRegistry.name(e.url) : e.platform))
+                .setMessage(msg)
+                .setPositiveButton("Ouvrir", (x, w) -> openUrl(e.url))
+                .setNegativeButton("Fermer", null);
+        if (e.userAdded) {
+            dlg.setNeutralButton("Retirer", (x, w) -> {
+                db.deleteEdition(title, e.url);
+                bindAll();
+            });
+        }
+        dlg.show();
+    }
+
+    private void toggleEditions(boolean on) {
+        DbHelper.Meta m = db.getMeta(title);
+        if (m != null && m.editionsOn == on) return;
+        db.setEditionsOn(title, on);
+        if (on) {
+            refreshEditions(true);
+        } else {
+            db.deleteReleases(title, Editions.RELEASE_SOURCE);   // plus d'éditions dans la liste ni les alertes
+        }
+        bindAll();
+    }
+
+    private void refreshEditions(boolean userAsked) {
+        if (editionsLoading) return;
+        editionsLoading = true;
+        new Thread(() -> {
+            int n = -1;
+            try {
+                n = Editions.refresh(this, title);
+            } catch (Exception ex) {
+                App.saveError(this, "Éditions", ex);
+            }
+            final int found = n;
+            runOnUiThread(() -> {
+                editionsLoading = false;
+                if (isFinishing() || isDestroyed()) return;
+                bindAll();
+                if (userAsked && found >= 0) {
+                    Toast.makeText(this, found == 0 ? "Aucune édition officielle trouvée"
+                            : found + (found > 1 ? " éditions officielles trouvées" : " édition officielle trouvée"),
+                            Toast.LENGTH_SHORT).show();
+                }
+            });
+        }).start();
+    }
+
+    /** Ajouter une source autorisée : acceptée seulement si un canal officiel la cite (page vérifiée). */
+    private void showAddSourceDialog() {
+        View v = getLayoutInflater().inflate(R.layout.dialog_add_source, null);
+        EditText src = v.findViewById(R.id.asSource), proof = v.findViewById(R.id.asProof);
+        TextView hint = v.findViewById(R.id.asHint);
+        List<String> channels = Editions.channels(this, title);
+        Set<String> hosts = new java.util.LinkedHashSet<>();
+        for (String c : channels) {
+            String h = SourceRegistry.host(c);
+            if (h != null) hosts.add(h);
+        }
+        String base = channels.isEmpty()
+                ? "Aucun canal officiel connu pour cette série : une preuve ne peut pas être vérifiée."
+                : "La preuve doit être une page publique d'un canal officiel ("
+                + android.text.TextUtils.join(", ", new ArrayList<>(hosts).subList(0, Math.min(4, hosts.size())))
+                + "…) qui cite cette source. Exemple : l'annonce d'une traduction officielle par l'éditeur.";
+        hint.setText(base);
+        androidx.appcompat.app.AlertDialog d = new MaterialAlertDialogBuilder(this)
+                .setTitle("Source autorisée")
+                .setView(v)
+                .setPositiveButton("Vérifier", null)
+                .setNegativeButton("Annuler", null)
+                .create();
+        d.setOnShowListener(x -> d.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener(btn -> {
+            String s = src.getText() == null ? "" : src.getText().toString();
+            String p = proof.getText() == null ? "" : proof.getText().toString();
+            btn.setEnabled(false);
+            hint.setTextColor(ContextCompat.getColor(this, R.color.text_soft));
+            hint.setText("Vérification de la preuve…");
+            new Thread(() -> {
+                String err;
+                try {
+                    err = Editions.addAuthorized(this, title, s, p);
+                } catch (Exception ex) {
+                    err = "Vérification impossible : " + ex.getMessage();
+                }
+                final String e = err;
+                runOnUiThread(() -> {
+                    btn.setEnabled(true);
+                    if (e == null) {
+                        d.dismiss();
+                        Toast.makeText(this, "Source autorisée ajoutée ✓", Toast.LENGTH_SHORT).show();
+                        bindAll();
+                    } else {
+                        hint.setTextColor(ContextCompat.getColor(this, R.color.ed_paid_text));
+                        hint.setText(e);
+                    }
+                });
+            }).start();
+        }));
+        d.show();
     }
 
     private void bindStars() {

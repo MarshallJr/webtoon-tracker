@@ -26,4 +26,10 @@
     <color name="episode_current">#1C1A2A</color>
     <color name="episode_fold">#4A4370</color>
     <color name="screen_bg_half">#990E0D16</color>
+    <color name="ed_free_bg">#263DDC84</color>
+    <color name="ed_free_text">#5FE39A</color>
+    <color name="ed_paid_bg">#FF3B2412</color>
+    <color name="ed_paid_text">#FDBA74</color>
+    <color name="ed_auth_bg">#263DDC84</color>
+    <color name="ed_auth_text">#5FE39A</color>
 </resources>

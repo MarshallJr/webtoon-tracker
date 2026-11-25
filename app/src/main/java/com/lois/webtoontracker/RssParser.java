@@ -44,6 +44,23 @@ public final class RssParser {
         return best;
     }
 
+    /** Tous les épisodes du flux (n° d'épisode, titre, lien), dans l'ordre du flux. */
+    public static java.util.List<Latest> items(String xml) {
+        java.util.List<Latest> out = new java.util.ArrayList<>();
+        Matcher items = ITEM.matcher(xml);
+        while (items.find()) {
+            String item = items.group(1);
+            Matcher l = LINK.matcher(item);
+            if (!l.find()) continue;
+            String link = clean(l.group(1));
+            Matcher e = EP.matcher(link);
+            if (!e.find()) continue;
+            Matcher t = TITLE.matcher(item);
+            out.add(new Latest(Long.parseLong(e.group(1)), t.find() ? clean(t.group(1)) : "", link));
+        }
+        return out;
+    }
+
     private static String clean(String s) {
         return s.replace("<![CDATA[", "").replace("]]>", "")
                 .replace("&amp;", "&").replace("&quot;", "\"").replace("&#39;", "'")

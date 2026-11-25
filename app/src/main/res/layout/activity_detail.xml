@@ -285,6 +285,104 @@
                             android:layout_marginTop="6dp" />
                     </LinearLayout>
 
+                    <!-- Langues & sources : éditions officielles et autorisées, dans toutes les langues -->
+                    <LinearLayout
+                        android:id="@+id/dEdCard"
+                        style="@style/DetailCard">
+
+                        <LinearLayout
+                            android:id="@+id/dEdHeader"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
+
+                            <FrameLayout
+                                android:layout_width="40dp"
+                                android:layout_height="40dp"
+                                android:background="@drawable/bg_pill_soft">
+
+                                <ImageView
+                                    android:layout_width="22dp"
+                                    android:layout_height="22dp"
+                                    android:layout_gravity="center"
+                                    android:contentDescription="@null"
+                                    android:src="@drawable/ic_language"
+                                    android:tint="@color/badge_text" />
+                            </FrameLayout>
+
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="12dp"
+                                android:layout_weight="1"
+                                android:orientation="vertical">
+
+                                <TextView
+                                    style="@style/CardTitle"
+                                    android:text="Langues &amp; sources"
+                                    android:textSize="16sp" />
+
+                                <TextView
+                                    android:id="@+id/dEdSub"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="1dp"
+                                    android:maxLines="2"
+                                    android:textColor="@color/text_soft"
+                                    android:textSize="12.5sp" />
+                            </LinearLayout>
+
+                            <com.google.android.material.materialswitch.MaterialSwitch
+                                android:id="@+id/dEdSwitch"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="8dp" />
+                        </LinearLayout>
+
+                        <com.google.android.material.progressindicator.LinearProgressIndicator
+                            android:id="@+id/dEdProgress"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:indeterminate="true"
+                            android:visibility="gone"
+                            app:indicatorColor="@color/brand"
+                            app:trackColor="@color/badge_bg"
+                            app:trackCornerRadius="2dp"
+                            app:trackThickness="3dp" />
+
+                        <LinearLayout
+                            android:id="@+id/dEdList"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:orientation="vertical"
+                            android:visibility="gone" />
+
+                        <TextView
+                            android:id="@+id/dEdStatus"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
+                            android:textColor="@color/text_soft"
+                            android:textSize="11.5sp"
+                            android:visibility="gone" />
+
+                        <TextView
+                            android:id="@+id/dEdAdd"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:fontFamily="sans-serif-medium"
+                            android:paddingTop="8dp"
+                            android:paddingBottom="4dp"
+                            android:text="＋ Ajouter une source autorisée"
+                            android:textColor="@color/brand"
+                            android:textSize="14sp"
+                            android:visibility="gone" />
+                    </LinearLayout>
+
                     <LinearLayout style="@style/DetailCard">
 
                         <TextView

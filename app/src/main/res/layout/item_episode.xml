@@ -115,6 +115,23 @@
                 android:textColor="@color/online"
                 android:textSize="13sp"
                 android:visibility="gone" />
+
+            <!-- « Aussi en 🇪🇸 🇰🇷 » : éditions officielles où ce chapitre existe -->
+            <TextView
+                android:id="@+id/eAlso"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:background="@drawable/bg_pill_soft"
+                android:fontFamily="sans-serif-medium"
+                android:maxLines="1"
+                android:paddingStart="9dp"
+                android:paddingTop="2dp"
+                android:paddingEnd="9dp"
+                android:paddingBottom="3dp"
+                android:textColor="@color/badge_text"
+                android:textSize="12.5sp"
+                android:visibility="gone" />
         </LinearLayout>
 
         <TextView

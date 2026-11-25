@@ -68,6 +68,7 @@ public final class BackupManager {
             o.put("rssBase", m.rssBase == null ? "" : m.rssBase);
             o.put("rssLastEp", m.rssLastEp);
             o.put("follow", m.follow);
+            o.put("editions", m.editionsOn);
             o.put("rating", m.rating);
             o.put("note", m.note == null ? "" : m.note);
             metas.put(o);
@@ -150,6 +151,7 @@ public final class BackupManager {
                     m.rssLastEp = o.optLong("rssLastEp", 0);
                 }
                 if (o.optBoolean("follow", false)) m.follow = true;
+                if (o.optBoolean("editions", false)) m.editionsOn = true;   // « Langues & sources »
                 if (m.rating == 0) m.rating = o.optInt("rating", 0);
                 if (m.note == null || m.note.isEmpty()) m.note = emptyToNull(o.optString("note"));
                 db.saveMeta(m);

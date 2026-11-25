@@ -19,9 +19,9 @@ public final class SeriesInfo {
     public static final long MAX_AGE_MS = 7L * 24 * 3600 * 1000;
 
     /** Tous les champs AniList utiles (couverture, tags, fiche, recommandations…), en une requête. */
-    static final String MEDIA_FIELDS = "siteUrl title{romaji english native} synonyms description(asHtml:false)"
+    static final String MEDIA_FIELDS = "id siteUrl title{romaji english native} synonyms description(asHtml:false)"
             + " status startDate{year} chapters averageScore genres countryOfOrigin coverImage{extraLarge large}"
-            + " tags{name rank isMediaSpoiler} externalLinks{url site}"
+            + " tags{name rank isMediaSpoiler} externalLinks{url site type language isDisabled}"
             + " staff(perPage:4){edges{role node{name{full}}}}"
             + " recommendations(perPage:10,sort:RATING_DESC){nodes{mediaRecommendation{siteUrl averageScore"
             + " countryOfOrigin title{romaji english} coverImage{large} externalLinks{url site}}}}";
