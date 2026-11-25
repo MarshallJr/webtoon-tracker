@@ -84,9 +84,75 @@ final class WebtoonFinder {
             if (best != null && best.score >= 0.95) break;
             sleep(350);
         }
+        // Rien de sûr par la recherche : catalogue complet des séries de cette langue (liste publique).
+        if (best == null || best.score < TitleMatch.SAME) {
+            for (Hit c : catalog(ctx, lang)) {
+                c.score = Math.max(TitleMatch.best(c.title, refs), TitleMatch.best(c.slugTitle, refs));
+                if (authorMatch(c.text, authors)) c.score += 0.15;
+                if (best == null || c.score > best.score) best = c;
+            }
+        }
         if (best == null || best.score < TitleMatch.SAME) return null;
         enrich(best, refs, authors);
         return best.score >= TitleMatch.SAME ? best : null;
+    }
+
+    // ------------------------------------------------------------------ Catalogue (repli)
+
+    private static final long CATALOG_MS = 3L * 24 * 3600 * 1000;
+    private static final String[] DAYS = {"monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"};
+
+    /**
+     * Toutes les séries WEBTOON Originals d'une langue (en cours + terminées), depuis les listes
+     * publiques du site. Gardé 3 jours (titre, adresse, n° de série seulement).
+     */
+    static List<Hit> catalog(Context ctx, String lang) {
+        android.content.SharedPreferences p = ctx.getSharedPreferences("webtoon_catalog", Context.MODE_PRIVATE);
+        long now = System.currentTimeMillis();
+        List<Hit> out = new ArrayList<>();
+        if (now - p.getLong("at_" + lang, 0) < CATALOG_MS) {
+            try {
+                org.json.JSONArray a = new org.json.JSONArray(p.getString("list_" + lang, "[]"));
+                for (int i = 0; i < a.length(); i++) {
+                    org.json.JSONArray e = a.optJSONArray(i);
+                    if (e == null || e.length() < 3) continue;
+                    Hit h = new Hit();
+                    h.lang = lang;
+                    h.titleNo = e.optString(0);
+                    h.base = e.optString(1);
+                    h.title = e.optString(2);
+                    h.text = e.length() > 3 ? e.optString(3) : "";
+                    String[] parsed = Detector.parseSeriesLink(h.base + "/list?title_no=" + h.titleNo);
+                    h.slugTitle = parsed == null ? h.title : parsed[2];
+                    out.add(h);
+                }
+                return out;
+            } catch (Exception ignored) {
+            }
+        }
+        java.util.LinkedHashMap<String, Hit> all = new java.util.LinkedHashMap<>();
+        List<String> pages = new ArrayList<>();
+        pages.add("https://www.webtoons.com/" + lang + "/originals");
+        pages.add("https://www.webtoons.com/" + lang + "/originals/complete");
+        for (int i = 0; i < pages.size(); i++) {
+            try {
+                for (Hit h : parseResults(Editions.http(pages.get(i), 4_000_000), lang)) all.putIfAbsent(h.titleNo, h);
+            } catch (Exception ignored) {
+            }
+            // Page « en cours » limitée au jour même : on ajoute les 7 jours.
+            if (i == 0 && all.size() < 80) for (String d : DAYS) pages.add("https://www.webtoons.com/" + lang + "/originals/" + d);
+            sleep(300);
+        }
+        org.json.JSONArray a = new org.json.JSONArray();
+        for (Hit h : all.values()) {
+            org.json.JSONArray e = new org.json.JSONArray();
+            e.put(h.titleNo).put(h.base).put(h.title == null ? "" : h.title)
+                    .put(h.text == null ? "" : h.text.substring(0, Math.min(120, h.text.length())));
+            a.put(e);
+            out.add(h);
+        }
+        if (!all.isEmpty()) p.edit().putLong("at_" + lang, now).putString("list_" + lang, a.toString()).apply();
+        return out;
     }
 
     private static boolean authorMatch(String text, List<String> authors) {
