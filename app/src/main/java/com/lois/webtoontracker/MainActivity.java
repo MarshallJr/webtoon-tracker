@@ -161,6 +161,7 @@ public class MainActivity extends AppCompatActivity {
             if (Repair.run(this) > 0) runOnUiThread(this::refresh); // titres incohérents corrigés
             CoverWorker.cleanupBadImages(this);                       // images prises sur l'écran de veille
             CoverWorker.cleanupDuplicateThumbs(this);                 // même image sur plusieurs chapitres
+            SeriesResolver.rematchAllOnce(this);                      // une fois : titres traduits (EN ↔ FR…) recherchés à nouveau
         }).start();
         Anim.pressAll(root);
     }

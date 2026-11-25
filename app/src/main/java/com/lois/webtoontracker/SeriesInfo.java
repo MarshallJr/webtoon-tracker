@@ -38,22 +38,50 @@ public final class SeriesInfo {
      * (anglais, romanisé, original, synonymes) correspond vraiment au titre. Sinon null.
      */
     public static JSONObject searchMedia(String title) throws Exception {
-        String q = "query($s:String){Page(perPage:5){media(search:$s,type:MANGA,sort:SEARCH_MATCH){" + MEDIA_FIELDS + "}}}";
-        String res = ReleaseSources.post("https://graphql.anilist.co", new JSONObject().put("query", q)
-                .put("variables", new JSONObject().put("s", title)).toString());
-        JSONObject data = new JSONObject(res).optJSONObject("data");
-        JSONObject page = data == null ? null : data.optJSONObject("Page");
-        JSONArray list = page == null ? null : page.optJSONArray("media");
-        if (list == null) return null;
-        for (int i = 0; i < list.length(); i++) {
-            JSONObject m = list.optJSONObject(i);
-            if (m != null && matches(title, m)) return m;
+        List<String> one = new ArrayList<>();
+        one.add(title);
+        return searchMedia(title, one);
+    }
+
+    /**
+     * Cherche avec le titre puis les autres noms connus (autres langues…), et garde le résultat dont
+     * un nom correspond le mieux à l'un d'eux (mots apparentés acceptés, voir {@link TitleMatch}).
+     */
+    public static JSONObject searchMedia(String title, List<String> names) throws Exception {
+        List<String> refs = new ArrayList<>(names);
+        if (!refs.contains(title)) refs.add(0, title);
+        String q = "query($s:String){Page(perPage:6){media(search:$s,type:MANGA,sort:SEARCH_MATCH){" + MEDIA_FIELDS + "}}}";
+        int tried = 0;
+        for (String query : refs) {
+            if (tried++ >= 3) break;
+            String res = ReleaseSources.post("https://graphql.anilist.co", new JSONObject().put("query", q)
+                    .put("variables", new JSONObject().put("s", query)).toString());
+            JSONObject data = new JSONObject(res).optJSONObject("data");
+            JSONObject page = data == null ? null : data.optJSONObject("Page");
+            JSONArray list = page == null ? null : page.optJSONArray("media");
+            if (list == null) continue;
+            JSONObject best = null;
+            double bestScore = 0;
+            for (int i = 0; i < list.length(); i++) {
+                JSONObject m = list.optJSONObject(i);
+                if (m == null) continue;
+                double s = 0;
+                for (String n : names(m)) {
+                    s = Math.max(s, TitleMatch.best(n, refs));
+                    for (String r : refs) if (ReleaseSources.sameTitle(r, n)) s = Math.max(s, 0.9);
+                }
+                if (s > bestScore) {
+                    bestScore = s;
+                    best = m;
+                }
+            }
+            if (best != null && bestScore >= TitleMatch.SAME) return best;
         }
         return null;
     }
 
     public static boolean matches(String title, JSONObject media) {
-        for (String n : names(media)) if (ReleaseSources.sameTitle(title, n)) return true;
+        for (String n : names(media)) if (ReleaseSources.sameTitle(title, n) || TitleMatch.same(title, n)) return true;
         return false;
     }
 
@@ -92,11 +120,25 @@ public final class SeriesInfo {
     // ------------------------------------------------------------------ Téléchargement
 
     /** Télécharge et met en cache. Appelé hors du fil principal. */
+    /** Version de la fiche : une fiche plus ancienne est recherchée à nouveau (correspondance des titres). */
+    public static final int VERSION = 2;
+
     public static SeriesInfo fetch(Context ctx, String title) throws Exception {
+        // 1. Ses noms dans toutes les langues + la série sur WEBTOON (titre traduit compris).
+        SeriesResolver.resolve(ctx, title, false);
         JSONObject store = new JSONObject();
+        store.put("v", VERSION);
+        DbHelper.Meta before = DbHelper.get(ctx).getMeta(title);
+        if (before != null && before.detailsJson != null) {
+            try {
+                JSONObject old = new JSONObject(before.detailsJson);
+                if (old.optJSONObject("webtoon") != null) store.put("webtoon", old.optJSONObject("webtoon"));
+            } catch (Exception ignored) {
+            }
+        }
 
         try {
-            JSONObject media = searchMedia(title);
+            JSONObject media = searchMedia(title, SeriesNames.names(ctx, title));
             if (media != null) {
                 store.put("anilist", media);
                 int sc = media.optInt("averageScore", 0);
@@ -128,7 +170,10 @@ public final class SeriesInfo {
         } catch (Exception ignored) {
         }
 
-        if (store.length() == 0) return null;
+        if (store.length() <= 1) {   // rien trouvé (seulement la version)
+            DbHelper.get(ctx).setDetails(title, store.toString());
+            return null;
+        }
         DbHelper.get(ctx).setDetails(title, store.toString());
         return parse(store.toString());
     }
@@ -145,9 +190,18 @@ public final class SeriesInfo {
             String fr = clean(store.optString("descFr", ""));
             String mdxEn = clean(store.optString("descEn", ""));
             String aniEn = a == null ? "" : clean(a.optString("description", ""));
-            if (!fr.isEmpty()) {
+            JSONObject wt = store.optJSONObject("webtoon");
+            String wtSum = wt == null ? "" : clean(wt.optString("summary", ""));
+            String wtLang = wt == null ? "" : wt.optString("lang", "");
+            if (!wtSum.isEmpty() && "fr".equals(wtLang)) {
+                i.summary = wtSum;
+                i.summarySource = "Résumé · WEBTOON (français)";
+            } else if (!fr.isEmpty()) {
                 i.summary = fr;
                 i.summarySource = "Résumé · MangaDex (FR)";
+            } else if (!wtSum.isEmpty()) {
+                i.summary = wtSum;
+                i.summarySource = "Résumé · WEBTOON (" + SourceRegistry.langName(wtLang).toLowerCase(java.util.Locale.FRANCE) + ")";
             } else if (!aniEn.isEmpty()) {
                 i.summary = aniEn;
                 i.summarySource = "Résumé · AniList (en anglais)";
@@ -221,6 +275,18 @@ public final class SeriesInfo {
                         i.recos.add(r);
                     }
                 }
+            }
+            if (wt != null) {
+                String local = nn(wt.optString("title", ""));
+                if (local != null && !i.altTitles.contains(local)) i.altTitles.add(0, local);
+                String au = nn(wt.optString("authors", ""));
+                if (au != null && (i.authors == null || i.authors.isEmpty())) {
+                    i.authors = au;
+                    for (String n : au.split("\\s*[/,&]\\s*")) if (!n.trim().isEmpty()) i.credits.add(new String[]{n.trim(), "Auteur"});
+                }
+                String genre = nn(wt.optString("genre", ""));
+                if (genre != null && i.genres.isEmpty()) i.genres.add(genre);
+                if (i.format == null) i.format = "Webtoon";
             }
             return i;
         } catch (Exception e) {

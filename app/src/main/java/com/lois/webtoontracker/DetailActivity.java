@@ -480,7 +480,7 @@ public class DetailActivity extends AppCompatActivity {
             if (!loading && m.editionsAt > 0) {
                 TextView empty = new TextView(this);
                 empty.setText("Ni AniList ni MangaDex ne listent d'édition officielle pour cette série, "
-                        + "et WEBTOON ne la publie pas sous ce titre.");
+                        + "et WEBTOON ne la publie sous aucun de ses titres connus (traductions comprises).");
                 empty.setTextColor(ContextCompat.getColor(this, R.color.text_soft));
                 empty.setTextSize(13.5f);
                 empty.setPadding(0, dp(6), 0, dp(4));
@@ -734,6 +734,7 @@ public class DetailActivity extends AppCompatActivity {
     private void loadInfo(boolean force) {
         DbHelper.Meta m = db.getMeta(title);
         boolean fresh = m != null && m.detailsJson != null
+                && m.detailsJson.contains("\"v\":" + SeriesInfo.VERSION)          // fiche à jour de la correspondance des titres
                 && System.currentTimeMillis() - m.detailsAt < SeriesInfo.MAX_AGE_MS;
         if (fresh && !force) return;
         new Thread(() -> {
@@ -746,9 +747,8 @@ public class DetailActivity extends AppCompatActivity {
             runOnUiThread(() -> {
                 if (isFinishing()) return;
                 if (i != null) {
-                    DbHelper.Series s = series();
-                    bindInfo(i, s);
-                    if (s != null) bindProgress(s);
+                    bindAll();          // couverture, tags, liens WEBTOON… ont pu changer
+                    bindHeader();
                 } else if (db.getMeta(title) == null || db.getMeta(title).detailsJson == null) {
                     ((TextView) findViewById(R.id.dSummary)).setText(
                             "Pas de résumé trouvé (vérifie ta connexion, ou le titre est peut-être trop différent du titre officiel).");

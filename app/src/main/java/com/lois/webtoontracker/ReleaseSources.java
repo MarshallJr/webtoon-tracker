@@ -45,7 +45,8 @@ public final class ReleaseSources {
         JSONObject titles = attributes.optJSONObject("title");
         if (titles != null) {
             for (java.util.Iterator<String> it = titles.keys(); it.hasNext(); ) {
-                if (sameTitle(want, titles.optString(it.next()))) return true;
+                String t = titles.optString(it.next());
+                if (sameTitle(want, t) || TitleMatch.same(want, t)) return true;
             }
         }
         JSONArray alts = attributes.optJSONArray("altTitles");
@@ -54,7 +55,8 @@ public final class ReleaseSources {
                 JSONObject alt = alts.optJSONObject(i);
                 if (alt == null) continue;
                 for (java.util.Iterator<String> it = alt.keys(); it.hasNext(); ) {
-                    if (sameTitle(want, alt.optString(it.next()))) return true;
+                    String t = alt.optString(it.next());
+                    if (sameTitle(want, t) || TitleMatch.same(want, t)) return true;
                 }
             }
         }
@@ -128,7 +130,8 @@ public final class ReleaseSources {
             JSONObject r = results.getJSONObject(i);
             JSONObject rec = r.optJSONObject("record");
             if (rec == null) continue;
-            if (sameTitle(title, rec.optString("title")) || sameTitle(title, r.optString("hit_title"))) {
+            if (sameTitle(title, rec.optString("title")) || sameTitle(title, r.optString("hit_title"))
+                    || TitleMatch.same(title, rec.optString("title")) || TitleMatch.same(title, r.optString("hit_title"))) {
                 return String.valueOf(rec.optLong("series_id"));
             }
         }

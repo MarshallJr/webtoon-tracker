@@ -80,6 +80,8 @@ final class Editions {
         if (!running.add(key)) return -1;
         try {
             DbHelper db = DbHelper.get(ctx);
+            // Noms dans toutes les langues + lien WEBTOON (titre traduit compris) avant tout.
+            SeriesResolver.resolve(ctx, title, false);
             DbHelper.Meta m = db.getMeta(title);
             Map<String, DbHelper.Edition> found = new LinkedHashMap<>();
             List<String> channels = new ArrayList<>();
@@ -87,7 +89,7 @@ final class Editions {
             // 1. AniList : liens officiels avec leur langue, + canaux officiels (réseaux, site de la série)
             String origin = null;
             try {
-                JSONObject media = anilistMedia(title, m);
+                JSONObject media = anilistMedia(ctx, title, m);
                 if (media != null) {
                     origin = SourceRegistry.originLang(str(media, "countryOfOrigin"));
                     fromAniList(media, origin, found, channels);
@@ -177,7 +179,7 @@ final class Editions {
 
     // ------------------------------------------------------------------ AniList
 
-    static JSONObject anilistMedia(String title, DbHelper.Meta m) throws Exception {
+    static JSONObject anilistMedia(Context ctx, String title, DbHelper.Meta m) throws Exception {
         int id = 0;
         if (m != null && m.detailsJson != null) {
             JSONObject a = new JSONObject(m.detailsJson).optJSONObject("anilist");
@@ -189,7 +191,7 @@ final class Editions {
                 }
             }
         }
-        if (id <= 0) return SeriesInfo.searchMedia(title);
+        if (id <= 0) return SeriesInfo.searchMedia(title, SeriesNames.names(ctx, title));
         String q = "query($id:Int){Media(id:$id,type:MANGA){id siteUrl countryOfOrigin"
                 + " externalLinks{url site type language isDisabled}}}";
         String res = ReleaseSources.post("https://graphql.anilist.co", new JSONObject().put("query", q)
@@ -319,13 +321,14 @@ final class Editions {
     }
 
     /**
-     * La même série dans les autres langues de WEBTOON : recherche du titre exact sur chaque version
-     * du site (une fois par semaine au plus). Les séries CANVAS homonymes sont ignorées.
+     * La même série dans les autres langues de WEBTOON, même sous un titre traduit : noms connus dans
+     * la langue, traduction automatique du titre, auteurs (voir {@link WebtoonFinder}). Une fois par
+     * semaine au plus ; les séries CANVAS homonymes sont ignorées.
      */
     static void fromWebtoonSearch(Context ctx, String title, Map<String, DbHelper.Edition> found) throws Exception {
         SharedPreferences p = prefs(ctx);
         String key = Titles.key(title);
-        if (key.length() < 4) return;
+        if (key.length() < 3) return;
         long now = System.currentTimeMillis();
         JSONArray cached = new JSONArray(p.getString("wt_found_" + key, "[]"));
         if (now - p.getLong("wt_search_" + key, 0) > WT_SEARCH_MS) {
@@ -337,20 +340,10 @@ final class Editions {
             cached = new JSONArray();
             for (String lang : WEBTOON_LANGS) {
                 if (have.contains(lang)) continue;
-                try {
-                    String html = http("https://www.webtoons.com/" + lang + "/search?keyword="
-                            + URLEncoder.encode(title, "UTF-8"), 1_500_000);
-                    Matcher mm = SERIES_LINK.matcher(html);
-                    while (mm.find()) {
-                        if (mm.group(2).matches("(?i)canvas|challenge")) continue;
-                        if (!Titles.key(Detector.slugToTitle(mm.group(3))).equals(key)) continue;
-                        cached.put("https://www.webtoons.com/" + mm.group(1) + "/" + mm.group(2) + "/" + mm.group(3)
-                                + "/list?title_no=" + mm.group(4));
-                        break;
-                    }
-                    Thread.sleep(400);
-                } catch (Exception ignored) {
-                }
+                WebtoonFinder.Hit h = WebtoonFinder.find(ctx, title, lang);
+                if (h == null) continue;
+                cached.put(h.listUrl());
+                SeriesNames.add(ctx, title, h.title, lang, "WEBTOON");
             }
             p.edit().putString("wt_found_" + key, cached.toString()).apply();
         }
@@ -358,7 +351,7 @@ final class Editions {
             String url = cached.optString(i, "");
             if (url.isEmpty()) continue;
             add(found, edition(url, "WEBTOON", SourceRegistry.langFromUrl(url), SourceRegistry.classify(url, true),
-                    "Même titre trouvé sur WEBTOON", SourceRegistry.FASTPASS));
+                    "Même série trouvée sur WEBTOON", SourceRegistry.FASTPASS));
         }
     }
 

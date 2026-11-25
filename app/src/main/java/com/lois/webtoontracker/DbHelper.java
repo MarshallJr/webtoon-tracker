@@ -897,6 +897,21 @@ public class DbHelper extends SQLiteOpenHelper {
         saveMeta(m);
     }
 
+    /**
+     * Ajoute / remplace une partie de la fiche (ex. « webtoon ») sans changer sa date : la fiche
+     * complète (AniList, MangaDex) sera tout de même récupérée à la prochaine ouverture.
+     */
+    public synchronized void setDetailsPart(String title, String key, org.json.JSONObject value) {
+        Meta m = metaOrNew(title);
+        try {
+            org.json.JSONObject store = m.detailsJson == null ? new org.json.JSONObject() : new org.json.JSONObject(m.detailsJson);
+            store.put(key, value);
+            m.detailsJson = store.toString();
+            saveMeta(m);
+        } catch (Exception ignored) {
+        }
+    }
+
     public synchronized void setDetails(String title, String json) {
         Meta m = metaOrNew(title);
         m.detailsJson = json;

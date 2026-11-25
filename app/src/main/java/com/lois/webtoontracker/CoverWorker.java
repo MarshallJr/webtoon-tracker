@@ -88,11 +88,13 @@ public class CoverWorker extends Worker {
         return now - p.getLong("tags_" + key(s.title), 0) > RETRY_MS;
     }
 
-    /** Lien webtoons.com automatique (pour les alertes nouveaux chapitres). */
+    /**
+     * Lien WEBTOON automatique (alertes, vignettes officielles des épisodes, résumé, image) : pour toutes
+     * les séries pas encore reliées, une fois par semaine, même si WEBTOON la publie sous un titre traduit.
+     */
     private static boolean needsLink(Context ctx, DbHelper.Series s, SharedPreferences p, long now) {
         DbHelper.Meta m = DbHelper.get(ctx).getMeta(s.title);
-        if (m == null || !m.follow) return false;          // lien utile seulement pour les séries 🔔
-        if (m.titleNo != null) return false;
+        if (m != null && m.titleNo != null) return false;
         return now - p.getLong("link_" + key(s.title), 0) > RETRY_MS;
     }
 
@@ -125,12 +127,14 @@ public class CoverWorker extends Worker {
         int found = 0;
         DbHelper db = DbHelper.get(ctx);
         found += Repair.run(ctx); // titres incohérents (ex : "2879576") corrigés grâce à l'URL
+        int resolveBudget = 8;    // correspondances complètes (bases + WEBTOON) par passage : les autres au suivant
         for (DbHelper.Series s : db.getSeries()) {
             if (isStopped()) break;
             long now = System.currentTimeMillis();
             boolean wantCover = needsCover(ctx, s.title, p, now);
             boolean wantTags = needsTags(s, p, now);
-            boolean wantLink = needsLink(ctx, s, p, now);
+            boolean canResolve = resolveBudget > 0;
+            boolean wantLink = canResolve && needsLink(ctx, s, p, now);   // sinon : au prochain passage
             boolean wantInfo = needsInfo(ctx, s, p, now);
             if (!wantCover && !wantTags && !wantLink && !wantInfo) continue;
             if (wantCover) p.edit().putLong(key(s.title), now).putLong("portrait_" + key(s.title), now).apply();
@@ -139,7 +143,12 @@ public class CoverWorker extends Worker {
             p.edit().putLong("info_" + key(s.title), now).apply();
             String title = s.title;
             try {
-                AniInfo info = lookup(title);
+                // Noms dans toutes les langues + la série sur WEBTOON (titre traduit compris).
+                if (canResolve) {
+                    resolveBudget--;
+                    if (SeriesResolver.resolve(ctx, title, false)) found++;
+                }
+                AniInfo info = lookup(ctx, title);
                 Thread.sleep(800); // reste poli avec les sites (AniList : ~90 requêtes/min)
 
                 if (info != null) {
@@ -208,27 +217,13 @@ public class CoverWorker extends Worker {
     private static final java.util.regex.Pattern SERIES_LINK = java.util.regex.Pattern.compile(
             "https?://(?:www\\.|m\\.)?webtoons\\.com/([a-z]{2}(?:-[a-z]+)?)/([^/\"'\\s]+)/([^/\"'\\s]+)/list\\?title_no=(\\d+)");
 
-    /** Cherche la série sur webtoons.com (FR puis EN), sinon prend le lien AniList. Vérifie le titre. */
+    /**
+     * Relie la série à WEBTOON : d'abord le lien officiel donné par AniList, sinon la recherche
+     * (français puis anglais) avec tous ses noms et la traduction de son titre — voir {@link SeriesResolver}.
+     */
     static boolean autoLink(Context ctx, String title, AniInfo info) {
-        String want = Titles.key(title);
-        for (String lang : new String[]{"fr", "en"}) {
-            try {
-                String html = new String(download("https://www.webtoons.com/" + lang + "/search?keyword="
-                        + java.net.URLEncoder.encode(title, "UTF-8")), StandardCharsets.UTF_8);
-                java.util.regex.Matcher m = SERIES_LINK.matcher(html);
-                while (m.find()) {
-                    String slugKey = Titles.key(Detector.slugToTitle(m.group(3)));
-                    boolean close = slugKey.equals(want) || (want.length() >= 6 && slugKey.length() >= 6
-                            && (slugKey.contains(want) || want.contains(slugKey)));
-                    if (!close) continue;
-                    String base = "https://www.webtoons.com/" + m.group(1) + "/" + m.group(2) + "/" + m.group(3);
-                    DbHelper.get(ctx).linkWebtoons(title, base, m.group(4));
-                    return true;
-                }
-                Thread.sleep(500);
-            } catch (Exception ignored) {
-            }
-        }
+        DbHelper.Meta m0 = DbHelper.get(ctx).getMeta(title);
+        if (m0 != null && m0.titleNo != null) return true;
         if (info != null && info.webtoonsUrl != null) {
             String[] parsed = Detector.parseSeriesLink(info.webtoonsUrl);
             if (parsed != null) {
@@ -236,12 +231,17 @@ public class CoverWorker extends Worker {
                 return true;
             }
         }
-        return false;
+        if (SeriesResolver.triedRecently(ctx, title)) return false;   // recherche complète faite il y a peu
+        try {
+            return SeriesResolver.linkWebtoon(ctx, title);
+        } catch (Exception e) {
+            return false;
+        }
     }
 
-    /** Recherche AniList avec contrôle du titre (voir SeriesInfo.searchMedia). */
-    static AniInfo lookup(String title) throws Exception {
-        org.json.JSONObject media = SeriesInfo.searchMedia(title);
+    /** Recherche AniList avec tous les noms connus de la série (voir SeriesInfo.searchMedia). */
+    static AniInfo lookup(Context ctx, String title) throws Exception {
+        org.json.JSONObject media = SeriesInfo.searchMedia(title, SeriesNames.names(ctx, title));
         if (media == null) return null;
         AniInfo info = new AniInfo();
         info.media = media;
