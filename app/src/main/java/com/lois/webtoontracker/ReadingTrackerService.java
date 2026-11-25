@@ -50,6 +50,8 @@ public class ReadingTrackerService extends AccessibilityService {
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final ExecutorService io = Executors.newSingleThreadExecutor();
+    /** Réseau (liste des chapitres du site…) : à part, pour ne jamais retarder la détection. */
+    private final ExecutorService net = Executors.newSingleThreadExecutor();
     private final NotifyPolicy policy = new NotifyPolicy();
     private Banner banner;
     private Detector.Result pending;
@@ -351,6 +353,7 @@ public class ReadingTrackerService extends AccessibilityService {
         }
         ChapterLinks.rememberVisit(this, r.title, r.url, r.chapter); // le site à réutiliser pour les autres chapitres
         db.rememberSource(r); // pour "Reprendre" et les alertes, même si le chapitre était déjà lu
+        updateSiteChapters(r, newSeries);
         if (!isNew) {
             db.markReopened(r.title, r.chapter, now, r.url, NotifyPolicy.SESSION_GAP_MS); // relecture
             if (!ChapterThumbs.has(this, r.title, r.chapter)) captureChapterThumb(r.title, r.chapter);
@@ -369,6 +372,22 @@ public class ReadingTrackerService extends AccessibilityService {
             sendBroadcast(new Intent(ACTION_UPDATED).setPackage(getPackageName()));
             showBannerFor(d, r);
         });
+    }
+
+    /**
+     * Liste complète des chapitres (du 1er au dernier) sur le site où tu lis : tout de suite pour une
+     * nouvelle série ou si ce chapitre dépasse la liste connue, sinon toutes les 6 h au plus.
+     */
+    private void updateSiteChapters(Detector.Result r, boolean newSeries) {
+        if (r.url == null || !r.url.startsWith("http")) return;
+        final String title = r.title, url = r.url;
+        final double ch = r.chapter;
+        java.util.TreeMap<Double, String> known = DbHelper.get(this).siteChapters(title, ChapterLinks.host(url));
+        final boolean force = newSeries || known.isEmpty() || ch > known.lastKey();
+        net.execute(() -> safe("Liste des chapitres", () -> {
+            int n = SiteChapters.refresh(this, title, url, ch, force);
+            if (n > 0) sendBroadcast(new Intent(ACTION_UPDATED).setPackage(getPackageName()));
+        }));
     }
 
     // ------------------------------------------------------------------ Chapitres payants

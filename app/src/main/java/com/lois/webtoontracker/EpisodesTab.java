@@ -127,8 +127,13 @@ final class EpisodesTab {
             if (cur == null || (!cur.active() && l.active())) locks.put(l.chapter, l);
             latest = Math.max(latest, l.chapter);
         }
+        // Liste complète du site où tu lis (du 1er au dernier chapitre publié), avec l'adresse exacte de chacun.
+        siteList = db.siteChapters(title, site);
+        if (!siteList.isEmpty()) latest = Math.max(latest, siteList.lastKey());
+        refreshSiteList(site, entries);
         java.util.TreeSet<Double> all = new java.util.TreeSet<>(read.keySet());
         all.addAll(fresh.keySet());
+        all.addAll(siteList.keySet());
         if (latest <= 3000) for (int c = 1; c <= (int) Math.floor(latest); c++) all.add((double) c);
 
         boolean newest = newestFirst();
@@ -148,7 +153,7 @@ final class EpisodesTab {
         // En-tête
         TextView count = act.findViewById(R.id.eCount);
         String c = all.size() + (all.size() > 1 ? " épisodes" : " épisode") + "  ·  " + entries.size()
-                + (entries.size() > 1 ? " lus" : " lu");
+                + (entries.size() > 1 ? " lus" : " lu") + (siteList.isEmpty() ? "" : "  ·  " + site);
         count.setText(c);
         ((TextView) act.findViewById(R.id.eSort)).setText(newest ? "Plus récents" : "Plus anciens");
         bindBackfill(entries);
@@ -373,6 +378,8 @@ final class EpisodesTab {
      * Si ce site ne permet pas de deviner l'adresse : la page de la série sur ce site.
      */
     private Runnable linkAction(DbHelper.Meta meta, List<DbHelper.Entry> entries, double chapter) {
+        String exact = siteList == null ? null : siteList.get(chapter);   // adresse lue dans la liste du site
+        if (exact != null) return () -> open(exact);
         ChapterLinks.Link link = ChapterLinks.linkFor(act, title, meta, entries, chapter);
         if (link == null) return null;
         if (!link.seriesPage) return () -> open(link.url);
@@ -422,6 +429,38 @@ final class EpisodesTab {
                 return true;
             });
             pm.show();
+        });
+    }
+
+    // ------------------------------------------------------------------ Liste du site
+
+    /** Chapitres de la série sur le site où tu lis (numéro → adresse exacte). */
+    private java.util.TreeMap<Double, String> siteList = new java.util.TreeMap<>();
+    private final java.util.Set<String> siteRefreshing = java.util.Collections.synchronizedSet(new java.util.HashSet<>());
+
+    /** Met la liste du site à jour en arrière-plan si elle manque ou date de plus de 6 h. */
+    private void refreshSiteList(String site, List<DbHelper.Entry> entries) {
+        if (site == null) return;
+        long age = SiteChapters.age(act, title, site);
+        if (age >= 0 && age < 6L * 3600 * 1000) return;
+        String url = null;
+        double ch = 0;
+        for (DbHelper.Entry e : entries) {                 // le chapitre le plus récent lu sur ce site
+            if (e.url != null && site.equals(ChapterLinks.host(e.url))) {
+                url = e.url;
+                ch = e.chapter;
+                break;
+            }
+        }
+        if (url == null || !siteRefreshing.add(title + "|" + site)) return;
+        final String t = title, u = url;
+        final double c = ch;
+        io.execute(() -> {
+            int n = SiteChapters.refresh(act, t, u, c, false);
+            siteRefreshing.remove(t + "|" + site);
+            if (n > 0) act.runOnUiThread(() -> {
+                if (t.equals(this.title) && !act.isFinishing()) bind(t);
+            });
         });
     }
 

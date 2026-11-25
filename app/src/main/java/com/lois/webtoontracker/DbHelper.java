@@ -16,7 +16,7 @@ import java.util.TreeSet;
 public class DbHelper extends SQLiteOpenHelper {
 
     private static final String DB_NAME = "webtoons.db";
-    private static final int DB_VERSION = 8;
+    private static final int DB_VERSION = 9;
     private static DbHelper instance;
 
     public static synchronized DbHelper get(Context ctx) {
@@ -47,6 +47,18 @@ public class DbHelper extends SQLiteOpenHelper {
         upgradeTo6(db);
         upgradeTo7(db);
         upgradeTo8(db);
+        upgradeTo9(db);
+    }
+
+    /** v9 : liste complète des chapitres d'une série sur le site où tu la lis (du 1er au dernier). */
+    private void upgradeTo9(SQLiteDatabase db) {
+        db.execSQL("CREATE TABLE IF NOT EXISTS site_chapters (" +
+                "title TEXT NOT NULL COLLATE NOCASE," +
+                "host TEXT NOT NULL," +
+                "chapter REAL NOT NULL," +
+                "url TEXT NOT NULL," +
+                "seen_at INTEGER DEFAULT 0," +
+                "PRIMARY KEY (title, host, chapter))");
     }
 
     /** v8 : chapitres payants repérés sur les sites où tu lis (pour te prévenir quand ils deviennent gratuits). */
@@ -149,6 +161,7 @@ public class DbHelper extends SQLiteOpenHelper {
         if (oldV < 6) upgradeTo6(db);
         if (oldV < 7) upgradeTo7(db);
         if (oldV < 8) upgradeTo8(db);
+        if (oldV < 9) upgradeTo9(db);
     }
 
     // ------------------------------------------------------------------ Modèles
@@ -430,6 +443,7 @@ public class DbHelper extends SQLiteOpenHelper {
         db.delete("releases", "title = ? COLLATE NOCASE", new String[]{title});
         db.delete("editions", "title = ? COLLATE NOCASE", new String[]{title});
         db.delete("locks", "title = ? COLLATE NOCASE", new String[]{title});
+        db.delete("site_chapters", "title = ? COLLATE NOCASE", new String[]{title});
         db.delete("reads", "title = ? COLLATE NOCASE", new String[]{title});
         db.delete("series_meta", "title = ? COLLATE NOCASE", new String[]{title});
     }
@@ -451,6 +465,8 @@ public class DbHelper extends SQLiteOpenHelper {
             db.delete("editions", "title = ? COLLATE NOCASE", new String[]{from});
             db.execSQL("UPDATE OR IGNORE locks SET title = ? WHERE title = ? COLLATE NOCASE", new Object[]{into, from});
             db.delete("locks", "title = ? COLLATE NOCASE", new String[]{from});
+            db.execSQL("UPDATE OR IGNORE site_chapters SET title = ? WHERE title = ? COLLATE NOCASE", new Object[]{into, from});
+            db.delete("site_chapters", "title = ? COLLATE NOCASE", new String[]{from});
             db.delete("reads", "title = ? COLLATE NOCASE", new String[]{from});
 
             Meta a = getMeta(from), b = getMeta(into);
@@ -750,6 +766,41 @@ public class DbHelper extends SQLiteOpenHelper {
         saveMeta(m);
     }
 
+    // ------------------------------------------------------------------ Chapitres du site où tu lis
+
+    /** Remplace la liste des chapitres de la série sur ce site. */
+    public synchronized void saveSiteChapters(String title, String host, java.util.TreeMap<Double, String> chapters, long now) {
+        SQLiteDatabase db = getWritableDatabase();
+        db.beginTransaction();
+        try {
+            db.delete("site_chapters", "title = ? COLLATE NOCASE AND host = ?", new String[]{title, host});
+            ContentValues v = new ContentValues();
+            for (java.util.Map.Entry<Double, String> e : chapters.entrySet()) {
+                v.clear();
+                v.put("title", title);
+                v.put("host", host);
+                v.put("chapter", e.getKey());
+                v.put("url", e.getValue());
+                v.put("seen_at", now);
+                db.insertWithOnConflict("site_chapters", null, v, SQLiteDatabase.CONFLICT_REPLACE);
+            }
+            db.setTransactionSuccessful();
+        } finally {
+            db.endTransaction();
+        }
+    }
+
+    /** Chapitres de la série sur ce site : numéro → adresse exacte. */
+    public java.util.TreeMap<Double, String> siteChapters(String title, String host) {
+        java.util.TreeMap<Double, String> out = new java.util.TreeMap<>();
+        if (host == null) return out;
+        try (Cursor c = getReadableDatabase().rawQuery("SELECT chapter, url FROM site_chapters WHERE title = ? COLLATE NOCASE " +
+                "AND host = ?", new String[]{title, host})) {
+            while (c.moveToNext()) out.put(c.getDouble(0), c.getString(1));
+        }
+        return out;
+    }
+
     // ------------------------------------------------------------------ Chapitres payants
 
     /** Chapitre payant repéré (ou toujours payant) : on garde la 1re date de repérage. */
@@ -973,6 +1024,7 @@ public class DbHelper extends SQLiteOpenHelper {
             db.execSQL("UPDATE releases SET title = ? WHERE title = ? COLLATE NOCASE", new Object[]{to, from});
             db.execSQL("UPDATE editions SET title = ? WHERE title = ? COLLATE NOCASE", new Object[]{to, from});
             db.execSQL("UPDATE locks SET title = ? WHERE title = ? COLLATE NOCASE", new Object[]{to, from});
+            db.execSQL("UPDATE site_chapters SET title = ? WHERE title = ? COLLATE NOCASE", new Object[]{to, from});
         } else {
             mergeSeries(from, to);
         }

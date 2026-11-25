@@ -150,7 +150,10 @@ public class ChapterCheckWorker extends Worker {
                     known = m.lastUrl;      // lu avant la v4.3 : l'adresse du dernier chapitre
                     knownCh = last;
                 }
+                // Liste complète des chapitres sur ce site (6 h au plus), puis le chapitre suivant page par page.
+                SiteChapters.refresh(ctx, s.title, known, knownCh, false);
                 DbHelper.Release r = ReleaseSources.siteLatest(ctx, s.title, known, knownCh, last);
+                if (r == null) r = fromSiteList(db, s.title, known, last);
                 if (r != null) rel.add(r);
             } catch (Exception ignored) {
             }
@@ -266,6 +269,32 @@ public class ChapterCheckWorker extends Worker {
             b.addAction(0, "Lire le ch. " + Detector.formatChapter(first.chapter), vp);
         }
         NotificationManagerCompat.from(ctx).notify(("free" + series.toLowerCase()).hashCode(), b.build());
+    }
+
+    /**
+     * Adresses impossibles à deviner (identifiants) : le dernier chapitre de la liste du site,
+     * s'il dépasse le dernier lu et n'est pas marqué payant.
+     */
+    private static DbHelper.Release fromSiteList(DbHelper db, String title, String knownUrl, double last) {
+        String host = ChapterLinks.host(knownUrl);
+        java.util.TreeMap<Double, String> list = db.siteChapters(title, host);
+        if (list.isEmpty() || list.lastKey() <= last) return null;
+        java.util.Set<Double> locked = new java.util.HashSet<>();
+        for (DbHelper.Lock l : db.getLocks(title)) if (l.active() && host != null && host.equals(l.host)) locked.add(l.chapter);
+        for (Double ch : list.descendingKeySet()) {
+            if (ch <= last) break;
+            if (locked.contains(ch)) continue;
+            DbHelper.Release r = new DbHelper.Release();
+            r.title = title;
+            r.source = "Site";
+            r.chapter = ch;
+            r.url = list.get(ch);
+            r.label = host;
+            r.lang = "";
+            r.foundAt = System.currentTimeMillis();
+            return r;
+        }
+        return null;
     }
 
     private static boolean isNone(String id) {
