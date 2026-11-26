@@ -32,13 +32,13 @@ import java.util.concurrent.Executors;
  */
 final class HomeFeed {
 
-    /** Genres d'Explorer : {genre AniList (null = tous), libellé, icône, teinte}. */
+    /** Genres d'Explorer : {genre AniList (null = tous), libellé, icône, teinte (null = icône en couleurs)}. */
     private static final Object[][] GENRES = {
             {null, "Tous", R.drawable.ic_grid, 0xFFFFFFFF},
-            {"Action", "Action", R.drawable.ic_swords, 0xFFFBBF24},
-            {"Romance", "Romance", R.drawable.ic_heart, 0xFFF472B6},
-            {"Fantasy", "Fantasy", R.drawable.ic_castle, 0xFFFBBF24},
-            {"Drama", "Drame", R.drawable.ic_masks, 0xFFC4B5FD}};
+            {"Action", "Action", R.drawable.ic_genre_action, null},
+            {"Romance", "Romance", R.drawable.ic_genre_romance, null},
+            {"Fantasy", "Fantasy", R.drawable.ic_genre_fantasy, null},
+            {"Drama", "Drame", R.drawable.ic_genre_drama, null}};
     private static final long EXPLORE_MS = 12L * 3600 * 1000;
     private static final int EXPLORE_MAX = 12;
     private static final ExecutorService IO = Executors.newSingleThreadExecutor();
@@ -56,7 +56,9 @@ final class HomeFeed {
         this.act = act;
         forYou = new CoverCards.Adapter(R.layout.item_discover_card, listener);
         explore = new CoverCards.Adapter(R.layout.item_discover, listener)
-                .width(act.getResources().getDimensionPixelSize(R.dimen.tile_width));
+                .width(act.getResources().getDimensionPixelSize(R.dimen.tile_width))
+                .ratio(1.3f)
+                .withoutWishButton();
         RecyclerView fy = act.findViewById(R.id.forYouList);
         fy.setLayoutManager(new LinearLayoutManager(act, LinearLayoutManager.HORIZONTAL, false));
         fy.setAdapter(forYou);
@@ -76,7 +78,7 @@ final class HomeFeed {
             c.setText((String) g[1]);
             c.setChipIconResource((Integer) g[2]);
             c.setChipIconVisible(true);
-            c.setChipIconTint(ColorStateList.valueOf((Integer) g[3]));
+            c.setChipIconTint(g[3] == null ? null : ColorStateList.valueOf((Integer) g[3]));
             c.setTag(g[0]);
             group.addView(c);
             c.setChecked(g[0] == null);

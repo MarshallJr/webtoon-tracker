@@ -571,11 +571,11 @@ public class MainActivity extends AppCompatActivity {
         for (int i = 0; i < items.length; i++) {
             boolean on = i == page;
             View pill = findViewById(items[i][0]);
-            pill.setBackgroundResource(on ? R.drawable.bg_nav_selected : 0);
-            int c = ContextCompat.getColor(this, on ? R.color.primary_bright : R.color.text_soft);
+            pill.setBackgroundResource(on ? R.drawable.bg_nav_active : 0);   // halo violet derrière l'icône
+            int c = ContextCompat.getColor(this, on ? R.color.primary_bright : R.color.nav_idle);
             ((android.widget.ImageView) findViewById(items[i][1])).setImageTintList(android.content.res.ColorStateList.valueOf(c));
             TextView label = findViewById(items[i][2]);
-            label.setTextColor(c);
+            label.setTextColor(ContextCompat.getColor(this, on ? R.color.nav_label_on : R.color.nav_idle));
         }
     }
 
@@ -638,7 +638,10 @@ public class MainActivity extends AppCompatActivity {
         android.graphics.Bitmap cover = Covers.get(this, top.title);
         com.google.android.material.imageview.ShapeableImageView img = findViewById(R.id.resumeCover);
         img.setVisibility(cover == null ? View.GONE : View.VISIBLE);
-        if (cover != null) img.setImageBitmap(cover);
+        if (cover != null) {
+            img.setImageBitmap(cover);
+            cropTop(img);
+        }
         findViewById(R.id.resumeButton).setOnClickListener(v -> Resume.open(this, top.title));
         findViewById(R.id.resumeCard).setOnClickListener(v -> DetailActivity.open(this, top.title));
 
@@ -650,6 +653,28 @@ public class MainActivity extends AppCompatActivity {
             recent.addView(card);
             Anim.pressAll(card);
         }
+    }
+
+    /** Vignette paysage : la couverture (en portrait) est cadrée sur son haut, là où sont les visages. */
+    private static void cropTop(android.widget.ImageView v) {
+        v.setScaleType(android.widget.ImageView.ScaleType.MATRIX);
+        Runnable fit = () -> {
+            android.graphics.drawable.Drawable d = v.getDrawable();
+            int vw = v.getWidth() - v.getPaddingLeft() - v.getPaddingRight();
+            int vh = v.getHeight() - v.getPaddingTop() - v.getPaddingBottom();
+            if (d == null || vw <= 0 || vh <= 0 || d.getIntrinsicWidth() <= 0 || d.getIntrinsicHeight() <= 0) return;
+            float sc = Math.max(vw / (float) d.getIntrinsicWidth(), vh / (float) d.getIntrinsicHeight());
+            android.graphics.Matrix m = new android.graphics.Matrix();
+            m.setScale(sc, sc);
+            m.postTranslate((vw - d.getIntrinsicWidth() * sc) / 2f, (vh - d.getIntrinsicHeight() * sc) * 0.2f);
+            v.setImageMatrix(m);
+        };
+        if (v.getTag(R.id.crop_top) == null) {
+            v.setTag(R.id.crop_top, Boolean.TRUE);
+            v.addOnLayoutChangeListener((x, l, t, r, b, ol, ot, or, ob) -> fit.run());
+        }
+        if (v.getWidth() > 0) fit.run();
+        else v.post(fit);
     }
 
     private static String cap(String s) {

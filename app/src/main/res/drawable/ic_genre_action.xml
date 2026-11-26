@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Action : épées croisées dorées -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+    <path android:pathData="M4,4L15,15" android:strokeWidth="2.2" android:strokeLineCap="round" android:strokeLineJoin="round">
+        <aapt:attr name="android:strokeColor">
+            <gradient android:type="linear" android:startX="4" android:startY="4" android:endX="20" android:endY="20"
+                android:startColor="#FFFDE68A" android:endColor="#FFF59E0B" />
+        </aapt:attr>
+    </path>
+    <path android:pathData="M20,4L9,15" android:strokeWidth="2.2" android:strokeLineCap="round" android:strokeLineJoin="round">
+        <aapt:attr name="android:strokeColor">
+            <gradient android:type="linear" android:startX="4" android:startY="4" android:endX="20" android:endY="20"
+                android:startColor="#FFFDE68A" android:endColor="#FFF59E0B" />
+        </aapt:attr>
+    </path>
+    <path android:pathData="M13,17L17,13" android:strokeWidth="2.2" android:strokeLineCap="round" android:strokeLineJoin="round">
+        <aapt:attr name="android:strokeColor">
+            <gradient android:type="linear" android:startX="4" android:startY="12" android:endX="20" android:endY="20"
+                android:startColor="#FFFBBF24" android:endColor="#FFD97706" />
+        </aapt:attr>
+    </path>
+    <path android:pathData="M16,16L20,20" android:strokeWidth="2.2" android:strokeLineCap="round" android:strokeLineJoin="round">
+        <aapt:attr name="android:strokeColor">
+            <gradient android:type="linear" android:startX="4" android:startY="12" android:endX="20" android:endY="20"
+                android:startColor="#FFFBBF24" android:endColor="#FFD97706" />
+        </aapt:attr>
+    </path>
+    <path android:pathData="M7,13L11,17" android:strokeWidth="2.2" android:strokeLineCap="round" android:strokeLineJoin="round">
+        <aapt:attr name="android:strokeColor">
+            <gradient android:type="linear" android:startX="4" android:startY="12" android:endX="20" android:endY="20"
+                android:startColor="#FFFBBF24" android:endColor="#FFD97706" />
+        </aapt:attr>
+    </path>
+    <path android:pathData="M8,16L4,20" android:strokeWidth="2.2" android:strokeLineCap="round" android:strokeLineJoin="round">
+        <aapt:attr name="android:strokeColor">
+            <gradient android:type="linear" android:startX="4" android:startY="12" android:endX="20" android:endY="20"
+                android:startColor="#FFFBBF24" android:endColor="#FFD97706" />
+        </aapt:attr>
+    </path>
+</vector>

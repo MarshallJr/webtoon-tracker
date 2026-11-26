@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Halo violet derrière la mascotte de l'accueil -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="oval">
+    <gradient android:type="radial" android:gradientRadius="50%"
+        android:startColor="#8C8B5CF6" android:centerColor="#337C3AED" android:endColor="#007C3AED" />
+</shape>

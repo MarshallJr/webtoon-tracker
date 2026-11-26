@@ -10,14 +10,22 @@ import android.graphics.Shader;
 import android.graphics.Typeface;
 
 import org.json.JSONArray;
+import org.json.JSONObject;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 
 /**
  * Données d'essai des tests de captures (jamais dans l'appli) : une bibliothèque de lectures, des
- * nouveautés, un cache « Pour toi », et des couvertures dessinées (dégradés) à la place des vraies.
+ * nouveautés, une lecture en cours, un cache « Pour toi ». Les couvertures sont les vraies affiches
+ * AniList quand le réseau répond (une seule requête), sinon des dégradés dessinés.
  */
 final class Fixtures {
 
@@ -35,7 +43,16 @@ final class Fixtures {
             {0xFF2A1B05, 0xFFF59E0B}, {0xFF1E1B4B, 0xFFEC4899}, {0xFF0F172A, 0xFF64748B}, {0xFF231942, 0xFFA78BFA},
             {0xFF0C1E2C, 0xFF22D3EE}, {0xFF2D0A31, 0xFFD946EF}};
 
+    private static final String[][] FOR_YOU = {{"Kill the Hero", "2020", "KR", "86", "Action"},
+            {"Swordmaster's Youngest Son", "2022", "KR", "85", "Fantasy"}, {"Vinland Saga", "2005", "JP", "90", "Drama"},
+            {"The Boxer", "2019", "KR", "87", "Sports"}, {"Lout of Count's Family", "2021", "KR", "84", "Fantasy"},
+            {"Blue Lock", "2018", "JP", "83", "Sports"}};
+
     static void seed(Context ctx) throws Exception {
+        String[] all = new String[TITLES.length + FOR_YOU.length];
+        System.arraycopy(TITLES, 0, all, 0, TITLES.length);
+        for (int i = 0; i < FOR_YOU.length; i++) all[TITLES.length + i] = FOR_YOU[i][0];
+        JSONObject real = anilist(all);
         DbHelper db = DbHelper.get(ctx);
         long now = System.currentTimeMillis(), hour = 3_600_000L;
         for (int i = 0; i < TITLES.length; i++) {
@@ -46,8 +63,11 @@ final class Fixtures {
             }
             db.setScore(t, SCORE[i]);
             db.setTags(t, TAGS[i]);
-            Covers.save(ctx, t, cover(i, t, 460, 650));
+            Bitmap poster = real == null ? null : download(real.optJSONObject("a" + i));
+            if (poster != null) Covers.savePoster(ctx, t, poster);
+            else Covers.save(ctx, t, cover(i, t, 460, 650));
         }
+        Progress.save(ctx, TITLES[0], LAST[0], 0.72f);   // « arrêté à 72 % » sur la carte Reprendre
         for (int i : new int[]{0, 2, 5}) {
             DbHelper.Release r = new DbHelper.Release();
             r.title = TITLES[i];
@@ -59,14 +79,12 @@ final class Fixtures {
             r.foundAt = now - hour;
             db.saveRelease(r);
         }
-        seedDiscover(ctx);
+        seedDiscover(ctx, real);
     }
 
     /** Cache « Pour toi » : des fiches de catalogue avec couvertures (dans le cache disque de NetImages). */
-    static void seedDiscover(Context ctx) throws Exception {
-        String[][] fy = {{"Kill the Hero", "2020", "KR", "86", "Action"}, {"Swordmaster's Youngest Son", "2022", "KR", "85", "Fantasy"},
-                {"Vinland Saga", "2005", "JP", "90", "Drama"}, {"The Boxer", "2019", "KR", "87", "Sports"},
-                {"Lout of Count's Family", "2021", "KR", "84", "Fantasy"}, {"Blue Lock", "2018", "JP", "83", "Sports"}};
+    static void seedDiscover(Context ctx, JSONObject real) throws Exception {
+        String[][] fy = FOR_YOU;
         JSONArray a = new JSONArray();
         for (int i = 0; i < fy.length; i++) {
             Discover.Media m = new Discover.Media();
@@ -80,7 +98,15 @@ final class Fixtures {
             m.because = "Comme " + TITLES[i % 3];
             m.cover = "https://fixtures.test/cover/" + i + ".jpg";
             m.color = "#2A2450";
-            netImage(ctx, m.cover, cover(i + 2, m.title, 300, 430));
+            JSONObject r = real == null ? null : real.optJSONObject("a" + (TITLES.length + i));
+            Bitmap b = download(r);
+            if (b != null) {
+                JSONObject img = r.optJSONObject("coverImage");
+                m.cover = img.optString("extraLarge", img.optString("large"));
+                m.color = img.optString("color", m.color);
+                if (r.optInt("averageScore") > 0) m.score = r.optInt("averageScore");
+            }
+            netImage(ctx, m.cover, b != null ? b : cover(i + 2, m.title, 300, 430));
             a.put(m.toJson());
         }
         Discover.Profile p = Discover.profile(ctx);
@@ -89,6 +115,59 @@ final class Fixtures {
                 .putLong("for_you_at", System.currentTimeMillis())
                 .putString("for_you_sig", p.series + ":" + p.ids.size())
                 .commit();
+    }
+
+    /** Fiches AniList des titres (alias a0, a1…) en une requête ; null sans réseau. */
+    static JSONObject anilist(String[] titles) {
+        try {
+            StringBuilder q = new StringBuilder("query{");
+            for (int i = 0; i < titles.length; i++) {
+                q.append('a').append(i).append(":Media(search:").append(JSONObject.quote(titles[i]))
+                        .append(",type:MANGA){id averageScore coverImage{extraLarge large color}}");
+            }
+            q.append('}');
+            HttpURLConnection c = (HttpURLConnection) new URL("https://graphql.anilist.co").openConnection();
+            c.setConnectTimeout(8000);
+            c.setReadTimeout(12000);
+            c.setRequestMethod("POST");
+            c.setDoOutput(true);
+            c.setRequestProperty("Content-Type", "application/json");
+            c.setRequestProperty("Accept", "application/json");
+            try (OutputStream o = c.getOutputStream()) {
+                o.write(new JSONObject().put("query", q.toString()).toString().getBytes(StandardCharsets.UTF_8));
+            }
+            if (c.getResponseCode() != 200) return null;
+            return new JSONObject(new String(readAll(c.getInputStream()), StandardCharsets.UTF_8)).optJSONObject("data");
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /** L'affiche d'une fiche AniList, ou null. */
+    static Bitmap download(JSONObject media) {
+        if (media == null || media.optJSONObject("coverImage") == null) return null;
+        JSONObject img = media.optJSONObject("coverImage");
+        String url = img.optString("extraLarge", img.optString("large", ""));
+        if (url.isEmpty()) return null;
+        try {
+            HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
+            c.setConnectTimeout(8000);
+            c.setReadTimeout(12000);
+            byte[] data = readAll(c.getInputStream());
+            return android.graphics.BitmapFactory.decodeByteArray(data, 0, data.length);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static byte[] readAll(InputStream in) throws java.io.IOException {
+        try (InputStream i = in) {
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            byte[] buf = new byte[16384];
+            int n;
+            while ((n = i.read(buf)) > 0) out.write(buf, 0, n);
+            return out.toByteArray();
+        }
     }
 
     /** Met une image dans le cache disque de NetImages (même clé : SHA-1 de l'adresse). */

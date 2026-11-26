@@ -81,12 +81,18 @@
     </style>
 
     <style name="SectionIcon">
+        <item name="android:layout_width">26dp</item>
+        <item name="android:layout_height">26dp</item>
+        <item name="android:layout_marginEnd">10dp</item>
+        <item name="android:tint">@color/primary_bright</item>
+        <item name="android:contentDescription">@null</item>
+    </style>
+
+    <!-- Icône de section en couleurs (étoile Pour toi, boussole Explorer) -->
+    <style name="SectionBadge">
         <item name="android:layout_width">30dp</item>
         <item name="android:layout_height">30dp</item>
         <item name="android:layout_marginEnd">10dp</item>
-        <item name="android:padding">6dp</item>
-        <item name="android:background">@drawable/bg_section_icon</item>
-        <item name="android:tint">@color/primary_bright</item>
         <item name="android:contentDescription">@null</item>
     </style>
 
@@ -94,7 +100,7 @@
         <item name="android:layout_width">wrap_content</item>
         <item name="android:layout_height">wrap_content</item>
         <item name="android:textColor">@color/text_main</item>
-        <item name="android:textSize">20sp</item>
+        <item name="android:textSize">21sp</item>
         <item name="android:fontFamily">@font/inter_display_bold</item>
         <item name="android:letterSpacing">-0.015</item>
     </style>
@@ -185,6 +191,16 @@
     <style name="RoundedMini">
         <item name="cornerFamily">rounded</item>
         <item name="cornerSize">8dp</item>
+    </style>
+
+    <style name="RoundedCardInner">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">17dp</item>
+    </style>
+
+    <style name="RoundedTile">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">14dp</item>
     </style>
 
     <style name="RoundedGrid">
@@ -285,12 +301,12 @@
         <item name="android:fontFeatureSettings">tnum</item>
         <item name="android:gravity">center_vertical</item>
         <item name="android:includeFontPadding">false</item>
-        <item name="android:paddingStart">7dp</item>
-        <item name="android:paddingTop">4dp</item>
-        <item name="android:paddingEnd">8dp</item>
-        <item name="android:paddingBottom">4dp</item>
+        <item name="android:paddingStart">6dp</item>
+        <item name="android:paddingTop">3.5dp</item>
+        <item name="android:paddingEnd">7dp</item>
+        <item name="android:paddingBottom">3.5dp</item>
         <item name="android:textColor">#FFFFFF</item>
-        <item name="android:textSize">12sp</item>
+        <item name="android:textSize">11.5sp</item>
     </style>
 
     <!-- Étiquette de genre (couleur posée dans le code) -->
@@ -301,41 +317,41 @@
         <item name="android:fontFamily">@font/inter_semibold</item>
         <item name="android:includeFontPadding">false</item>
         <item name="android:maxLines">1</item>
-        <item name="android:paddingStart">9dp</item>
-        <item name="android:paddingTop">4dp</item>
-        <item name="android:paddingEnd">9dp</item>
-        <item name="android:paddingBottom">4dp</item>
+        <item name="android:paddingStart">8dp</item>
+        <item name="android:paddingTop">3.5dp</item>
+        <item name="android:paddingEnd">8dp</item>
+        <item name="android:paddingBottom">3.5dp</item>
         <item name="android:textColor">@color/genre_violet</item>
-        <item name="android:textSize">11.5sp</item>
+        <item name="android:textSize">11sp</item>
     </style>
 
     <!-- Raccourci de l'accueil (Populaires, Tendances…) : pilule, icône colorée, libellé -->
     <style name="QuickChipBox">
         <item name="android:layout_width">wrap_content</item>
-        <item name="android:layout_height">46dp</item>
-        <item name="android:layout_marginEnd">10dp</item>
+        <item name="android:layout_height">44dp</item>
+        <item name="android:layout_marginEnd">9dp</item>
         <item name="android:background">@drawable/bg_quick_chip</item>
         <item name="android:clickable">true</item>
         <item name="android:focusable">true</item>
         <item name="android:gravity">center_vertical</item>
         <item name="android:orientation">horizontal</item>
-        <item name="android:paddingStart">14dp</item>
-        <item name="android:paddingEnd">18dp</item>
+        <item name="android:paddingStart">13dp</item>
+        <item name="android:paddingEnd">16dp</item>
     </style>
 
     <style name="QuickChipIcon">
-        <item name="android:layout_width">20dp</item>
-        <item name="android:layout_height">20dp</item>
+        <item name="android:layout_width">19dp</item>
+        <item name="android:layout_height">19dp</item>
         <item name="android:contentDescription">@null</item>
     </style>
 
     <style name="QuickChipText">
         <item name="android:layout_width">wrap_content</item>
         <item name="android:layout_height">wrap_content</item>
-        <item name="android:layout_marginStart">9dp</item>
+        <item name="android:layout_marginStart">8dp</item>
         <item name="android:fontFamily">@font/inter_semibold</item>
         <item name="android:textColor">@color/text_main</item>
-        <item name="android:textSize">14sp</item>
+        <item name="android:textSize">13.5sp</item>
     </style>
 
     <!-- Titre d'une page (Bibliothèque, Activité, Découvrir) -->
@@ -362,8 +378,8 @@
     </style>
 
     <style name="NavPill">
-        <item name="android:layout_width">48dp</item>
-        <item name="android:layout_height">30dp</item>
+        <item name="android:layout_width">52dp</item>
+        <item name="android:layout_height">34dp</item>
     </style>
 
     <style name="NavIcon">

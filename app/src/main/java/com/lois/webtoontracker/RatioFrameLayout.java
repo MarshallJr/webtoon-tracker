@@ -8,7 +8,7 @@ import android.widget.FrameLayout;
 /** Cadre au format couverture : hauteur = largeur × 1,45. */
 public class RatioFrameLayout extends FrameLayout {
 
-    private static final float RATIO = 1.45f;
+    private float ratio = 1.45f;
 
     public RatioFrameLayout(Context context) {
         super(context);
@@ -18,9 +18,17 @@ public class RatioFrameLayout extends FrameLayout {
         super(context, attrs);
     }
 
+    /** Autre proportion (hauteur = largeur × r). */
+    public void setRatio(float r) {
+        if (r > 0 && r != ratio) {
+            ratio = r;
+            requestLayout();
+        }
+    }
+
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         int w = View.MeasureSpec.getSize(widthMeasureSpec);
-        super.onMeasure(widthMeasureSpec, View.MeasureSpec.makeMeasureSpec(Math.round(w * RATIO), View.MeasureSpec.EXACTLY));
+        super.onMeasure(widthMeasureSpec, View.MeasureSpec.makeMeasureSpec(Math.round(w * ratio), View.MeasureSpec.EXACTLY));
     }
 }

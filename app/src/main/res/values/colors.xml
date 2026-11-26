@@ -32,7 +32,6 @@
     <color name="card_shadow">#808B5CF6</color>
     <color name="rating_bg">#2B2210</color>
     <color name="rating_text">#FFC53D</color>
-    <color name="nav_selected">#2E8B5CF6</color>
     <color name="hero_start">#2A1B5C</color>
     <color name="hero_end">#13111C</color>
     <color name="hero_stroke">#408B5CF6</color>
@@ -50,7 +49,7 @@
     <!-- Barre en verre et logo central -->
     <color name="glass_tint">#B30D0B15</color>
     <color name="glass_flat">#F00F0D18</color>
-    <color name="glass_stroke">#33A78BFA</color>
+    <color name="glass_stroke">#4DA78BFA</color>
     <color name="logo_ring">#FFA78BFA</color>
     <color name="logo_glow">#FF8B5CF6</color>
 
@@ -67,17 +66,20 @@
 
     <!-- Genres : une teinte par famille (étiquettes des cartes) -->
     <color name="genre_violet">#C4B5FD</color>
-    <color name="genre_violet_bg">#338B5CF6</color>
+    <color name="genre_violet_bg">#4D8B5CF6</color>
     <color name="genre_blue">#93C5FD</color>
-    <color name="genre_blue_bg">#333B82F6</color>
+    <color name="genre_blue_bg">#4D3B82F6</color>
     <color name="genre_orange">#FDBA74</color>
-    <color name="genre_orange_bg">#33F97316</color>
+    <color name="genre_orange_bg">#4DF97316</color>
     <color name="genre_green">#86EFAC</color>
-    <color name="genre_green_bg">#3322C55E</color>
+    <color name="genre_green_bg">#4D22C55E</color>
     <color name="genre_pink">#F9A8D4</color>
-    <color name="genre_pink_bg">#33EC4899</color>
+    <color name="genre_pink_bg">#4DEC4899</color>
     <color name="genre_teal">#5EEAD4</color>
-    <color name="genre_teal_bg">#3314B8A6</color>
+    <color name="genre_teal_bg">#4D14B8A6</color>
     <color name="genre_red">#FCA5A5</color>
-    <color name="genre_red_bg">#33EF4444</color>
+    <color name="genre_red_bg">#4DEF4444</color>
+    <!-- Barre du bas : icônes au repos, libellé actif -->
+    <color name="nav_idle">#8C88A3</color>
+    <color name="nav_label_on">#EDE9FE</color>
 </resources>

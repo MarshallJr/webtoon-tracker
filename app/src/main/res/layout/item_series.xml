@@ -1,16 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Série de la bibliothèque (et des lectures récentes) : couverture, titre, note, où tu en es, lecture -->
+<!-- Série de la bibliothèque (et des lectures récentes) : couverture, titre, note, chapitres lus,
+     où tu en es, nouveauté, lecture -->
 <com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_marginTop="5dp"
     android:layout_marginBottom="5dp"
-    app:cardBackgroundColor="@color/card_bg"
+    app:cardBackgroundColor="#FF13111D"
     app:cardCornerRadius="20dp"
     app:cardElevation="0dp"
     app:rippleColor="#26A78BFA"
-    app:strokeColor="@color/hairline"
+    app:strokeColor="#2EA78BFA"
     app:strokeWidth="1dp">
 
     <LinearLayout
@@ -21,14 +22,16 @@
         android:padding="10dp">
 
         <FrameLayout
-            android:layout_width="72dp"
-            android:layout_height="102dp">
+            android:layout_width="74dp"
+            android:layout_height="104dp"
+            android:background="@drawable/bg_resume_thumb_glow"
+            android:padding="1dp">
 
             <TextView
                 android:id="@+id/avatar"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:background="@drawable/bg_avatar"
+                android:background="@drawable/bg_resume_thumb"
                 android:fontFamily="@font/inter_display_extrabold"
                 android:gravity="center"
                 android:textColor="#FFFFFF"
@@ -58,83 +61,87 @@
                 android:layout_height="wrap_content"
                 android:ellipsize="end"
                 android:fontFamily="@font/inter_bold"
-                android:lineSpacingExtra="1dp"
+                android:includeFontPadding="false"
+                android:lineSpacingExtra="2dp"
                 android:maxLines="2"
                 android:textColor="@color/text_main"
-                android:textSize="15.5sp" />
+                android:textSize="15sp" />
 
-            <TextView
-                android:id="@+id/rating"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="3dp"
-                android:fontFamily="@font/inter_bold"
-                android:textColor="@color/star"
-                android:textSize="12.5sp"
-                android:visibility="gone" />
-
-            <TextView
-                android:id="@+id/subtitle"
+            <!-- « ★ 8,4   📖 14 chapitres lus » -->
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="3dp"
-                android:ellipsize="end"
-                android:maxLines="1"
-                android:textColor="@color/text_soft"
-                android:textSize="13sp" />
-
-            <LinearLayout
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
+                android:layout_marginTop="6dp"
+                android:gravity="center_vertical"
                 android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/rating"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="12dp"
+                    android:fontFamily="@font/inter_bold"
+                    android:includeFontPadding="false"
+                    android:textColor="@color/star"
+                    android:textSize="12.5sp"
+                    android:visibility="gone" />
 
                 <TextView
                     android:id="@+id/tagLine"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:background="@drawable/bg_pill_soft"
-                    android:fontFamily="@font/inter_semibold"
+                    android:drawableStart="@drawable/ic_book_small"
+                    android:drawablePadding="5dp"
+                    android:ellipsize="end"
+                    android:fontFamily="@font/inter_medium"
                     android:includeFontPadding="false"
-                    android:paddingStart="10dp"
-                    android:paddingTop="5dp"
-                    android:paddingEnd="10dp"
-                    android:paddingBottom="5dp"
-                    android:textColor="@color/badge_text"
-                    android:textSize="11.5sp" />
-
-                <TextView
-                    android:id="@+id/newBadge"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="6dp"
-                    android:background="@drawable/bg_new_badge"
-                    android:fontFamily="@font/inter_bold"
-                    android:includeFontPadding="false"
-                    android:paddingStart="10dp"
-                    android:paddingTop="5dp"
-                    android:paddingEnd="10dp"
-                    android:paddingBottom="5dp"
-                    android:textColor="@color/on_accent"
-                    android:textSize="11.5sp"
-                    android:visibility="gone" />
+                    android:maxLines="1"
+                    android:textColor="@color/text_soft"
+                    android:textSize="12.5sp" />
             </LinearLayout>
+
+            <TextView
+                android:id="@+id/subtitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textColor="@color/text_soft"
+                android:textSize="12.5sp" />
+
+            <TextView
+                android:id="@+id/newBadge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_new_badge"
+                android:fontFamily="@font/inter_bold"
+                android:includeFontPadding="false"
+                android:maxLines="1"
+                android:paddingStart="10dp"
+                android:paddingTop="5dp"
+                android:paddingEnd="10dp"
+                android:paddingBottom="5dp"
+                android:textColor="@color/on_accent"
+                android:textSize="11.5sp"
+                android:visibility="gone" />
         </LinearLayout>
 
         <FrameLayout
             android:id="@+id/play"
-            android:layout_width="46dp"
-            android:layout_height="46dp"
-            android:layout_marginEnd="4dp"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_marginEnd="2dp"
             android:background="@drawable/bg_play"
             android:contentDescription="Reprendre"
-            android:elevation="6dp"
-            android:outlineAmbientShadowColor="@color/shadow_strong"
-            android:outlineSpotShadowColor="@color/shadow_strong">
+            android:elevation="8dp"
+            android:outlineAmbientShadowColor="@color/logo_glow"
+            android:outlineSpotShadowColor="@color/logo_glow">
 
             <ImageView
-                android:layout_width="22dp"
-                android:layout_height="22dp"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
                 android:layout_gravity="center"
                 android:contentDescription="@null"
                 android:src="@drawable/ic_play"

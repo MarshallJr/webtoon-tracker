@@ -117,8 +117,8 @@
         android:layout_marginTop="24dp">
 
         <ImageView
-            style="@style/SectionIcon"
-            android:src="@drawable/ic_sparkle" />
+            style="@style/SectionBadge"
+            android:src="@drawable/ic_sparkle_grad" />
 
         <TextView
             style="@style/SectionTitle"
@@ -184,8 +184,8 @@
         android:layout_marginTop="26dp">
 
         <ImageView
-            style="@style/SectionIcon"
-            android:src="@drawable/ic_compass" />
+            style="@style/SectionBadge"
+            android:src="@drawable/ic_compass_badge" />
 
         <TextView
             style="@style/SectionTitle"

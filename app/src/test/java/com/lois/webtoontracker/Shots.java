@@ -69,6 +69,7 @@ final class Shots {
             return;
         }
         View child = ((ViewGroup) scroll).getChildAt(0);
+        softShapes(child);
         int w = scroll.getWidth();
         int h = Math.max(1, child.getHeight() + scroll.getPaddingTop() + scroll.getPaddingBottom());
         Bitmap b = Bitmap.createBitmap(Math.max(1, w), Math.min(h, 12000), Bitmap.Config.ARGB_8888);
@@ -92,11 +93,27 @@ final class Shots {
     }
 
     static void save(View v, String name, int w, int h, int bg) throws Exception {
+        softShapes(v);
         Bitmap b = Bitmap.createBitmap(Math.max(1, w), Math.max(1, h), Bitmap.Config.ARGB_8888);
         Canvas c = new Canvas(b);
         if (bg != 0) c.drawColor(bg);
         v.draw(c);
         write(b, name);
+    }
+
+    /**
+     * Capture logicielle : une ShapeableImageView « opaque » (couverture JPEG) est mise en cache sans
+     * transparence, et les coins qu'elle efface sortent en blanc. Une opacité de 254/255 (invisible à
+     * l'œil) la fait dessiner avec un vrai canal alpha, comme le rendu matériel du téléphone.
+     */
+    static void softShapes(View v) {
+        if (v instanceof com.google.android.material.imageview.ShapeableImageView) {
+            ((android.widget.ImageView) v).setImageAlpha(254);
+        }
+        if (v instanceof ViewGroup) {
+            ViewGroup g = (ViewGroup) v;
+            for (int i = 0; i < g.getChildCount(); i++) softShapes(g.getChildAt(i));
+        }
     }
 
     private static void write(Bitmap b, String name) throws Exception {

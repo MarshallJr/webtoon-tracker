@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Romance : cœur en contour ambré -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+    <path android:pathData="M12,20.2l-1.2,-1.1C6.3,15.1 3.5,12.5 3.5,9.2 3.5,6.6 5.5,4.6 8,4.6c1.5,0 2.9,0.7 4,1.8 1.1,-1.1 2.5,-1.8 4,-1.8 2.5,0 4.5,2 4.5,4.6 0,3.3 -2.8,5.9 -7.3,9.9L12,20.2z" android:strokeWidth="2" android:strokeLineCap="round" android:strokeLineJoin="round">
+        <aapt:attr name="android:strokeColor">
+            <gradient android:type="linear" android:startX="12" android:startY="2" android:endX="12" android:endY="22"
+                android:startColor="#FFFDE68A" android:endColor="#FFF97316" />
+        </aapt:attr>
+    </path>
+</vector>

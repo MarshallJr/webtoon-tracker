@@ -8,14 +8,19 @@
     <dimen name="grid_padding">14dp</dimen>
     <!-- Accueil : grand titre et mascotte -->
     <dimen name="hero_title">31sp</dimen>
-    <dimen name="hero_art">262dp</dimen>
-    <dimen name="hero_text_end">120dp</dimen>
+    <dimen name="hero_art">236dp</dimen>
+    <dimen name="hero_text_end">110dp</dimen>
     <!-- Largeur maximale d'une colonne de contenu (grands écrans) -->
     <dimen name="content_max">760dp</dimen>
     <!-- Cartes des carrousels -->
-    <dimen name="card_width">148dp</dimen>
-    <dimen name="tile_width">134dp</dimen>
+    <dimen name="card_width">116dp</dimen>
+    <dimen name="card_height">190dp</dimen>
+    <dimen name="tile_width">104dp</dimen>
     <!-- En-tête de Découvrir : débord des carrousels jusqu'aux bords de l'écran -->
     <dimen name="header_bleed">20dp</dimen>
     <dimen name="header_bleed_neg">-20dp</dimen>
+    <dimen name="hero_art_top">30dp</dimen>
+    <dimen name="hero_art_end">-50dp</dimen>
+    <dimen name="resume_thumb_w">104dp</dimen>
+    <dimen name="resume_thumb_h">66dp</dimen>
 </resources>

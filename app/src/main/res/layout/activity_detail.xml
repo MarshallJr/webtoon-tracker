@@ -22,7 +22,7 @@
             <FrameLayout
                 android:id="@+id/dHero"
                 android:layout_width="match_parent"
-                android:layout_height="320dp"
+                android:layout_height="340dp"
                 android:background="@color/screen_bg"
                 android:clipChildren="true">
 
@@ -45,12 +45,12 @@
                 android:id="@+id/dContent"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="-170dp"
+                android:layout_marginTop="-176dp"
                 android:clipChildren="false"
                 android:clipToPadding="false"
                 android:orientation="vertical"
-                android:paddingStart="20dp"
-                android:paddingEnd="20dp"
+                android:paddingStart="@dimen/page_padding"
+                android:paddingEnd="@dimen/page_padding"
                 android:paddingBottom="110dp">
 
                 <LinearLayout
@@ -140,11 +140,11 @@
                             android:layout_height="wrap_content"
                             android:layout_marginTop="6dp"
                             android:ellipsize="end"
-                            android:fontFamily="@font/inter_bold"
+                            android:fontFamily="@font/inter_display_extrabold"
                             android:letterSpacing="-0.02"
                             android:maxLines="4"
                             android:textColor="@color/text_main"
-                            android:textSize="24sp" />
+                            android:textSize="25sp" />
 
                         <TextView
                             android:id="@+id/dAuthors"
@@ -224,18 +224,18 @@
                     android:id="@+id/dResume"
                     android:layout_width="match_parent"
                     android:layout_height="58dp"
-                    android:layout_marginTop="6dp"
-                    android:fontFamily="@font/inter_semibold"
+                    android:layout_marginTop="8dp"
+                    android:background="@drawable/bg_primary_button"
+                    android:elevation="10dp"
+                    android:fontFamily="@font/inter_bold"
                     android:insetTop="0dp"
                     android:insetBottom="0dp"
-                    android:outlineAmbientShadowColor="#99FFB020"
-                    android:outlineSpotShadowColor="#99FFB020"
+                    android:outlineAmbientShadowColor="@color/shadow_strong"
+                    android:outlineSpotShadowColor="@color/shadow_strong"
                     android:text="Reprendre la lecture"
                     android:textColor="@color/on_accent"
                     android:textSize="16sp"
-                    app:backgroundTint="@color/accent"
-                    app:cornerRadius="18dp"
-                    app:elevation="6dp"
+                    app:backgroundTint="@null"
                     app:icon="@drawable/ic_play"
                     app:iconGravity="textStart"
                     app:iconTint="@color/on_accent" />
@@ -253,23 +253,24 @@
                     android:id="@+id/dTabs"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="-20dp"
+                    android:layout_marginStart="@dimen/page_padding_neg"
                     android:layout_marginTop="12dp"
-                    android:layout_marginEnd="-20dp"
+                    android:layout_marginEnd="@dimen/page_padding_neg"
                     android:background="@android:color/transparent"
-                    app:tabIndicatorColor="@color/brand"
+                    app:tabIndicator="@drawable/tab_indicator"
+                    app:tabIndicatorColor="@color/primary_bright"
                     app:tabIndicatorFullWidth="false"
                     app:tabIndicatorHeight="3dp"
-                    app:tabRippleColor="@null"
-                    app:tabSelectedTextColor="@color/brand"
+                    app:tabRippleColor="#1FA78BFA"
+                    app:tabSelectedTextColor="@color/text_main"
                     app:tabTextAppearance="@style/TabText"
                     app:tabTextColor="@color/text_soft" />
 
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
-                    android:layout_marginStart="-20dp"
-                    android:layout_marginEnd="-20dp"
+                    android:layout_marginStart="@dimen/page_padding_neg"
+                    android:layout_marginEnd="@dimen/page_padding_neg"
                     android:background="@color/hairline" />
 
                 <!-- ═════════ Onglet : Aperçu ═════════ -->
@@ -507,11 +508,11 @@
                         android:id="@+id/dRecoScroll"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="-20dp"
-                        android:layout_marginEnd="-20dp"
+                        android:layout_marginStart="@dimen/page_padding_neg"
+                        android:layout_marginEnd="@dimen/page_padding_neg"
                         android:clipToPadding="false"
-                        android:paddingStart="20dp"
-                        android:paddingEnd="20dp"
+                        android:paddingStart="@dimen/page_padding"
+                        android:paddingEnd="@dimen/page_padding"
                         android:scrollbars="none"
                         android:visibility="gone">
 
@@ -710,8 +711,8 @@
                         android:id="@+id/eList"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="-20dp"
-                        android:layout_marginEnd="-20dp"
+                        android:layout_marginStart="@dimen/page_padding_neg"
+                        android:layout_marginEnd="@dimen/page_padding_neg"
                         android:animateLayoutChanges="false"
                         android:orientation="vertical" />
 
@@ -1174,9 +1175,9 @@
         android:layout_height="wrap_content"
         android:layout_gravity="bottom"
         android:background="@drawable/bg_sticky"
-        android:paddingStart="20dp"
+        android:paddingStart="@dimen/page_padding"
         android:paddingTop="14dp"
-        android:paddingEnd="20dp"
+        android:paddingEnd="@dimen/page_padding"
         android:paddingBottom="14dp"
         android:visibility="gone">
 
@@ -1184,14 +1185,17 @@
             android:id="@+id/dStickyResume"
             android:layout_width="match_parent"
             android:layout_height="56dp"
-            android:fontFamily="@font/inter_semibold"
+            android:background="@drawable/bg_primary_button"
+            android:elevation="10dp"
+            android:fontFamily="@font/inter_bold"
             android:insetTop="0dp"
             android:insetBottom="0dp"
+            android:outlineAmbientShadowColor="@color/shadow_strong"
+            android:outlineSpotShadowColor="@color/shadow_strong"
             android:text="Reprendre la lecture"
             android:textColor="@color/on_accent"
             android:textSize="16sp"
-            app:backgroundTint="@color/accent"
-            app:cornerRadius="18dp"
+            app:backgroundTint="@null"
             app:icon="@drawable/ic_play"
             app:iconGravity="textStart"
             app:iconTint="@color/on_accent" />

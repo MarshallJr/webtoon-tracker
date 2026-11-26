@@ -112,6 +112,8 @@ final class CoverCards {
         private final List<Discover.Media> items = new ArrayList<>();
         private Set<Integer> wished = new HashSet<>();
         private int width;          // largeur fixe d'une tuile (0 = celle du gabarit)
+        private float ratio;        // hauteur / largeur d'une tuile (0 = celle du gabarit)
+        private boolean wishButton = true;
         private boolean animate = true;
 
         Adapter(int layout, Listener listener) {
@@ -122,6 +124,18 @@ final class CoverCards {
         /** Tuiles de largeur fixe (carrousel Explorer). */
         Adapter width(int px) {
             this.width = px;
+            return this;
+        }
+
+        /** Tuiles moins hautes que le format couverture (carrousel Explorer). */
+        Adapter ratio(float r) {
+            this.ratio = r;
+            return this;
+        }
+
+        /** Sans signet sur la tuile (la fiche garde son bouton « Ma liste à lire »). */
+        Adapter withoutWishButton() {
+            this.wishButton = false;
             return this;
         }
 
@@ -163,6 +177,9 @@ final class CoverCards {
                 lp.width = width;
                 v.setLayoutParams(lp);
             }
+            View frame = v.findViewById(R.id.dcFrame);
+            if (ratio > 0 && frame instanceof RatioFrameLayout) ((RatioFrameLayout) frame).setRatio(ratio);
+            if (!wishButton) v.findViewById(R.id.dcWish).setVisibility(View.GONE);
             Anim.pressAll(v);
             return new Holder(v);
         }
