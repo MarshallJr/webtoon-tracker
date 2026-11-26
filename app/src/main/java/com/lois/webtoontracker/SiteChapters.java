@@ -68,17 +68,46 @@ final class SiteChapters {
             Result r = fetch(chapterUrl, chapter, SeriesNames.names(ctx, title));
             if (r == null || r.chapters.size() < 2) return -1;
             DbHelper db = DbHelper.get(ctx);
-            db.saveSiteChapters(title, host, r.chapters, now);
+            List<Double> appeared = db.saveSiteChapters(title, host, r.chapters, now);
             // Chapitres marqués payants dans la liste du site (cadenas, pièces…) : repérés d'avance.
             for (Double c : r.locked) {
                 if (db.getReadAt(title, c) < 0) db.saveLock(title, host, c, r.chapters.get(c), 0, now);
             }
+            announce(db, title, host, r, appeared, now);
             return r.chapters.size();
         } catch (Exception e) {
             return -1;
         } finally {
             running.remove(key);
         }
+    }
+
+    /**
+     * Un chapitre apparu sur ton site depuis la lecture précédente de sa liste, plus loin que ton
+     * dernier lu et gratuit ici, devient une sortie (carte « Nouveaux chapitres » de l'accueil).
+     */
+    static DbHelper.Release announce(DbHelper db, String title, String host, Result r, List<Double> appeared, long now) {
+        if (appeared == null || appeared.isEmpty()) return null;
+        double last = db.lastRead(title);
+        Set<Double> locked = new HashSet<>(r.locked);
+        for (DbHelper.Lock l : db.getLocks(title)) if (l.active() && host.equals(l.host)) locked.add(l.chapter);
+        double best = -1;
+        for (Double c : appeared) if (c > last && c > best && !locked.contains(c)) best = c;
+        if (best < 0) return null;
+        for (DbHelper.Release x : db.newReleases(title)) {
+            // Déjà signalé (même site), ou une sortie « Site » plus avancée qu'on écraserait.
+            if (x.chapter >= best && (host.equals(x.label) || ("Site".equals(x.source) && "".equals(x.lang)))) return null;
+        }
+        DbHelper.Release rel = new DbHelper.Release();
+        rel.title = title;
+        rel.source = "Site";
+        rel.lang = "";
+        rel.chapter = best;
+        rel.url = r.chapters.get(best);
+        rel.label = host;
+        rel.foundAt = now;
+        db.saveRelease(rel);
+        return rel;
     }
 
     /** Âge de la liste pour ce site (ms), ou -1 si jamais lue. */

@@ -66,6 +66,9 @@ final class EpisodesTab {
             bind(title);
         });
         act.findViewById(R.id.eAdd).setOnClickListener(v -> host.showAddDialog());
+        act.findViewById(R.id.eJump).setOnClickListener(v -> showJumpDialog());
+        Anim.press(act.findViewById(R.id.eAdd));
+        Anim.press(act.findViewById(R.id.eJump));
         act.findViewById(R.id.eMore).setOnClickListener(v -> {
             shown += PAGE;
             bind(title);
@@ -97,6 +100,9 @@ final class EpisodesTab {
         DbHelper.Release release;      // ou nouveau chapitre repéré en ligne
         double chapter;
     }
+
+    /** Lignes de la dernière liste affichée (pour « Aller au ch. » et « Marquer 1 → N »). */
+    private List<Row> lastRows = new ArrayList<>();
 
     void bind(String title) {
         this.title = title;
@@ -149,12 +155,15 @@ final class EpisodesTab {
         for (int i = 0; i < rows.size(); i++) {
             if (rows.get(i).chapter == furthest && shown < i + 6) shown = ((i + 6) / PAGE + 1) * PAGE;
         }
+        lastRows = rows;
 
         // En-tête
         TextView count = act.findViewById(R.id.eCount);
         String c = all.size() + (all.size() > 1 ? " épisodes" : " épisode") + "  ·  " + entries.size()
-                + (entries.size() > 1 ? " lus" : " lu") + (siteList.isEmpty() ? "" : "  ·  " + site);
+                + (entries.size() > 1 ? " lus" : " lu");
         count.setText(c);
+        bindSiteLine(site, entries);
+        act.findViewById(R.id.eJump).setVisibility(rows.size() > PAGE ? View.VISIBLE : View.GONE);
         ((TextView) act.findViewById(R.id.eSort)).setText(newest ? "Plus récents" : "Plus anciens");
         bindBackfill(entries);
         bindLockCard(locks);
@@ -181,7 +190,7 @@ final class EpisodesTab {
             boolean changed = WebtoonThumbs.fetch(act, t, visible);
             if (SiteThumbs.fetch(act, t, visible)) changed = true;
             if (changed) act.runOnUiThread(() -> {
-                if (t.equals(this.title) && !act.isFinishing()) bind(t);
+                if (t.equals(this.title) && !act.isFinishing()) reloadThumbs();   // les images seulement, pas toute la liste
             });
         });
 
@@ -190,6 +199,27 @@ final class EpisodesTab {
         more.setVisibility(left > 0 ? View.VISIBLE : View.GONE);
         more.setText("Afficher " + Math.min(PAGE, left) + " de plus  (" + left + " restants)");
         act.findViewById(R.id.eHint).setVisibility(entries.isEmpty() ? View.GONE : View.VISIBLE);
+    }
+
+    /** Nouvelles vignettes arrivées : on les pose sur les lignes déjà affichées. */
+    private void reloadThumbs() {
+        LinearLayout list = act.findViewById(R.id.eList);
+        final String t = title;
+        for (int i = 0; i < list.getChildCount(); i++) {
+            View v = list.getChildAt(i);
+            Object tag = v.getTag(R.id.eNum);
+            if (!(tag instanceof Double)) continue;
+            final double c = (Double) tag;
+            ImageView thumb = v.findViewById(R.id.eThumb);
+            TextView num = v.findViewById(R.id.eNum);
+            io.execute(() -> {
+                Bitmap b = ChapterThumbs.get(act, t, c);
+                if (b != null) act.runOnUiThread(() -> {
+                    thumb.setImageBitmap(b);
+                    num.setVisibility(View.GONE);
+                });
+            });
+        }
     }
 
     /** « Tu as commencé au ch. 38 ? » → marquer 1 à 37 comme lus (pour être prévenu si tu les rouvres). */
@@ -235,6 +265,7 @@ final class EpisodesTab {
         LinearProgressIndicator bar = v.findViewById(R.id.eBar);
         String ch = Detector.formatChapter(r.chapter);
         name.setText("Épisode " + ch);
+        v.setTag(R.id.eNum, r.chapter);
 
         // Vignette : officielle WEBTOON ou capture du chapitre si on l'a, sinon fond flouté + numéro.
         thumb.setImageBitmap(strip);
@@ -311,7 +342,7 @@ final class EpisodesTab {
             DbHelper.Entry e = r.entry;
             boolean current = e.chapter == furthest;
             boolean before = DbHelper.SOURCE_BEFORE.equals(e.source);
-            date.setText(before ? "Lu avant l'appli" : dayFmt.format(new Date(e.readAt)));
+            date.setText(before ? "Lu ailleurs" : dayFmt.format(new Date(e.readAt)));
             if (current) {
                 v.setBackgroundColor(ContextCompat.getColor(act, R.color.episode_current));
                 v.findViewById(R.id.eFold).setVisibility(View.VISIBLE);
@@ -438,11 +469,40 @@ final class EpisodesTab {
     private java.util.TreeMap<Double, String> siteList = new java.util.TreeMap<>();
     private final java.util.Set<String> siteRefreshing = java.util.Collections.synchronizedSet(new java.util.HashSet<>());
 
+    /** « Liste de en-thunderscans.com · à jour il y a 2 heures » ; un appui la relit tout de suite. */
+    private void bindSiteLine(String site, List<DbHelper.Entry> entries) {
+        TextView line = act.findViewById(R.id.eSite);
+        if (site == null || (siteList.isEmpty() && !siteRefreshing.contains(title + "|" + site))) {
+            line.setVisibility(View.GONE);
+            return;
+        }
+        long at = db.siteListAt(title, site);
+        String text;
+        if (siteRefreshing.contains(title + "|" + site)) {
+            text = "Liste de " + site + " · mise à jour…";
+        } else {
+            long now = System.currentTimeMillis();
+            text = "Liste de " + site + " · " + (now - at < 60_000 ? "à jour à l'instant" : "à jour "
+                    + android.text.format.DateUtils.getRelativeTimeSpanString(at, now,
+                    android.text.format.DateUtils.MINUTE_IN_MILLIS).toString().toLowerCase(Locale.FRANCE)) + "  ·  ↻";
+        }
+        line.setText(text);
+        line.setVisibility(View.VISIBLE);
+        line.setOnClickListener(v -> {
+            if (refreshSiteList(site, entries, true)) bindSiteLine(site, entries);
+        });
+    }
+
     /** Met la liste du site à jour en arrière-plan si elle manque ou date de plus de 6 h. */
     private void refreshSiteList(String site, List<DbHelper.Entry> entries) {
-        if (site == null) return;
+        refreshSiteList(site, entries, false);
+    }
+
+    /** @return true si une lecture de la liste vient d'être lancée */
+    private boolean refreshSiteList(String site, List<DbHelper.Entry> entries, boolean force) {
+        if (site == null) return false;
         long age = SiteChapters.age(act, title, site);
-        if (age >= 0 && age < 6L * 3600 * 1000) return;
+        if (!force && age >= 0 && age < 6L * 3600 * 1000) return false;
         String url = null;
         double ch = 0;
         for (DbHelper.Entry e : entries) {                 // le chapitre le plus récent lu sur ce site
@@ -452,16 +512,23 @@ final class EpisodesTab {
                 break;
             }
         }
-        if (url == null || !siteRefreshing.add(title + "|" + site)) return;
+        if (url == null || !siteRefreshing.add(title + "|" + site)) return false;
         final String t = title, u = url;
         final double c = ch;
         io.execute(() -> {
-            int n = SiteChapters.refresh(act, t, u, c, false);
+            int n = SiteChapters.refresh(act, t, u, c, force);
             siteRefreshing.remove(t + "|" + site);
-            if (n > 0) act.runOnUiThread(() -> {
-                if (t.equals(this.title) && !act.isFinishing()) bind(t);
+            act.runOnUiThread(() -> {
+                if (!t.equals(this.title) || act.isFinishing()) return;
+                if (force && n <= 0) Toast.makeText(act, "Liste illisible sur " + site + " pour l'instant", Toast.LENGTH_SHORT).show();
+                if (n > 0) {
+                    host.onEpisodesChanged();   // sorties, retard, compteur : toute la fiche
+                } else {
+                    bindSiteLine(site, entries);
+                }
             });
         });
+        return true;
     }
 
     // ------------------------------------------------------------------ Chapitres payants
@@ -550,17 +617,130 @@ final class EpisodesTab {
         });
     }
 
-    /** Appui long sur un chapitre pas encore lu → le marquer comme lu. */
+    /** Appui long sur un chapitre pas encore lu → le marquer comme lu, seul ou avec tous ceux d'avant. */
     private boolean markRead(View anchor, double chapter) {
+        List<Double> before = new ArrayList<>();
+        for (Row r : lastRows) if (r.entry == null && r.chapter < chapter) before.add(r.chapter);
         PopupMenu pm = new PopupMenu(act, anchor);
-        pm.getMenu().add("Marquer comme lu");
+        pm.getMenu().add(0, 1, 0, "Marquer comme lu");
+        if (!before.isEmpty()) {
+            pm.getMenu().add(0, 2, 1, "Marquer jusqu'ici comme lus (" + (before.size() + 1) + " chapitres)");
+        }
         pm.setOnMenuItemClickListener(it -> {
-            db.insertRead(title, chapter, System.currentTimeMillis(), "manuel");
+            long now = System.currentTimeMillis();
+            if (it.getItemId() == 2) {
+                // « Lu ailleurs » : ne gonfle pas ton rythme de lecture de la semaine.
+                int added = db.markChaptersRead(title, before, now - 60_000, DbHelper.SOURCE_BEFORE);
+                db.insertRead(title, chapter, now, "manuel");
+                Toast.makeText(act, (added + 1) + " chapitres marqués comme lus", Toast.LENGTH_SHORT).show();
+            } else {
+                db.insertRead(title, chapter, now, "manuel");
+            }
             host.onEpisodesChanged();
             return true;
         });
         pm.show();
         return true;
+    }
+
+    // ------------------------------------------------------------------ Aller au chapitre
+
+    private void showJumpDialog() {
+        if (lastRows.isEmpty()) return;
+        float dp = act.getResources().getDisplayMetrics().density;
+        android.widget.EditText input = new android.widget.EditText(act);
+        input.setInputType(android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        input.setHint("Numéro du chapitre");
+        input.setSingleLine(true);
+        android.widget.FrameLayout box = new android.widget.FrameLayout(act);
+        box.setPadding((int) (24 * dp), (int) (8 * dp), (int) (24 * dp), 0);
+        box.addView(input);
+        double lo = Double.MAX_VALUE, hi = 0;
+        for (Row r : lastRows) {
+            lo = Math.min(lo, r.chapter);
+            hi = Math.max(hi, r.chapter);
+        }
+        final boolean[] went = {false};
+        Runnable go = () -> {
+            if (went[0]) return;   // Entrée du clavier physique : appelé à l'appui ET au relâchement
+            went[0] = true;
+            jumpTo(input.getText().toString());
+        };
+        androidx.appcompat.app.AlertDialog d = new MaterialAlertDialogBuilder(act)
+                .setTitle("Aller au chapitre")
+                .setMessage("De " + Detector.formatChapter(lo) + " à " + Detector.formatChapter(hi))
+                .setView(box)
+                .setPositiveButton("Aller", (x, w) -> go.run())
+                .setNegativeButton("Annuler", null)
+                .create();
+        input.setOnEditorActionListener((v, actionId, ev) -> {
+            go.run();
+            d.dismiss();
+            return true;
+        });
+        d.setOnShowListener(x -> {
+            input.requestFocus();
+            android.view.inputmethod.InputMethodManager im = act.getSystemService(android.view.inputmethod.InputMethodManager.class);
+            if (im != null) input.postDelayed(() -> im.showSoftInput(input, 0), 120);
+        });
+        d.show();
+    }
+
+    private void jumpTo(String text) {
+        double want;
+        try {
+            want = Double.parseDouble(text.trim().replace(',', '.'));
+        } catch (Exception e) {
+            return;
+        }
+        int idx = -1;
+        double gap = Double.MAX_VALUE;
+        for (int i = 0; i < lastRows.size(); i++) {      // le chapitre demandé, sinon le plus proche
+            double g = Math.abs(lastRows.get(i).chapter - want);
+            if (g < gap) {
+                gap = g;
+                idx = i;
+            }
+        }
+        if (idx < 0) return;
+        if (gap > 0.001) Toast.makeText(act, "Pas de ch. " + Detector.formatChapter(want) + " : le plus proche est le "
+                + Detector.formatChapter(lastRows.get(idx).chapter), Toast.LENGTH_SHORT).show();
+        if (idx >= shown) shown = ((idx + 6) / PAGE + 1) * PAGE;
+        bind(title);
+        final int target = idx;
+        LinearLayout list = act.findViewById(R.id.eList);
+        androidx.core.view.OneShotPreDrawListener.add(list, () -> scrollToRow(target));
+    }
+
+    /** Fait défiler la fiche jusqu'à la ligne, puis la fait clignoter doucement. */
+    private void scrollToRow(int idx) {
+        LinearLayout list = act.findViewById(R.id.eList);
+        if (idx >= list.getChildCount()) return;
+        View row = list.getChildAt(idx);
+        View sv = act.findViewById(R.id.dScroll);
+        int y = 0;
+        for (View cur = row; cur != null && cur != sv; cur = cur.getParent() instanceof View ? (View) cur.getParent() : null) {
+            y += cur.getTop();
+        }
+        View top = act.findViewById(R.id.dTopBar);
+        int pad = (top == null ? 0 : top.getHeight()) + (int) (12 * act.getResources().getDisplayMetrics().density);
+        if (sv instanceof androidx.core.widget.NestedScrollView) {
+            ((androidx.core.widget.NestedScrollView) sv).smoothScrollTo(0, Math.max(0, y - pad));
+        }
+        android.graphics.drawable.ColorDrawable glow = new android.graphics.drawable.ColorDrawable(
+                ContextCompat.getColor(act, R.color.brand));
+        glow.setAlpha(0);
+        row.setForeground(glow);
+        android.animation.ObjectAnimator a = android.animation.ObjectAnimator.ofInt(glow, "alpha", 0, 64, 0, 64, 0);
+        a.setStartDelay(250);
+        a.setDuration(1300);
+        a.addListener(new android.animation.AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationEnd(android.animation.Animator animation) {
+                row.setForeground(null);
+            }
+        });
+        a.start();
     }
 
     private void open(String url) {

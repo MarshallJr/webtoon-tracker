@@ -321,7 +321,7 @@ public class ReadingTrackerService extends AccessibilityService {
         String ch = Detector.formatChapter(r.chapter), last = Detector.formatChapter(furthest);
         final String title = r.title;
         // Plus ancien que ton dernier chapitre : on le dit, avec un raccourci pour revenir où tu en étais.
-        String lu = DbHelper.SOURCE_BEFORE.equals(db.getSource(r.title, r.chapter)) ? "Lu avant l'appli" : "Lu le " + when;
+        String lu = DbHelper.SOURCE_BEFORE.equals(db.getSource(r.title, r.chapter)) ? "Lu ailleurs" : "Lu le " + when;
         banner.show(NotifyPolicy.Kind.ALREADY_READ, "Déjà lu · Chapitre " + ch,
                 lu,
                 7000, 0, "Aller au ch. " + last, () -> Resume.open(this, title));

@@ -119,7 +119,7 @@ public class DetailActivity extends AppCompatActivity {
             @Override
             public void onEpisodesChanged() {
                 NoteWriter.writeAsync(DetailActivity.this);
-                WidgetProvider.updateAll(DetailActivity.this);
+                WidgetProvider.updateAllAsync(DetailActivity.this);
                 bindAll();
             }
 
@@ -167,7 +167,7 @@ public class DetailActivity extends AppCompatActivity {
             io(() -> {
                 Covers.saveFromUri(this, title, uri);
                 Covers.markUserPick(this, title);
-                WidgetProvider.updateAll(this);
+                WidgetProvider.updateAllAsync(this);
             }, "Miniature mise à jour 🖼");
         });
         notifPermission = registerForActivityResult(new ActivityResultContracts.RequestPermission(), granted -> {
@@ -395,6 +395,7 @@ public class DetailActivity extends AppCompatActivity {
         DbHelper.Meta m = db.getMeta(title);
         SeriesInfo info = m == null ? null : SeriesInfo.parse(m.detailsJson);
         double latest = !fresh.isEmpty() ? fresh.get(0).chapter : (info != null && info.chapters > 0 ? info.chapters : 0);
+        latest = Math.max(latest, db.siteLatest(title, null));   // liste complète du site où tu lis
 
         TextView value = findViewById(R.id.dProgValue);
         TextView sub = findViewById(R.id.dProgSub);
@@ -432,7 +433,8 @@ public class DetailActivity extends AppCompatActivity {
         for (DbHelper.Release r : fresh) {
             if (r.url == null || !seen.add(r.label + r.lang)) continue;
             Chip c = (Chip) getLayoutInflater().inflate(R.layout.chip_site, g, false);
-            c.setText(r.lang + " · " + r.label + " · ch. " + Detector.formatChapter(r.chapter));
+            c.setText((r.lang == null || r.lang.isEmpty() ? "" : r.lang + " · ") + r.label + " · ch. "
+                    + Detector.formatChapter(r.chapter));
             c.setOnClickListener(v -> openUrl(r.url));
             g.addView(c);
         }
@@ -723,7 +725,7 @@ public class DetailActivity extends AppCompatActivity {
         switch (s) {
             case "app": return "Appli de lecture";
             case "manuel": return "Ajouté à la main";
-            case DbHelper.SOURCE_BEFORE: return "Lu avant l'appli";
+            case DbHelper.SOURCE_BEFORE: return "Lu ailleurs";
             case "sauvegarde": return "Restauré";
             default: return s;
         }
@@ -1097,7 +1099,7 @@ public class DetailActivity extends AppCompatActivity {
                             db.mergeSeries(items[w], title);
                             Covers.merge(this, items[w], title);
                             NoteWriter.writeAsync(this);
-                            WidgetProvider.updateAll(this);
+                            WidgetProvider.updateAllAsync(this);
                             bindAll();
                         })
                         .setNegativeButton("Annuler", null)
@@ -1121,7 +1123,7 @@ public class DetailActivity extends AppCompatActivity {
                             .putLong("try_" + title.toLowerCase(Locale.ROOT), w == 1 ? 0 : System.currentTimeMillis())
                             .apply();
                     if (w == 1) CoverWorker.enqueueIfNeeded(this);
-                    WidgetProvider.updateAll(this);
+                    WidgetProvider.updateAllAsync(this);
                     bindAll();
                 })
                 .setNegativeButton("Annuler", null)
@@ -1186,7 +1188,7 @@ public class DetailActivity extends AppCompatActivity {
                             db.insertRead(title, Double.parseDouble(txt), System.currentTimeMillis(), "manuel");
                         }
                         NoteWriter.writeAsync(this);
-                        WidgetProvider.updateAll(this);
+                        WidgetProvider.updateAllAsync(this);
                         bindAll();
                     } catch (NumberFormatException e) {
                         Toast.makeText(this, "Numéro de chapitre invalide", Toast.LENGTH_SHORT).show();
@@ -1203,7 +1205,7 @@ public class DetailActivity extends AppCompatActivity {
                     db.deleteEntry(e.id);
                     ChapterThumbs.delete(this, title, e.chapter);
                     NoteWriter.writeAsync(this);
-                    WidgetProvider.updateAll(this);
+                    WidgetProvider.updateAllAsync(this);
                     bindAll();
                 })
                 .setNegativeButton("Annuler", null)
@@ -1219,7 +1221,7 @@ public class DetailActivity extends AppCompatActivity {
                     Covers.delete(this, title);
                     Follow.sync(this);
                     NoteWriter.writeAsync(this);
-                    WidgetProvider.updateAll(this);
+                    WidgetProvider.updateAllAsync(this);
                     finish();
                 })
                 .setNegativeButton("Annuler", null)

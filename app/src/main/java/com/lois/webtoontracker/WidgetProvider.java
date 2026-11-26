@@ -48,6 +48,19 @@ public class WidgetProvider extends AppWidgetProvider {
         }
     }
 
+    private static final java.util.concurrent.ExecutorService BG = java.util.concurrent.Executors.newSingleThreadExecutor();
+    private static final java.util.concurrent.atomic.AtomicBoolean pending = new java.util.concurrent.atomic.AtomicBoolean();
+
+    /** Comme updateAll, hors du fil d'affichage ; des demandes rapprochées n'en font qu'une. */
+    public static void updateAllAsync(Context ctx) {
+        Context app = ctx.getApplicationContext();
+        if (!pending.compareAndSet(false, true)) return;
+        BG.execute(() -> {
+            pending.set(false);
+            updateAll(app);
+        });
+    }
+
     /** Redessine les deux widgets (Confort et Compact). */
     public static void updateAll(Context ctx) {
         try {

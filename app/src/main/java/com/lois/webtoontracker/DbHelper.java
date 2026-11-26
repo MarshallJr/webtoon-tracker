@@ -16,7 +16,7 @@ import java.util.TreeSet;
 public class DbHelper extends SQLiteOpenHelper {
 
     private static final String DB_NAME = "webtoons.db";
-    private static final int DB_VERSION = 9;
+    private static final int DB_VERSION = 10;
     private static DbHelper instance;
 
     public static synchronized DbHelper get(Context ctx) {
@@ -48,6 +48,13 @@ public class DbHelper extends SQLiteOpenHelper {
         upgradeTo7(db);
         upgradeTo8(db);
         upgradeTo9(db);
+        upgradeTo10(db);
+    }
+
+    /** v10 : index — historique d'une série (dernier lu, retard…) et statistiques par date, sans tout parcourir. */
+    private void upgradeTo10(SQLiteDatabase db) {
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_reads_title ON reads(title COLLATE NOCASE, chapter)");
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_reads_at ON reads(read_at)");
     }
 
     /** v9 : liste complète des chapitres d'une série sur le site où tu la lis (du 1er au dernier). */
@@ -162,6 +169,7 @@ public class DbHelper extends SQLiteOpenHelper {
         if (oldV < 7) upgradeTo7(db);
         if (oldV < 8) upgradeTo8(db);
         if (oldV < 9) upgradeTo9(db);
+        if (oldV < 10) upgradeTo10(db);
     }
 
     // ------------------------------------------------------------------ Modèles
@@ -328,6 +336,28 @@ public class DbHelper extends SQLiteOpenHelper {
                 v.put("chapter", (double) c);
                 v.put("read_at", readAt);
                 v.put("source", SOURCE_BEFORE);
+                if (db.insertWithOnConflict("reads", null, v, SQLiteDatabase.CONFLICT_IGNORE) != -1) added++;
+            }
+            db.setTransactionSuccessful();
+        } finally {
+            db.endTransaction();
+        }
+        return added;
+    }
+
+    /** Marque ces chapitres comme lus (ceux déjà lus restent tels quels). @return nombre ajouté */
+    public synchronized int markChaptersRead(String title, java.util.Collection<Double> chapters, long readAt, String source) {
+        SQLiteDatabase db = getWritableDatabase();
+        int added = 0;
+        db.beginTransaction();
+        try {
+            ContentValues v = new ContentValues();
+            for (Double c : chapters) {
+                v.clear();
+                v.put("title", title);
+                v.put("chapter", c);
+                v.put("read_at", readAt);
+                v.put("source", source);
                 if (db.insertWithOnConflict("reads", null, v, SQLiteDatabase.CONFLICT_IGNORE) != -1) added++;
             }
             db.setTransactionSuccessful();
@@ -768,12 +798,20 @@ public class DbHelper extends SQLiteOpenHelper {
 
     // ------------------------------------------------------------------ Chapitres du site où tu lis
 
-    /** Remplace la liste des chapitres de la série sur ce site. */
-    public synchronized void saveSiteChapters(String title, String host, java.util.TreeMap<Double, String> chapters, long now) {
+    /**
+     * Enregistre la liste du site (les chapitres disparus du site sont retirés).
+     * @return les chapitres apparus depuis la lecture précédente de cette liste (aucun la 1re fois)
+     */
+    public synchronized List<Double> saveSiteChapters(String title, String host, java.util.TreeMap<Double, String> chapters, long now) {
+        List<Double> appeared = new ArrayList<>();
         SQLiteDatabase db = getWritableDatabase();
         db.beginTransaction();
         try {
-            db.delete("site_chapters", "title = ? COLLATE NOCASE AND host = ?", new String[]{title, host});
+            boolean had;
+            try (Cursor c = db.rawQuery("SELECT 1 FROM site_chapters WHERE title = ? COLLATE NOCASE AND host = ? LIMIT 1",
+                    new String[]{title, host})) {
+                had = c.moveToFirst();
+            }
             ContentValues v = new ContentValues();
             for (java.util.Map.Entry<Double, String> e : chapters.entrySet()) {
                 v.clear();
@@ -782,11 +820,37 @@ public class DbHelper extends SQLiteOpenHelper {
                 v.put("chapter", e.getKey());
                 v.put("url", e.getValue());
                 v.put("seen_at", now);
-                db.insertWithOnConflict("site_chapters", null, v, SQLiteDatabase.CONFLICT_REPLACE);
+                if (db.insertWithOnConflict("site_chapters", null, v, SQLiteDatabase.CONFLICT_IGNORE) == -1) {
+                    db.execSQL("UPDATE site_chapters SET url = ?, seen_at = ? WHERE title = ? COLLATE NOCASE AND host = ? AND chapter = ?",
+                            new Object[]{e.getValue(), now, title, host, e.getKey()});
+                } else if (had) {
+                    appeared.add(e.getKey());
+                }
             }
+            // Chapitres retirés du site : plus proposés.
+            db.delete("site_chapters", "title = ? COLLATE NOCASE AND host = ? AND seen_at < ?",
+                    new String[]{title, host, String.valueOf(now)});
             db.setTransactionSuccessful();
         } finally {
             db.endTransaction();
+        }
+        return appeared;
+    }
+
+    /** Date de la dernière lecture réussie de la liste de ce site (0 si jamais). */
+    public long siteListAt(String title, String host) {
+        if (host == null) return 0;
+        try (Cursor c = getReadableDatabase().rawQuery("SELECT MAX(seen_at) FROM site_chapters WHERE title = ? COLLATE NOCASE " +
+                "AND host = ?", new String[]{title, host})) {
+            return c.moveToFirst() && !c.isNull(0) ? c.getLong(0) : 0;
+        }
+    }
+
+    /** Dernier chapitre de la série sur ce site, ou sur tous ses sites si host est null (0 si aucune liste). */
+    public double siteLatest(String title, String host) {
+        String sql = "SELECT MAX(chapter) FROM site_chapters WHERE title = ? COLLATE NOCASE" + (host == null ? "" : " AND host = ?");
+        try (Cursor c = getReadableDatabase().rawQuery(sql, host == null ? new String[]{title} : new String[]{title, host})) {
+            return c.moveToFirst() && !c.isNull(0) ? c.getDouble(0) : 0;
         }
     }
 

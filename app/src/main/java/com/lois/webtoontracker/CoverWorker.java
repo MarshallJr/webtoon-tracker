@@ -127,7 +127,8 @@ public class CoverWorker extends Worker {
         int found = 0;
         DbHelper db = DbHelper.get(ctx);
         found += Repair.run(ctx); // titres incohérents (ex : "2879576") corrigés grâce à l'URL
-        int resolveBudget = 8;    // correspondances complètes (bases + WEBTOON) par passage : les autres au suivant
+        // Correspondances complètes (bases + WEBTOON) par passage, les autres au suivant ; moins en données mobiles.
+        int resolveBudget = Net.metered(ctx) ? 3 : 8;
         for (DbHelper.Series s : db.getSeries()) {
             if (isStopped()) break;
             long now = System.currentTimeMillis();

@@ -110,7 +110,9 @@ final class WebtoonFinder {
         android.content.SharedPreferences p = ctx.getSharedPreferences("webtoon_catalog", Context.MODE_PRIVATE);
         long now = System.currentTimeMillis();
         List<Hit> out = new ArrayList<>();
-        if (now - p.getLong("at_" + lang, 0) < CATALOG_MS) {
+        // Le catalogue pèse plusieurs Mo : en données mobiles, l'ancien (même périmé) ou rien.
+        boolean metered = Net.metered(ctx);
+        if (now - p.getLong("at_" + lang, 0) < CATALOG_MS || (metered && p.contains("list_" + lang))) {
             try {
                 org.json.JSONArray a = new org.json.JSONArray(p.getString("list_" + lang, "[]"));
                 for (int i = 0; i < a.length(); i++) {
@@ -130,6 +132,7 @@ final class WebtoonFinder {
             } catch (Exception ignored) {
             }
         }
+        if (metered) return out;
         java.util.LinkedHashMap<String, Hit> all = new java.util.LinkedHashMap<>();
         List<String> pages = new ArrayList<>();
         pages.add("https://www.webtoons.com/" + lang + "/originals");

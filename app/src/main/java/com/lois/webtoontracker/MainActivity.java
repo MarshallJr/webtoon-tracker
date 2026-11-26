@@ -71,7 +71,11 @@ public class MainActivity extends AppCompatActivity {
         // Écran de démarrage : le logo reste un court instant, puis s'envole pendant que l'accueil apparaît.
         androidx.core.splashscreen.SplashScreen splash = androidx.core.splashscreen.SplashScreen.installSplashScreen(this);
         createdAt = android.os.SystemClock.uptimeMillis();
-        splash.setKeepOnScreenCondition(() -> android.os.SystemClock.uptimeMillis() - createdAt < 380);
+        // Le logo reste au moins 380 ms, et jusqu'à ce que l'accueil soit rempli (1,5 s au plus).
+        splash.setKeepOnScreenCondition(() -> {
+            long t = android.os.SystemClock.uptimeMillis() - createdAt;
+            return t < 380 || (!firstBound && t < 1500);
+        });
         splash.setOnExitAnimationListener(this::animateSplashExit);
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
@@ -224,37 +228,87 @@ public class MainActivity extends AppCompatActivity {
 
     // ------------------------------------------------------------------ Affichage
 
+    /** Lectures de la base pour l'accueil : sur un fil à part, l'écran reste fluide. */
+    private static final java.util.concurrent.ExecutorService LOADER = java.util.concurrent.Executors.newSingleThreadExecutor();
+    private final java.util.concurrent.atomic.AtomicInteger refreshGen = new java.util.concurrent.atomic.AtomicInteger();
+    private volatile boolean firstBound;
+
+    /** Tout ce qu'affiche l'accueil, lu en une fois. */
+    private static final class HomeData {
+        List<DbHelper.Series> series;
+        final java.util.Set<String> tags = new java.util.TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+        java.util.LinkedHashMap<String, List<DbHelper.Release>> updates;
+        final java.util.Map<String, Double> fresh = new java.util.HashMap<>();
+        List<List<String>> duplicates;
+        int week, total;
+    }
+
+    private static HomeData loadHome(Context ctx) {
+        DbHelper db = DbHelper.get(ctx);
+        HomeData d = new HomeData();
+        d.series = db.getSeries();
+        List<String> titles = new java.util.ArrayList<>();
+        for (DbHelper.Series s : d.series) {
+            d.tags.addAll(Titles.splitTags(s.tags));
+            titles.add(s.title);
+        }
+        d.updates = groupedUpdates(ctx, null);
+        for (java.util.Map.Entry<String, List<DbHelper.Release>> e : d.updates.entrySet()) {
+            d.fresh.put(e.getKey(), e.getValue().get(0).chapter);
+        }
+        d.duplicates = Titles.duplicateGroups(titles);
+        d.week = db.countSince(System.currentTimeMillis() - 7L * 24 * 3600 * 1000);
+        d.total = db.totalChapters();
+        return d;
+    }
+
     private void refresh() {
+        boolean on = isServiceEnabled();
+        statusPill.setText(on ? "Analyse active" : "Analyse désactivée · activer");
+        android.graphics.drawable.Drawable dot = statusPill.getCompoundDrawablesRelative()[0];
+        if (dot != null) dot.mutate().setTint(on ? 0xFF3DDC84 : 0xFFFF6B6B);
+        int h = Calendar.getInstance().get(Calendar.HOUR_OF_DAY);
+        greeting.setText(h < 5 || h >= 18 ? "Bonsoir 🌙" : "Bonjour ☀️");
+
+        final int gen = refreshGen.incrementAndGet();
+        final Context app = getApplicationContext();
+        LOADER.execute(() -> {
+            if (gen != refreshGen.get()) return;   // une actualisation plus récente suit : inutile de lire deux fois
+            try {
+                HomeData d = loadHome(app);
+                runOnUiThread(() -> {
+                    if (gen == refreshGen.get() && !isDestroyed()) bind(d);
+                });
+            } catch (Throwable t) {
+                App.saveError(app, "Accueil", t);
+                firstBound = true;
+            }
+            WidgetProvider.updateAllAsync(app);
+            CoverWorker.enqueueIfNeeded(app);
+        });
+    }
+
+    private void bind(HomeData d) {
         try {
-            boolean on = isServiceEnabled();
-            statusPill.setText(on ? "Analyse active" : "Analyse désactivée · activer");
-            android.graphics.drawable.Drawable dot = statusPill.getCompoundDrawablesRelative()[0];
-            if (dot != null) dot.mutate().setTint(on ? 0xFF3DDC84 : 0xFFFF6B6B);
-
-            int h = Calendar.getInstance().get(Calendar.HOUR_OF_DAY);
-            greeting.setText(h < 5 || h >= 18 ? "Bonsoir 🌙" : "Bonjour ☀️");
-
-            DbHelper db = DbHelper.get(this);
-            List<DbHelper.Series> series = db.getSeries();
-            adapter.setData(series);
-            buildTagChips(db);
-            refreshUpdates(db);
-            updateDuplicates(series);
-            WidgetProvider.updateAll(this);
-            CoverWorker.enqueueIfNeeded(this);
-            int week = db.countSince(System.currentTimeMillis() - 7L * 24 * 3600 * 1000);
-            Anim.count(statSeries, series.size());
-            Anim.count(statChapters, db.totalChapters());
-            Anim.count(statWeek, week);
-            bindHome(series);
-            ((TextView) findViewById(R.id.libCount)).setText(series.size() + (series.size() > 1 ? " séries" : " série")
-                    + " · " + db.totalChapters() + " chapitres");
-            ((TextView) findViewById(R.id.libRhythmSub)).setText(week + (week > 1 ? " chapitres" : " chapitre") + " cette semaine");
+            adapter.setData(d.series);
+            adapter.setNewChapters(d.fresh);
+            buildTagChips(d.tags);
+            bindUpdates(d.updates);
+            bindDuplicates(d.duplicates);
+            Anim.count(statSeries, d.series.size());
+            Anim.count(statChapters, d.total);
+            Anim.count(statWeek, d.week);
+            bindHome(d.series, d.fresh);
+            ((TextView) findViewById(R.id.libCount)).setText(d.series.size() + (d.series.size() > 1 ? " séries" : " série")
+                    + " · " + d.total + " chapitres");
+            ((TextView) findViewById(R.id.libRhythmSub)).setText(d.week + (d.week > 1 ? " chapitres" : " chapitre") + " cette semaine");
             if (page == PAGE_ACTIVITY) StatsBinder.bind(this, findViewById(R.id.activityContent));
             updateEmpty();
         } catch (Throwable t) {
             App.saveError(this, "Affichage", t);
             Toast.makeText(this, "Erreur d'affichage : voir Diagnostic (ⓘ)", Toast.LENGTH_LONG).show();
+        } finally {
+            firstBound = true;
         }
     }
 
@@ -365,7 +419,7 @@ public class MainActivity extends AppCompatActivity {
 
     // ------------------------------------------------------------------ Accueil
 
-    private void bindHome(List<DbHelper.Series> series) {
+    private void bindHome(List<DbHelper.Series> series, java.util.Map<String, Double> fresh) {
         boolean any = !series.isEmpty();
         findViewById(R.id.resumeSection).setVisibility(any ? View.VISIBLE : View.GONE);
         findViewById(R.id.resumeCard).setVisibility(any ? View.VISIBLE : View.GONE);
@@ -394,7 +448,6 @@ public class MainActivity extends AppCompatActivity {
         findViewById(R.id.resumeButton).setOnClickListener(v -> Resume.open(this, top.title));
         findViewById(R.id.resumeCard).setOnClickListener(v -> DetailActivity.open(this, top.title));
 
-        java.util.Map<String, Double> fresh = newChaptersMap();
         for (int i = 1; i < Math.min(4, series.size()); i++) {
             DbHelper.Series s = series.get(i);
             View card = getLayoutInflater().inflate(R.layout.item_series, recent, false);
@@ -407,14 +460,6 @@ public class MainActivity extends AppCompatActivity {
 
     private static String cap(String s) {
         return s.isEmpty() ? s : Character.toUpperCase(s.charAt(0)) + s.substring(1);
-    }
-
-    private java.util.Map<String, Double> newChaptersMap() {
-        java.util.Map<String, Double> best = new java.util.HashMap<>();
-        for (java.util.Map.Entry<String, List<DbHelper.Release>> e : groupedUpdates(null).entrySet()) {
-            best.put(e.getKey(), e.getValue().get(0).chapter);
-        }
-        return best;
     }
 
     // ------------------------------------------------------------------ Filtres & tri (bibliothèque)
@@ -653,9 +698,9 @@ public class MainActivity extends AppCompatActivity {
     // ------------------------------------------------------------------ Nouveaux chapitres
 
     /** Regroupe les sorties plus récentes que ton dernier chapitre lu, par série. */
-    private java.util.LinkedHashMap<String, List<DbHelper.Release>> groupedUpdates(String onlyTitle) {
+    private static java.util.LinkedHashMap<String, List<DbHelper.Release>> groupedUpdates(Context ctx, String onlyTitle) {
         java.util.LinkedHashMap<String, List<DbHelper.Release>> map = new java.util.LinkedHashMap<>();
-        for (DbHelper.Release r : DbHelper.get(this).newReleases(onlyTitle)) {
+        for (DbHelper.Release r : DbHelper.get(ctx).newReleases(onlyTitle)) {
             String k = r.title.toLowerCase(Locale.ROOT);
             List<DbHelper.Release> l = map.get(k);
             if (l == null) {
@@ -667,13 +712,7 @@ public class MainActivity extends AppCompatActivity {
         return map;
     }
 
-    private void refreshUpdates(DbHelper db) {
-        java.util.LinkedHashMap<String, List<DbHelper.Release>> map = groupedUpdates(null);
-        java.util.Map<String, Double> best = new java.util.HashMap<>();
-        for (java.util.Map.Entry<String, List<DbHelper.Release>> e : map.entrySet()) {
-            best.put(e.getKey(), e.getValue().get(0).chapter);
-        }
-        adapter.setNewChapters(best);
+    private void bindUpdates(java.util.LinkedHashMap<String, List<DbHelper.Release>> map) {
         View card = findViewById(R.id.updatesCard);
         card.setVisibility(map.isEmpty() ? View.GONE : View.VISIBLE);
         if (!map.isEmpty()) {
@@ -689,7 +728,7 @@ public class MainActivity extends AppCompatActivity {
 
     /** Panneau "Nouveaux chapitres" : pour chaque série, les sites où lire, en EN et FR. */
     private void showUpdates(String onlyTitle) {
-        java.util.LinkedHashMap<String, List<DbHelper.Release>> map = groupedUpdates(onlyTitle);
+        java.util.LinkedHashMap<String, List<DbHelper.Release>> map = groupedUpdates(this, onlyTitle);
         BottomSheetDialog sheet = new BottomSheetDialog(this);
         float dp = getResources().getDisplayMetrics().density;
         LinearLayout box = new LinearLayout(this);
@@ -731,7 +770,8 @@ public class MainActivity extends AppCompatActivity {
                 if (r.url == null || !seen.add(r.label + r.lang)) continue;
                 com.google.android.material.chip.Chip c = (com.google.android.material.chip.Chip)
                         getLayoutInflater().inflate(R.layout.chip_site, sites, false);
-                c.setText(r.lang + " · " + r.label + " · ch. " + Detector.formatChapter(r.chapter));
+                c.setText((r.lang == null || r.lang.isEmpty() ? "" : r.lang + " · ") + r.label + " · ch. "
+                        + Detector.formatChapter(r.chapter));
                 c.setOnClickListener(x -> {
                     try {
                         startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(r.url)));
@@ -772,9 +812,8 @@ public class MainActivity extends AppCompatActivity {
     private static final String[] SUGGESTED_TAGS = {"Action", "Fantasy", "Romance", "Comédie", "Drame",
             "Murim", "Isekai", "Thriller", "Horreur", "Sport", "Slice of life", "En cours", "Terminé", "Favori ⭐"};
 
-    private void buildTagChips(DbHelper db) {
+    private void buildTagChips(java.util.Set<String> tags) {
         com.google.android.material.chip.ChipGroup group = findViewById(R.id.tagChips);
-        java.util.Set<String> tags = db.allTags();
         findViewById(R.id.tagScroll).setVisibility(tags.isEmpty() ? View.GONE : View.VISIBLE);
         if (selectedTag != null && !tags.contains(selectedTag)) {
             selectedTag = null;
@@ -806,10 +845,8 @@ public class MainActivity extends AppCompatActivity {
 
     // ------------------------------------------------------------------ Fusion des doublons
 
-    private void updateDuplicates(List<DbHelper.Series> series) {
-        List<String> titles = new java.util.ArrayList<>();
-        for (DbHelper.Series s : series) titles.add(s.title);
-        duplicates = Titles.duplicateGroups(titles);
+    private void bindDuplicates(List<List<String>> groups) {
+        duplicates = groups;
         View card = findViewById(R.id.dupCard);
         card.setVisibility(duplicates.isEmpty() ? View.GONE : View.VISIBLE);
         if (!duplicates.isEmpty()) {

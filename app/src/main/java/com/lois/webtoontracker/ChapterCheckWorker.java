@@ -83,6 +83,7 @@ public class ChapterCheckWorker extends Worker {
         DbHelper db = DbHelper.get(ctx);
         android.content.SharedPreferences tries = ctx.getSharedPreferences("covers_meta", Context.MODE_PRIVATE);
         long now = System.currentTimeMillis();
+        boolean metered = Net.metered(ctx);   // données mobiles : listes complètes et éditions moins souvent
         int found = 0;
 
         // 0. Chapitres payants repérés sur tes sites : sont-ils devenus gratuits ?
@@ -150,8 +151,8 @@ public class ChapterCheckWorker extends Worker {
                     known = m.lastUrl;      // lu avant la v4.3 : l'adresse du dernier chapitre
                     knownCh = last;
                 }
-                // Liste complète des chapitres sur ce site (6 h au plus), puis le chapitre suivant page par page.
-                SiteChapters.refresh(ctx, s.title, known, knownCh, false);
+                // Liste complète des chapitres sur ce site (6 h au plus, en Wi-Fi), puis le chapitre suivant page par page.
+                if (!metered) SiteChapters.refresh(ctx, s.title, known, knownCh, false);
                 DbHelper.Release r = ReleaseSources.siteLatest(ctx, s.title, known, knownCh, last);
                 if (r == null) r = fromSiteList(db, s.title, known, last);
                 if (r != null) rel.add(r);
@@ -163,7 +164,7 @@ public class ChapterCheckWorker extends Worker {
 
             // 5. Éditions officielles dans toutes les langues (« Langues & sources » activé pour cette série)
             try {
-                Editions.refreshIfStale(ctx, s.title, 20L * 3600 * 1000);
+                Editions.refreshIfStale(ctx, s.title, (metered ? 72L : 20L) * 3600 * 1000);   // données mobiles : tous les 3 jours
             } catch (Exception ignored) {
             }
 

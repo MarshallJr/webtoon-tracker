@@ -553,8 +553,7 @@
                         android:layout_height="wrap_content"
                         android:gravity="center_vertical"
                         android:orientation="horizontal"
-                        android:paddingTop="16dp"
-                        android:paddingBottom="8dp">
+                        android:paddingTop="16dp">
 
                         <TextView
                             android:id="@+id/eCount"
@@ -568,16 +567,6 @@
                             android:textSize="16sp" />
 
                         <TextView
-                            android:id="@+id/eAdd"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:fontFamily="sans-serif-medium"
-                            android:padding="6dp"
-                            android:text="＋ Ajouter"
-                            android:textColor="@color/brand"
-                            android:textSize="14sp" />
-
-                        <TextView
                             android:id="@+id/eSort"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
@@ -589,6 +578,62 @@
                             android:padding="6dp"
                             android:textColor="@color/text_soft"
                             android:textSize="14sp" />
+                    </LinearLayout>
+
+                    <!-- « Liste de en-thunderscans.com · à jour il y a 2 h » : touche pour la relire -->
+                    <TextView
+                        android:id="@+id/eSite"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:ellipsize="middle"
+                        android:maxLines="1"
+                        android:paddingTop="2dp"
+                        android:paddingBottom="2dp"
+                        android:textColor="@color/text_soft"
+                        android:textSize="12sp"
+                        android:visibility="gone" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:paddingTop="8dp"
+                        android:paddingBottom="10dp">
+
+                        <TextView
+                            android:id="@+id/eJump"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:background="@drawable/bg_pill_soft"
+                            android:drawableStart="@drawable/ic_jump"
+                            android:drawablePadding="6dp"
+                            android:drawableTint="@color/badge_text"
+                            android:fontFamily="sans-serif-medium"
+                            android:gravity="center_vertical"
+                            android:minHeight="36dp"
+                            android:paddingStart="12dp"
+                            android:paddingEnd="14dp"
+                            android:text="Aller au ch."
+                            android:textColor="@color/badge_text"
+                            android:textSize="13sp" />
+
+                        <TextView
+                            android:id="@+id/eAdd"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="8dp"
+                            android:background="@drawable/bg_pill_soft"
+                            android:drawableStart="@drawable/ic_add_small"
+                            android:drawablePadding="6dp"
+                            android:drawableTint="@color/badge_text"
+                            android:fontFamily="sans-serif-medium"
+                            android:gravity="center_vertical"
+                            android:minHeight="36dp"
+                            android:paddingStart="12dp"
+                            android:paddingEnd="14dp"
+                            android:text="Ajouter"
+                            android:textColor="@color/badge_text"
+                            android:textSize="13sp" />
                     </LinearLayout>
 
                     <LinearLayout
@@ -617,7 +662,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="6dp"
                         android:gravity="center"
-                        android:text="Appui long sur un épisode pour le marquer lu / non lu"
+                        android:text="Appui long sur un épisode : lu / non lu, ou tout lu jusqu'ici"
                         android:textColor="@color/text_soft"
                         android:textSize="12sp" />
                 </LinearLayout>

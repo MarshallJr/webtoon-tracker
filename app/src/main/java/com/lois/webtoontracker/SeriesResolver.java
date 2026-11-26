@@ -43,7 +43,12 @@ final class SeriesResolver {
             boolean changed = SeriesNames.gather(ctx, title, force);
             DbHelper.Meta m = db.getMeta(title);
             if (m == null || m.titleNo == null || m.rssBase == null) {
-                if (linkWebtoon(ctx, title)) changed = true;
+                if (linkWebtoon(ctx, title)) {
+                    changed = true;
+                } else if (Net.metered(ctx)) {
+                    // En données mobiles, le catalogue WEBTOON n'est pas téléchargé : nouvel essai dans 6 h.
+                    p.edit().putLong("at_" + key, now - RETRY_MS + 6L * 3600 * 1000).apply();
+                }
             } else if (!hasWebtoonDetails(m)) {
                 // Déjà reliée (lue sur webtoons.com) : on récupère quand même résumé, auteurs, image.
                 WebtoonFinder.Hit h = new WebtoonFinder.Hit();

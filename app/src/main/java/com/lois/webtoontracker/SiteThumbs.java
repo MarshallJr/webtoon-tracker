@@ -6,7 +6,6 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.BitmapRegionDecoder;
 import android.graphics.Rect;
-import android.net.ConnectivityManager;
 
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
@@ -53,8 +52,7 @@ final class SiteThumbs {
     static boolean fetch(Context ctx, String title, List<Double> chapters) {
         DbHelper db = DbHelper.get(ctx);
         SharedPreferences p = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-        ConnectivityManager cm = ctx.getSystemService(ConnectivityManager.class);
-        boolean metered = cm == null || cm.isActiveNetworkMetered();
+        boolean metered = Net.metered(ctx);
         int budget = metered ? 3 : 10;
         List<DbHelper.Entry> entries = db.getHistory(title);
         DbHelper.Meta meta = db.getMeta(title);
