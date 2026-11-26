@@ -25,7 +25,7 @@
 
     <color name="chart_grid">#1FFFFFFF</color>
     <color name="icon_bg">#140C2C</color>
-    <color name="hairline">#17FFFFFF</color>
+    <color name="hairline">#24A78BFA</color>
     <color name="hairline_strong">#4D8B5CF6</color>
     <color name="shadow">#668B5CF6</color>
     <color name="shadow_strong">#B38B5CF6</color>

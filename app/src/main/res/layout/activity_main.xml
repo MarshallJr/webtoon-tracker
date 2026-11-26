@@ -723,7 +723,7 @@
                             android:layout_height="wrap_content"
                             android:layout_marginTop="5dp"
                             android:ellipsize="end"
-                            android:maxLines="1"
+                            android:maxLines="2"
                             android:textColor="@color/text_soft"
                             android:textSize="12.5sp" />
 
@@ -735,8 +735,10 @@
                             android:max="1000"
                             android:visibility="gone"
                             app:indicatorColor="#FF9F7AEA"
+                            app:indicatorTrackGapSize="0dp"
                             app:trackColor="#1FFFFFFF"
                             app:trackCornerRadius="3dp"
+                            app:trackStopIndicatorSize="0dp"
                             app:trackThickness="5dp" />
 
                         <!-- Garde « il y a 15 min » pour le code, fondu dans la ligne du dessus -->

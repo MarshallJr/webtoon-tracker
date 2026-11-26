@@ -117,8 +117,21 @@ final class Fixtures {
                 .commit();
     }
 
+    /** Cache disque partagé par tous les tests (une seule requête AniList par build, pas de limite atteinte). */
+    private static final File NET_CACHE = new File("build/fixture-net");
+    private static JSONObject anilistMemo;
+
     /** Fiches AniList des titres (alias a0, a1…) en une requête ; null sans réseau. */
-    static JSONObject anilist(String[] titles) {
+    static synchronized JSONObject anilist(String[] titles) {
+        if (anilistMemo != null) return anilistMemo;
+        File memo = new File(NET_CACHE, "anilist.json");
+        try {
+            if (memo.exists()) {
+                anilistMemo = new JSONObject(new String(java.nio.file.Files.readAllBytes(memo.toPath()), StandardCharsets.UTF_8));
+                return anilistMemo;
+            }
+        } catch (Exception ignored) {
+        }
         try {
             StringBuilder q = new StringBuilder("query{");
             for (int i = 0; i < titles.length; i++) {
@@ -133,12 +146,26 @@ final class Fixtures {
             c.setDoOutput(true);
             c.setRequestProperty("Content-Type", "application/json");
             c.setRequestProperty("Accept", "application/json");
+            c.setRequestProperty("User-Agent", "WebtoonTracker-tests");
             try (OutputStream o = c.getOutputStream()) {
                 o.write(new JSONObject().put("query", q.toString()).toString().getBytes(StandardCharsets.UTF_8));
             }
-            if (c.getResponseCode() != 200) return null;
-            return new JSONObject(new String(readAll(c.getInputStream()), StandardCharsets.UTF_8)).optJSONObject("data");
+            int code = c.getResponseCode();
+            if (code != 200) {
+                System.out.println("Fixtures : AniList HTTP " + code);
+                return null;
+            }
+            JSONObject data = new JSONObject(new String(readAll(c.getInputStream()), StandardCharsets.UTF_8)).optJSONObject("data");
+            if (data != null) {
+                NET_CACHE.mkdirs();
+                try (FileOutputStream out = new FileOutputStream(memo)) {
+                    out.write(data.toString().getBytes(StandardCharsets.UTF_8));
+                }
+                anilistMemo = data;
+            }
+            return data;
         } catch (Exception e) {
+            System.out.println("Fixtures : AniList injoignable " + e);
             return null;
         }
     }
@@ -150,12 +177,24 @@ final class Fixtures {
         String url = img.optString("extraLarge", img.optString("large", ""));
         if (url.isEmpty()) return null;
         try {
-            HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
-            c.setConnectTimeout(8000);
-            c.setReadTimeout(12000);
-            byte[] data = readAll(c.getInputStream());
+            File f = new File(NET_CACHE, Integer.toHexString(url.hashCode()) + ".img");
+            byte[] data;
+            if (f.exists()) {
+                data = java.nio.file.Files.readAllBytes(f.toPath());
+            } else {
+                HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
+                c.setConnectTimeout(8000);
+                c.setReadTimeout(12000);
+                c.setRequestProperty("User-Agent", "WebtoonTracker-tests");
+                data = readAll(c.getInputStream());
+                NET_CACHE.mkdirs();
+                try (FileOutputStream out = new FileOutputStream(f)) {
+                    out.write(data);
+                }
+            }
             return android.graphics.BitmapFactory.decodeByteArray(data, 0, data.length);
         } catch (Exception e) {
+            System.out.println("Fixtures : affiche injoignable " + url + " " + e);
             return null;
         }
     }

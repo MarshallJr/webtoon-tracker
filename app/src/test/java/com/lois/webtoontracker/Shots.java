@@ -35,11 +35,50 @@ final class Shots {
         } catch (Throwable ignored) {
         }
         WorkManagerTestInitHelper.initializeTestWorkManager(ctx);
+        preloadFonts(ctx);
         java.lang.reflect.Field f = DbHelper.class.getDeclaredField("instance");
         f.setAccessible(true);
         f.set(null, null);
         Fixtures.seed(ctx);
         return ctx;
+    }
+
+    private static final int[] FONTS = {R.font.inter_regular, R.font.inter_medium, R.font.inter_semibold,
+            R.font.inter_bold, R.font.inter_display_bold, R.font.inter_display_extrabold};
+
+    /**
+     * Robolectric ne sait pas lire les polices de res/font (le texte sortirait en Roboto) : on les charge
+     * depuis les fichiers du projet et on les place dans le cache d'AppCompat, là où l'appli les cherche.
+     */
+    static void preloadFonts(Context ctx) {
+        StringBuilder log = new StringBuilder();
+        try {
+            java.lang.reflect.Field f = androidx.core.graphics.TypefaceCompat.class.getDeclaredField("sTypefaceCache");
+            f.setAccessible(true);
+            Object cache = f.get(null);
+            java.lang.reflect.Method put = cache.getClass().getMethod("put", Object.class, Object.class);
+            android.content.res.Resources res = ctx.getResources();
+            for (int id : FONTS) {
+                android.util.TypedValue tv = new android.util.TypedValue();
+                res.getValue(id, tv, true);
+                String path = tv.string.toString();
+                File file = new File("src/main/res/font/" + res.getResourceEntryName(id) + ".ttf");
+                android.graphics.Typeface t = android.graphics.Typeface.createFromFile(file);
+                for (int style = 0; style <= 3; style++) {
+                    put.invoke(cache, res.getResourcePackageName(id) + '-' + path + '-' + tv.assetCookie + '-' + id + '-' + style, t);
+                }
+                log.append(res.getResourceEntryName(id)).append(" path=").append(path).append(" cookie=").append(tv.assetCookie)
+                        .append(" file=").append(file.exists()).append(" weight=").append(t.getWeight())
+                        .append(" same=").append(androidx.core.content.res.ResourcesCompat.getFont(ctx, id) == t).append('\n');
+            }
+        } catch (Throwable e) {
+            log.append("échec : ").append(e);
+        }
+        System.out.println(log);
+        try (FileOutputStream out = new FileOutputStream(new File(OUT, "fonts.txt"))) {
+            out.write(log.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        } catch (Exception ignored) {
+        }
     }
 
     /** Laisse tourner les tâches de fond et le fil principal. */

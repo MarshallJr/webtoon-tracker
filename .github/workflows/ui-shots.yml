@@ -33,6 +33,7 @@ jobs:
         run: |
           mkdir -p /tmp/out
           cp app/build/shots/*.png /tmp/out/ 2>/dev/null || true
+          cp app/build/shots/*.txt /tmp/out/ 2>/dev/null || true
           cp app/build/test-results/testDebugUnitTest/*.xml /tmp/out/ 2>/dev/null || true
           cp tests-failed.txt /tmp/out/ 2>/dev/null || true
           echo "${{ github.sha }}" > /tmp/out/commit.txt
