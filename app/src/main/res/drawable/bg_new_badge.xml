@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Pastille « Nouveau » : violet électrique vers magenta -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
     <corners android:radius="999dp" />
-    <gradient android:angle="0" android:startColor="#FFFFC93C" android:endColor="#FFFF9F2E" />
+    <gradient android:angle="0" android:startColor="#FF8B5CF6" android:endColor="#FFD946EF" />
 </shape>

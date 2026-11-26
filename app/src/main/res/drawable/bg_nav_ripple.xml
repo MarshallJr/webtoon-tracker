@@ -1,10 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Appui sur une entrée du menu : onde arrondie dessinée au-dessus du verre (une onde « sans bord »
-     se dessinerait derrière la barre et resterait invisible) -->
-<ripple xmlns:android="http://schemas.android.com/apk/res/android" android:color="#33B7A6FF">
+<!-- Appui sur une entrée du menu : onde arrondie dessinée au-dessus du verre -->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android" android:color="#33A78BFA">
     <item android:id="@android:id/mask">
         <shape android:shape="rectangle">
-            <corners android:radius="22dp" />
+            <corners android:radius="24dp" />
             <solid android:color="#FFFFFFFF" />
         </shape>
     </item>

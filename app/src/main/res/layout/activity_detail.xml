@@ -73,7 +73,7 @@
                             android:layout_width="match_parent"
                             android:layout_height="match_parent"
                             android:background="@drawable/bg_avatar"
-                            android:fontFamily="sans-serif-black"
+                            android:fontFamily="@font/inter_bold"
                             android:gravity="center"
                             android:textColor="#FFFFFF"
                             android:textSize="48sp" />
@@ -106,7 +106,7 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:background="@drawable/bg_pill_soft"
-                                android:fontFamily="sans-serif-black"
+                                android:fontFamily="@font/inter_bold"
                                 android:letterSpacing="0.08"
                                 android:paddingStart="10dp"
                                 android:paddingTop="3dp"
@@ -130,7 +130,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="6dp"
-                            android:fontFamily="sans-serif-medium"
+                            android:fontFamily="@font/inter_semibold"
                             android:textColor="@color/text_main"
                             android:textSize="13sp" />
 
@@ -140,7 +140,7 @@
                             android:layout_height="wrap_content"
                             android:layout_marginTop="6dp"
                             android:ellipsize="end"
-                            android:fontFamily="sans-serif-black"
+                            android:fontFamily="@font/inter_bold"
                             android:letterSpacing="-0.02"
                             android:maxLines="4"
                             android:textColor="@color/text_main"
@@ -225,7 +225,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="58dp"
                     android:layout_marginTop="6dp"
-                    android:fontFamily="sans-serif-medium"
+                    android:fontFamily="@font/inter_semibold"
                     android:insetTop="0dp"
                     android:insetBottom="0dp"
                     android:outlineAmbientShadowColor="#99FFB020"
@@ -301,7 +301,7 @@
                                 android:id="@+id/dProgValue"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:fontFamily="sans-serif-black"
+                                android:fontFamily="@font/inter_bold"
                                 android:textColor="@color/text_main"
                                 android:textSize="20sp" />
                         </LinearLayout>
@@ -444,7 +444,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="4dp"
-                            android:fontFamily="sans-serif-medium"
+                            android:fontFamily="@font/inter_semibold"
                             android:paddingTop="8dp"
                             android:paddingBottom="4dp"
                             android:text="＋ Ajouter une source autorisée"
@@ -479,7 +479,7 @@
                             android:layout_marginTop="6dp"
                             android:drawableEnd="@drawable/ic_chevron_right"
                             android:drawableTint="@color/brand"
-                            android:fontFamily="sans-serif-medium"
+                            android:fontFamily="@font/inter_semibold"
                             android:gravity="center_vertical"
                             android:text="Lire la suite"
                             android:textColor="@color/brand"
@@ -567,7 +567,7 @@
                                 android:id="@+id/eLockTitle"
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:fontFamily="sans-serif-medium"
+                                android:fontFamily="@font/inter_semibold"
                                 android:textColor="@color/text_main"
                                 android:textSize="14.5sp" />
 
@@ -602,7 +602,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginStart="10dp"
-                            android:fontFamily="sans-serif-medium"
+                            android:fontFamily="@font/inter_semibold"
                             android:padding="8dp"
                             android:text="Marquer"
                             android:textColor="@color/brand"
@@ -632,7 +632,7 @@
                             android:layout_weight="1"
                             android:ellipsize="end"
                             android:maxLines="1"
-                            android:fontFamily="sans-serif-medium"
+                            android:fontFamily="@font/inter_semibold"
                             android:textColor="@color/text_main"
                             android:textSize="16sp" />
 
@@ -678,7 +678,7 @@
                             android:drawableStart="@drawable/ic_jump"
                             android:drawablePadding="6dp"
                             android:drawableTint="@color/badge_text"
-                            android:fontFamily="sans-serif-medium"
+                            android:fontFamily="@font/inter_semibold"
                             android:gravity="center_vertical"
                             android:minHeight="36dp"
                             android:paddingStart="12dp"
@@ -696,7 +696,7 @@
                             android:drawableStart="@drawable/ic_add_small"
                             android:drawablePadding="6dp"
                             android:drawableTint="@color/badge_text"
-                            android:fontFamily="sans-serif-medium"
+                            android:fontFamily="@font/inter_semibold"
                             android:gravity="center_vertical"
                             android:minHeight="36dp"
                             android:paddingStart="12dp"
@@ -719,7 +719,7 @@
                         android:id="@+id/eMore"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:fontFamily="sans-serif-medium"
+                        android:fontFamily="@font/inter_semibold"
                         android:gravity="center"
                         android:padding="14dp"
                         android:textColor="@color/brand"
@@ -792,7 +792,7 @@
                                     android:id="@+id/dTrackLast"
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
-                                    android:fontFamily="sans-serif-black"
+                                    android:fontFamily="@font/inter_bold"
                                     android:textColor="@color/text_main"
                                     android:textSize="24sp" />
 
@@ -905,7 +905,7 @@
                                     android:id="@+id/dTrackFirst"
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
-                                    android:fontFamily="sans-serif-medium"
+                                    android:fontFamily="@font/inter_semibold"
                                     android:textColor="@color/text_main"
                                     android:textSize="16sp" />
                             </LinearLayout>
@@ -1155,7 +1155,7 @@
             android:layout_weight="1"
             android:alpha="0"
             android:ellipsize="end"
-            android:fontFamily="sans-serif-medium"
+            android:fontFamily="@font/inter_semibold"
             android:maxLines="1"
             android:textColor="@color/text_main"
             android:textSize="16sp" />
@@ -1184,7 +1184,7 @@
             android:id="@+id/dStickyResume"
             android:layout_width="match_parent"
             android:layout_height="56dp"
-            android:fontFamily="sans-serif-medium"
+            android:fontFamily="@font/inter_semibold"
             android:insetTop="0dp"
             android:insetBottom="0dp"
             android:text="Reprendre la lecture"

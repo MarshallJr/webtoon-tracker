@@ -128,14 +128,8 @@ public class MainActivity extends AppCompatActivity {
         findViewById(R.id.homeStatsLink).setOnClickListener(v -> showPage(PAGE_ACTIVITY));
         findViewById(R.id.libRhythm).setOnClickListener(v -> showPage(PAGE_ACTIVITY));
         findViewById(R.id.homeSeeAll).setOnClickListener(v -> showPage(PAGE_LIBRARY));
-        findViewById(R.id.homeSearch).setOnClickListener(v -> {
-            showPage(PAGE_LIBRARY);
-            openSearch();
-        });
-        findViewById(R.id.homeFilter).setOnClickListener(v -> {
-            showPage(PAGE_LIBRARY);
-            showFilterDialog();
-        });
+        findViewById(R.id.resumeMore).setOnClickListener(v -> showPage(PAGE_LIBRARY));
+        setupHomeDiscovery();
         findViewById(R.id.libSearchButton).setOnClickListener(v -> {
             View field = findViewById(R.id.searchInput);
             if (field.getVisibility() == View.VISIBLE && ((EditText) field).getText().length() == 0) {
@@ -170,6 +164,114 @@ public class MainActivity extends AppCompatActivity {
             SeriesResolver.rematchAllOnce(this);                      // une fois : titres traduits (EN ↔ FR…) recherchés à nouveau
         }).start();
         Anim.pressAll(root);
+        fitLargeScreens();
+    }
+
+    // ------------------------------------------------------------------ Accueil : découverte
+
+    private HomeFeed feed;
+
+    /** Recherche du catalogue, raccourcis, « Pour toi » et « Explorer » (données de Découvrir). */
+    private void setupHomeDiscovery() {
+        EditText input = findViewById(R.id.homeSearchInput);
+        input.setOnEditorActionListener((v, actionId, ev) -> {
+            boolean enter = ev != null && ev.getKeyCode() == android.view.KeyEvent.KEYCODE_ENTER
+                    && ev.getAction() == android.view.KeyEvent.ACTION_DOWN;
+            if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH || enter) {
+                searchCatalog(v.getText().toString());
+                return true;
+            }
+            return false;
+        });
+        findViewById(R.id.homeSearchGo).setOnClickListener(v -> searchCatalog(input.getText().toString()));
+        findViewById(R.id.homeSearch).setOnClickListener(v -> {
+            input.requestFocus();
+            android.view.inputmethod.InputMethodManager imm =
+                    (android.view.inputmethod.InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+            if (imm != null) imm.showSoftInput(input, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT);
+        });
+        findViewById(R.id.quickPopular).setOnClickListener(v -> {
+            showPage(PAGE_DISCOVER);
+            discoverPage().sortBy("POPULARITY_DESC");
+        });
+        findViewById(R.id.quickTrending).setOnClickListener(v -> {
+            showPage(PAGE_DISCOVER);
+            discoverPage().sortBy("TRENDING_DESC");
+        });
+        findViewById(R.id.quickGenres).setOnClickListener(v -> {
+            showPage(PAGE_DISCOVER);
+            v.postDelayed(() -> {
+                if (!isFinishing()) discoverPage().openFilters();
+            }, 220);
+        });
+        findViewById(R.id.quickHistory).setOnClickListener(v -> showPage(PAGE_ACTIVITY));
+        findViewById(R.id.forYouMore).setOnClickListener(v -> showPage(PAGE_DISCOVER));
+        findViewById(R.id.exploreMore).setOnClickListener(v -> showPage(PAGE_DISCOVER));
+
+        feed = new HomeFeed(this, new CoverCards.Listener() {
+            @Override
+            public void open(Discover.Media m) {
+                discoverPage().openMedia(m);
+            }
+
+            @Override
+            public void toggleWish(Discover.Media m) {
+                discoverPage().toggleWish(m);
+            }
+        });
+
+        // « lectures » : dégradé violet, comme sur la maquette
+        TextView accent = findViewById(R.id.heroAccent);
+        accent.post(() -> {
+            float w = accent.getPaint().measureText(accent.getText().toString());
+            accent.getPaint().setShader(new android.graphics.LinearGradient(0, 0, w, 0,
+                    new int[]{0xFFD8B4FE, 0xFFA78BFA, 0xFF8B5CF6}, null, android.graphics.Shader.TileMode.CLAMP));
+            accent.invalidate();
+        });
+    }
+
+    /** Recherche tapée sur l'accueil : elle part dans Découvrir (AniList + MangaDex). */
+    private void searchCatalog(String text) {
+        EditText input = findViewById(R.id.homeSearchInput);
+        android.view.inputmethod.InputMethodManager imm =
+                (android.view.inputmethod.InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+        if (imm != null) imm.hideSoftInputFromWindow(input.getWindowToken(), 0);
+        input.clearFocus();
+        showPage(PAGE_DISCOVER);
+        if (text != null && !text.trim().isEmpty()) discoverPage().searchFor(text);
+        input.setText("");
+    }
+
+    private DiscoverPage discoverPage() {
+        if (discover == null) {
+            discover = new DiscoverPage(this);
+            discover.setOnWishChanged(() -> {
+                if (feed != null) feed.wishesChanged();
+            });
+        }
+        return discover;
+    }
+
+    /** Grands écrans : colonnes de contenu centrées et barre du bas bornée en largeur. */
+    private void fitLargeScreens() {
+        android.util.DisplayMetrics dm = getResources().getDisplayMetrics();
+        int max = getResources().getDimensionPixelSize(R.dimen.content_max);
+        if (dm.widthPixels > max + 48 * dm.density) {
+            for (int id : new int[]{R.id.homeColumn, R.id.libraryColumn, R.id.activityContent}) {
+                View col = findViewById(id);
+                FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) col.getLayoutParams();
+                lp.width = max;
+                lp.gravity = android.view.Gravity.CENTER_HORIZONTAL;
+                col.setLayoutParams(lp);
+            }
+        }
+        int bar = Math.round(560 * dm.density);
+        if (dm.widthPixels > bar + 28 * dm.density) {
+            View nav = findViewById(R.id.bottomNav);
+            FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) nav.getLayoutParams();
+            lp.width = bar;
+            nav.setLayoutParams(lp);
+        }
     }
 
     private void animateSplashExit(androidx.core.splashscreen.SplashScreenViewProvider provider) {
@@ -336,6 +438,7 @@ public class MainActivity extends AppCompatActivity {
             WidgetProvider.updateAllAsync(app);
             CoverWorker.enqueueIfNeeded(app);
         });
+        if (feed != null) feed.refresh();
     }
 
     private void bind(HomeData d) {
@@ -451,8 +554,7 @@ public class MainActivity extends AppCompatActivity {
             RecyclerView list = findViewById(R.id.seriesList);
             if (list.getAdapter() != null) list.getAdapter().notifyDataSetChanged(); // les cartes arrivent en cascade
         } else if (p == PAGE_DISCOVER) {
-            if (discover == null) discover = new DiscoverPage(this);
-            discover.onShow();
+            discoverPage().onShow();
         }
         styleNav();
         Anim.pop(findViewById(NAV[p][1]));
@@ -470,7 +572,7 @@ public class MainActivity extends AppCompatActivity {
             boolean on = i == page;
             View pill = findViewById(items[i][0]);
             pill.setBackgroundResource(on ? R.drawable.bg_nav_selected : 0);
-            int c = ContextCompat.getColor(this, on ? R.color.badge_text : R.color.text_soft);
+            int c = ContextCompat.getColor(this, on ? R.color.primary_bright : R.color.text_soft);
             ((android.widget.ImageView) findViewById(items[i][1])).setImageTintList(android.content.res.ColorStateList.valueOf(c));
             TextView label = findViewById(items[i][2]);
             label.setTextColor(c);

@@ -13,7 +13,7 @@ import org.robolectric.annotation.LooperMode;
 @RunWith(RobolectricTestRunner.class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @LooperMode(LooperMode.Mode.PAUSED)
-@Config(sdk = 34, qualifiers = "w1280dp-h800dp-land-mdpi")
+@Config(sdk = 34, qualifiers = "fr-rFR-w1280dp-h800dp-land-mdpi")
 public class UiShotsTabletTest {
 
     @Before

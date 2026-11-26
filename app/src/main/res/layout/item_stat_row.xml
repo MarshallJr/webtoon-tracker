@@ -18,7 +18,7 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:background="@drawable/bg_avatar"
-            android:fontFamily="sans-serif-black"
+            android:fontFamily="@font/inter_bold"
             android:gravity="center"
             android:textColor="#FFFFFF"
             android:textSize="16sp" />
@@ -51,7 +51,7 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:ellipsize="end"
-                android:fontFamily="sans-serif-medium"
+                android:fontFamily="@font/inter_semibold"
                 android:maxLines="1"
                 android:textColor="@color/text_main"
                 android:textSize="14sp" />

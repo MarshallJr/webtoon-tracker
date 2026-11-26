@@ -387,7 +387,7 @@ final class EpisodesTab {
                 btn.setText("Reprendre");
                 btn.setBackgroundResource(R.drawable.bg_episode_btn_accent);
                 btn.setTextColor(ContextCompat.getColor(act, R.color.on_accent));
-                btn.setTypeface(android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.BOLD));
+                btn.setTypeface(androidx.core.content.res.ResourcesCompat.getFont(act, R.font.inter_bold));
                 action = () -> Resume.open(act, title);
             } else {
                 action = linkAction(meta, entries, e.chapter);

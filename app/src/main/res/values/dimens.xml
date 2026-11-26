@@ -1,5 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Espace sous le contenu des pages : la barre du bas flotte par-dessus -->
-    <dimen name="nav_space">104dp</dimen>
+    <!-- Espace sous le contenu des pages : la barre du bas (et son bouton central) flotte par-dessus -->
+    <dimen name="nav_space">116dp</dimen>
+    <!-- Marges des pages (plus larges sur tablette : values-sw600dp) -->
+    <dimen name="page_padding">20dp</dimen>
+    <dimen name="page_padding_neg">-20dp</dimen>
+    <dimen name="grid_padding">14dp</dimen>
+    <!-- Accueil : grand titre et mascotte -->
+    <dimen name="hero_title">31sp</dimen>
+    <dimen name="hero_art">262dp</dimen>
+    <dimen name="hero_text_end">120dp</dimen>
+    <!-- Largeur maximale d'une colonne de contenu (grands écrans) -->
+    <dimen name="content_max">760dp</dimen>
+    <!-- Cartes des carrousels -->
+    <dimen name="card_width">148dp</dimen>
+    <dimen name="tile_width">134dp</dimen>
+    <!-- En-tête de Découvrir : débord des carrousels jusqu'aux bords de l'écran -->
+    <dimen name="header_bleed">20dp</dimen>
+    <dimen name="header_bleed_neg">-20dp</dimen>
 </resources>

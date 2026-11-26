@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Pastille du nombre de nouveautés (barre du bas) -->
+<!-- Pastille du nombre de nouveautés -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
-    <corners android:radius="8dp" />
-    <solid android:color="@color/accent" />
+    <corners android:radius="999dp" />
+    <gradient android:angle="0" android:startColor="#FF8B5CF6" android:endColor="#FFD946EF" />
+    <stroke android:width="1.5dp" android:color="@color/screen_bg" />
 </shape>

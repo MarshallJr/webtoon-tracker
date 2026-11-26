@@ -25,7 +25,7 @@ import androidx.core.content.ContextCompat;
  */
 public class GlassBar extends LinearLayout {
 
-    private static final float RADIUS_DP = 28f, BLUR_DP = 22f;
+    private static final float RADIUS_DP = 32f, BLUR_DP = 24f;
 
     private GlassSource source;
     private RenderNode blur;

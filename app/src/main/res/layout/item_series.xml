@@ -1,15 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Série de la bibliothèque (et des lectures récentes) : couverture, titre, note, où tu en es, lecture -->
 <com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_marginTop="5dp"
-    android:layout_marginBottom="7dp"
-    android:outlineAmbientShadowColor="@color/card_shadow"
-    android:outlineSpotShadowColor="@color/card_shadow"
+    android:layout_marginBottom="5dp"
     app:cardBackgroundColor="@color/card_bg"
     app:cardCornerRadius="20dp"
-    app:cardElevation="5dp"
+    app:cardElevation="0dp"
+    app:rippleColor="#26A78BFA"
     app:strokeColor="@color/hairline"
     app:strokeWidth="1dp">
 
@@ -21,15 +21,15 @@
         android:padding="10dp">
 
         <FrameLayout
-            android:layout_width="70dp"
-            android:layout_height="100dp">
+            android:layout_width="72dp"
+            android:layout_height="102dp">
 
             <TextView
                 android:id="@+id/avatar"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:background="@drawable/bg_avatar"
-                android:fontFamily="sans-serif-black"
+                android:fontFamily="@font/inter_display_extrabold"
                 android:gravity="center"
                 android:textColor="#FFFFFF"
                 android:textSize="26sp" />
@@ -41,7 +41,7 @@
                 android:contentDescription="@null"
                 android:scaleType="centerCrop"
                 android:visibility="gone"
-                app:shapeAppearanceOverlay="@style/RoundedCover" />
+                app:shapeAppearanceOverlay="@style/RoundedThumb" />
         </FrameLayout>
 
         <LinearLayout
@@ -57,27 +57,27 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:ellipsize="end"
-                android:fontFamily="sans-serif-medium"
+                android:fontFamily="@font/inter_bold"
                 android:lineSpacingExtra="1dp"
                 android:maxLines="2"
                 android:textColor="@color/text_main"
-                android:textSize="16sp" />
+                android:textSize="15.5sp" />
 
             <TextView
                 android:id="@+id/rating"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:fontFamily="sans-serif-black"
-                android:textColor="@color/accent"
-                android:textSize="13sp"
+                android:layout_marginTop="3dp"
+                android:fontFamily="@font/inter_bold"
+                android:textColor="@color/star"
+                android:textSize="12.5sp"
                 android:visibility="gone" />
 
             <TextView
                 android:id="@+id/subtitle"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
+                android:layout_marginTop="3dp"
                 android:ellipsize="end"
                 android:maxLines="1"
                 android:textColor="@color/text_soft"
@@ -86,7 +86,7 @@
             <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
+                android:layout_marginTop="8dp"
                 android:orientation="horizontal">
 
                 <TextView
@@ -94,13 +94,14 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:background="@drawable/bg_pill_soft"
-                    android:fontFamily="sans-serif-medium"
+                    android:fontFamily="@font/inter_semibold"
+                    android:includeFontPadding="false"
                     android:paddingStart="10dp"
-                    android:paddingTop="3dp"
+                    android:paddingTop="5dp"
                     android:paddingEnd="10dp"
-                    android:paddingBottom="3dp"
+                    android:paddingBottom="5dp"
                     android:textColor="@color/badge_text"
-                    android:textSize="12sp" />
+                    android:textSize="11.5sp" />
 
                 <TextView
                     android:id="@+id/newBadge"
@@ -108,13 +109,14 @@
                     android:layout_height="wrap_content"
                     android:layout_marginStart="6dp"
                     android:background="@drawable/bg_new_badge"
-                    android:fontFamily="sans-serif-black"
+                    android:fontFamily="@font/inter_bold"
+                    android:includeFontPadding="false"
                     android:paddingStart="10dp"
-                    android:paddingTop="3dp"
+                    android:paddingTop="5dp"
                     android:paddingEnd="10dp"
-                    android:paddingBottom="3dp"
+                    android:paddingBottom="5dp"
                     android:textColor="@color/on_accent"
-                    android:textSize="12sp"
+                    android:textSize="11.5sp"
                     android:visibility="gone" />
             </LinearLayout>
         </LinearLayout>
@@ -123,8 +125,12 @@
             android:id="@+id/play"
             android:layout_width="46dp"
             android:layout_height="46dp"
+            android:layout_marginEnd="4dp"
             android:background="@drawable/bg_play"
-            android:contentDescription="Reprendre">
+            android:contentDescription="Reprendre"
+            android:elevation="6dp"
+            android:outlineAmbientShadowColor="@color/shadow_strong"
+            android:outlineSpotShadowColor="@color/shadow_strong">
 
             <ImageView
                 android:layout_width="22dp"
@@ -132,7 +138,7 @@
                 android:layout_gravity="center"
                 android:contentDescription="@null"
                 android:src="@drawable/ic_play"
-                android:tint="@color/badge_text" />
+                android:tint="#FFFFFF" />
         </FrameLayout>
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>

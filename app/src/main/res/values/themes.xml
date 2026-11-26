@@ -1,13 +1,75 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.WebtoonTracker" parent="Theme.Material3.DayNight.NoActionBar">
+    <!--
+      Thème unique, sombre : noir profond, violet électrique, police Inter.
+      Les composants Material (boutons, chips, onglets, interrupteurs, dialogues, panneaux) en héritent.
+    -->
+    <style name="Theme.WebtoonTracker" parent="Theme.Material3.Dark.NoActionBar">
         <item name="colorPrimary">@color/brand</item>
         <item name="colorOnPrimary">#FFFFFF</item>
-        <item name="colorSecondary">@color/accent</item>
+        <item name="colorPrimaryContainer">#2E2160</item>
+        <item name="colorOnPrimaryContainer">#EDE9FE</item>
+        <item name="colorSecondary">@color/primary_bright</item>
+        <item name="colorOnSecondary">#1E1238</item>
+        <item name="colorSecondaryContainer">@color/badge_bg</item>
+        <item name="colorOnSecondaryContainer">#EDE9FE</item>
+        <item name="colorTertiary">@color/star</item>
+        <item name="colorOnTertiary">#1A1203</item>
+        <item name="colorError">@color/danger</item>
+
         <item name="android:colorBackground">@color/screen_bg</item>
+        <item name="colorOnBackground">@color/text_main</item>
         <item name="colorSurface">@color/card_bg</item>
-        <item name="android:statusBarColor">@color/screen_bg</item>
+        <item name="colorOnSurface">@color/text_main</item>
+        <item name="colorSurfaceVariant">@color/card_raised</item>
+        <item name="colorOnSurfaceVariant">@color/text_soft</item>
+        <item name="colorSurfaceContainerLowest">#09080F</item>
+        <item name="colorSurfaceContainerLow">#100E18</item>
+        <item name="colorSurfaceContainer">@color/card_bg</item>
+        <item name="colorSurfaceContainerHigh">@color/card_raised</item>
+        <item name="colorSurfaceContainerHighest">#241F34</item>
+        <item name="colorSurfaceBright">#2A2540</item>
+        <item name="colorSurfaceDim">@color/screen_bg</item>
+        <item name="colorOutline">#3B3554</item>
+        <item name="colorOutlineVariant">#252036</item>
+
+        <item name="colorControlNormal">@color/text_soft</item>
+        <item name="colorControlActivated">@color/brand</item>
+        <item name="colorControlHighlight">#1FFFFFFF</item>
+        <item name="android:textColorPrimary">@color/text_main</item>
+        <item name="android:textColorSecondary">@color/text_soft</item>
+        <item name="android:textColorHint">@color/text_faint</item>
+        <item name="android:textColorLink">@color/primary_bright</item>
+
+        <!-- Police : Inter partout (les textes sans police explicite compris) -->
+        <item name="android:fontFamily">@font/inter_regular</item>
+        <item name="fontFamily">@font/inter_regular</item>
+        <item name="textAppearanceDisplaySmall">@style/TextAppearance.WT.Display</item>
+        <item name="textAppearanceHeadlineLarge">@style/TextAppearance.WT.Headline</item>
+        <item name="textAppearanceHeadlineMedium">@style/TextAppearance.WT.Headline</item>
+        <item name="textAppearanceHeadlineSmall">@style/TextAppearance.WT.Headline.Small</item>
+        <item name="textAppearanceTitleLarge">@style/TextAppearance.WT.Title.Large</item>
+        <item name="textAppearanceTitleMedium">@style/TextAppearance.WT.Title</item>
+        <item name="textAppearanceTitleSmall">@style/TextAppearance.WT.Title.Small</item>
+        <item name="textAppearanceBodyLarge">@style/TextAppearance.WT.Body.Large</item>
+        <item name="textAppearanceBodyMedium">@style/TextAppearance.WT.Body</item>
+        <item name="textAppearanceBodySmall">@style/TextAppearance.WT.Body.Small</item>
+        <item name="textAppearanceLabelLarge">@style/TextAppearance.WT.Label</item>
+        <item name="textAppearanceLabelMedium">@style/TextAppearance.WT.Label.Medium</item>
+        <item name="textAppearanceLabelSmall">@style/TextAppearance.WT.Label.Small</item>
+
+        <!-- Composants -->
+        <item name="materialAlertDialogTheme">@style/ThemeOverlay.WT.Dialog</item>
+        <item name="bottomSheetDialogTheme">@style/ThemeOverlay.WT.BottomSheet</item>
+        <item name="materialButtonOutlinedStyle">@style/WT.Button.Outlined</item>
+        <item name="popupMenuStyle">@style/WT.PopupMenu</item>
+        <item name="textInputStyle">@style/Widget.Material3.TextInputLayout.OutlinedBox</item>
+
+        <item name="android:windowBackground">@color/screen_bg</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@color/screen_bg</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
     </style>
 
     <!-- Écran de démarrage (Android 12+ natif, versions plus anciennes via androidx core-splashscreen). -->
@@ -18,5 +80,74 @@
         <item name="postSplashScreenTheme">@style/Theme.WebtoonTracker</item>
         <item name="android:statusBarColor">@color/splash_bg</item>
         <item name="android:navigationBarColor">@color/splash_bg</item>
+    </style>
+
+    <!-- Dialogues : surface relevée, coins 28 dp, boutons violets -->
+    <style name="ThemeOverlay.WT.Dialog" parent="ThemeOverlay.Material3.MaterialAlertDialog">
+        <item name="alertDialogStyle">@style/WT.Dialog</item>
+        <item name="materialAlertDialogTitleTextStyle">@style/WT.Dialog.Title</item>
+        <item name="materialAlertDialogBodyTextStyle">@style/WT.Dialog.Body</item>
+        <item name="buttonBarPositiveButtonStyle">@style/WT.Dialog.Button</item>
+        <item name="buttonBarNegativeButtonStyle">@style/WT.Dialog.Button.Soft</item>
+        <item name="buttonBarNeutralButtonStyle">@style/WT.Dialog.Button.Soft</item>
+    </style>
+
+    <style name="WT.Dialog" parent="MaterialAlertDialog.Material3">
+        <item name="shapeAppearance">@style/WT.Shape.Dialog</item>
+        <item name="shapeAppearanceOverlay">@null</item>
+        <item name="backgroundTint">@color/card_raised</item>
+    </style>
+
+    <style name="WT.Shape.Dialog" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">28dp</item>
+    </style>
+
+    <style name="WT.Dialog.Title" parent="MaterialAlertDialog.Material3.Title.Text">
+        <item name="android:textAppearance">@style/TextAppearance.WT.Headline.Small</item>
+        <item name="android:textColor">@color/text_main</item>
+    </style>
+
+    <style name="WT.Dialog.Body" parent="MaterialAlertDialog.Material3.Body.Text">
+        <item name="android:textAppearance">@style/TextAppearance.WT.Body</item>
+        <item name="android:textColor">@color/text_soft</item>
+    </style>
+
+    <style name="WT.Dialog.Button" parent="Widget.Material3.Button.TextButton.Dialog">
+        <item name="android:textColor">@color/primary_bright</item>
+    </style>
+
+    <style name="WT.Dialog.Button.Soft">
+        <item name="android:textColor">@color/text_soft</item>
+    </style>
+
+    <!-- Panneaux du bas : coins 28 dp, surface du thème -->
+    <style name="ThemeOverlay.WT.BottomSheet" parent="ThemeOverlay.Material3.BottomSheetDialog">
+        <item name="bottomSheetStyle">@style/WT.BottomSheet</item>
+        <item name="android:navigationBarColor">@color/card_bg</item>
+    </style>
+
+    <style name="WT.BottomSheet" parent="Widget.Material3.BottomSheet.Modal">
+        <item name="backgroundTint">@color/card_bg</item>
+        <item name="shapeAppearance">@style/WT.Shape.Sheet</item>
+        <item name="shapeAppearanceOverlay">@null</item>
+    </style>
+
+    <style name="WT.Shape.Sheet" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSizeTopLeft">28dp</item>
+        <item name="cornerSizeTopRight">28dp</item>
+        <item name="cornerSizeBottomLeft">0dp</item>
+        <item name="cornerSizeBottomRight">0dp</item>
+    </style>
+
+    <style name="WT.Button.Outlined" parent="Widget.Material3.Button.OutlinedButton">
+        <item name="strokeColor">@color/hairline_strong</item>
+        <item name="android:textColor">@color/primary_bright</item>
+        <item name="iconTint">@color/primary_bright</item>
+    </style>
+
+    <style name="WT.PopupMenu" parent="Widget.Material3.PopupMenu">
+        <item name="android:popupBackground">@drawable/bg_popup</item>
     </style>
 </resources>

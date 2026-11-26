@@ -37,7 +37,7 @@
             android:id="@+id/tChapter"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:fontFamily="sans-serif-medium"
+            android:fontFamily="@font/inter_semibold"
             android:textColor="@color/text_main"
             android:textSize="16sp" />
 
@@ -54,7 +54,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="2dp"
             android:drawablePadding="4dp"
-            android:fontFamily="sans-serif-medium"
+            android:fontFamily="@font/inter_semibold"
             android:textColor="@color/brand"
             android:textSize="13sp" />
     </LinearLayout>

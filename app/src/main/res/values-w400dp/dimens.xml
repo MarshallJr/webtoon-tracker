@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="hero_title">34sp</dimen>
+    <dimen name="hero_art">272dp</dimen>
+    <dimen name="hero_text_end">124dp</dimen>
+</resources>

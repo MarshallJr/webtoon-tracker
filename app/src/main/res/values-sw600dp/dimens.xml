@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Tablette : plus d'air, titre plus grand, cartes plus larges -->
+    <dimen name="page_padding">32dp</dimen>
+    <dimen name="page_padding_neg">-32dp</dimen>
+    <dimen name="grid_padding">24dp</dimen>
+    <dimen name="hero_title">44sp</dimen>
+    <dimen name="hero_art">340dp</dimen>
+    <dimen name="hero_text_end">300dp</dimen>
+    <dimen name="card_width">164dp</dimen>
+    <dimen name="tile_width">150dp</dimen>
+    <!-- En-tête de Découvrir : débord des carrousels jusqu'aux bords de l'écran -->
+    <dimen name="header_bleed">30dp</dimen>
+    <dimen name="header_bleed_neg">-30dp</dimen>
+</resources>

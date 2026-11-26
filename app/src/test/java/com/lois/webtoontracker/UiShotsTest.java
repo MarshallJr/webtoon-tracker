@@ -24,7 +24,7 @@ import org.robolectric.shadows.ShadowDialog;
 @RunWith(RobolectricTestRunner.class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @LooperMode(LooperMode.Mode.PAUSED)
-@Config(sdk = 34, qualifiers = "w412dp-h915dp-xhdpi")
+@Config(sdk = 34, qualifiers = "fr-rFR-w412dp-h915dp-xhdpi")
 public class UiShotsTest {
 
     private Context ctx;

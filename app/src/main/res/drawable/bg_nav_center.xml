@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Bouton central du menu : halo violet derrière le logo -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="oval">
+            <gradient android:type="radial" android:gradientRadius="50%"
+                android:startColor="#998B5CF6" android:centerColor="#338B5CF6" android:endColor="#008B5CF6" />
+        </shape>
+    </item>
+</layer-list>

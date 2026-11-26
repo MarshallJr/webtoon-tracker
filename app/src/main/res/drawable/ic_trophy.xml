@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Record : coupe -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+    <path android:fillColor="#FFFFFFFF" android:fillType="evenOdd" android:pathData="M7,3h10v2h4v3c0,2.4 -1.8,4.4 -4.2,4.9c-0.8,1.6 -2.3,2.8 -3.8,3.05V19h3v2H8v-2h3v-3.05C9.5,15.7 8,14.5 7.2,12.9C4.8,12.4 3,10.4 3,8V5h4z M5,7v1c0,1.2 0.75,2.2 1.8,2.65C7.25,9.6 7,8.4 7,7z M19,7h-2c0,1.4 -0.25,2.6 -0.8,3.65C17.25,10.2 19,9.2 19,8z" />
+</vector>

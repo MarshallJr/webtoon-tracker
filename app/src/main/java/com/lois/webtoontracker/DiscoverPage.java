@@ -53,8 +53,20 @@ final class DiscoverPage {
     private final AppCompatActivity act;
     private final RecyclerView list;
     private final GridAdapter grid = new GridAdapter();
-    private final CardAdapter forYouAdapter = new CardAdapter(true);
-    private final CardAdapter wishAdapter = new CardAdapter(false);
+    /** Appui sur une carte : la fiche ; sur son signet : « Ma liste à lire ». */
+    private final CoverCards.Listener cards = new CoverCards.Listener() {
+        @Override
+        public void open(Discover.Media m) {
+            openMedia(m);
+        }
+
+        @Override
+        public void toggleWish(Discover.Media m) {
+            DiscoverPage.this.toggleWish(m);
+        }
+    };
+    private final CoverCards.Adapter forYouAdapter = new CoverCards.Adapter(R.layout.item_discover_card, cards);
+    private final CoverCards.Adapter wishAdapter = new CoverCards.Adapter(R.layout.item_discover_card, cards);
     private final Handler ui = new Handler(Looper.getMainLooper());
 
     private Discover.Query query = new Discover.Query();
@@ -69,15 +81,24 @@ final class DiscoverPage {
     private View header;
     private Runnable pendingSearch;
     private MultiSearch multi;   // recherche texte en cours : AniList + MangaDex (null sinon)
+    private Runnable onWishChanged;
+
+    /** Prévenu quand « Ma liste à lire » change (l'accueil met ses signets à jour). */
+    void setOnWishChanged(Runnable r) {
+        onWishChanged = r;
+    }
 
     DiscoverPage(AppCompatActivity act) {
         this.act = act;
         list = act.findViewById(R.id.pageDiscover);
-        GridLayoutManager lm = new GridLayoutManager(act, 3);
+        // Colonnes selon la largeur : 3 sur téléphone, davantage sur tablette.
+        android.util.DisplayMetrics dm = act.getResources().getDisplayMetrics();
+        int spans = Math.max(3, Math.round(dm.widthPixels / dm.density / 150f));
+        GridLayoutManager lm = new GridLayoutManager(act, spans);
         lm.setSpanSizeLookup(new GridLayoutManager.SpanSizeLookup() {
             @Override
             public int getSpanSize(int position) {
-                return grid.getItemViewType(position) == T_ITEM ? 1 : 3;
+                return grid.getItemViewType(position) == T_ITEM ? 1 : spans;
             }
         });
         list.setLayoutManager(lm);
@@ -114,6 +135,37 @@ final class DiscoverPage {
     }
 
     /** Remonte en haut (appui sur l'onglet déjà ouvert). */
+    /** Recherche lancée depuis l'accueil : le texte arrive dans le champ de Découvrir. */
+    void searchFor(String text) {
+        String t = text == null ? "" : text.trim();
+        if (header == null) {   // en-tête pas encore construit : la première recherche partira avec ce texte
+            query.search = t.isEmpty() ? null : t;
+            return;
+        }
+        EditText field = header.findViewById(R.id.dqSearch);
+        field.setText(t);
+        field.setSelection(field.length());
+        if (pendingSearch != null) ui.removeCallbacks(pendingSearch);
+        search(t);
+    }
+
+    /** Raccourcis de l'accueil (Populaires, Tendances) : tri choisi, sans texte de recherche. */
+    void sortBy(String sort) {
+        boolean changed = !sort.equals(query.sort) || query.searching();
+        query.sort = sort;
+        query.search = null;
+        if (header != null) {
+            ((EditText) header.findViewById(R.id.dqSearch)).setText("");
+            if (pendingSearch != null) ui.removeCallbacks(pendingSearch);
+            ChipGroup g = header.findViewById(R.id.dqSort);
+            for (int i = 0; i < g.getChildCount(); i++) {
+                View c = g.getChildAt(i);
+                if (c instanceof Chip) ((Chip) c).setChecked(sort.equals(c.getTag()));
+            }
+        }
+        if (changed && started && me != null) reload();
+    }
+
     void scrollTop() {
         GridLayoutManager lm = (GridLayoutManager) list.getLayoutManager();
         if (lm != null && lm.findFirstVisibleItemPosition() > 30) list.scrollToPosition(15);   // pas 300 cases d'animation
@@ -233,7 +285,7 @@ final class DiscoverPage {
                     forYouLoading = false;
                     forYou.clear();
                     forYou.addAll(l);
-                    forYouAdapter.setItems(forYou);
+                    forYouAdapter.setItems(forYou, wishIds);
                     bindHeader();
                 });
             } catch (Exception e) {
@@ -272,10 +324,10 @@ final class DiscoverPage {
                 wishIds = ids;
                 wishes.clear();
                 for (Discover.Media m : l) if (me == null || !me.has(m)) wishes.add(m);   // commencée : plus « à lire »
-                wishAdapter.setItems(wishes);
+                wishAdapter.setItems(wishes, wishIds);
                 bindHeader();
                 grid.notifyItemRangeChanged(1, results.size());
-                forYouAdapter.notifyDataSetChanged();
+                forYouAdapter.setWished(wishIds);
             });
         });
     }
@@ -355,6 +407,7 @@ final class DiscoverPage {
             Chip c = (Chip) LayoutInflater.from(act).inflate(R.layout.chip_filter, sort, false);
             c.setId(View.generateViewId());
             c.setText(s[0]);
+            c.setTag(s[1]);
             c.setChecked(s[1].equals(query.sort));
             c.setOnClickListener(v -> {
                 if (s[1].equals(query.sort)) {
@@ -477,7 +530,7 @@ final class DiscoverPage {
         return from + "–" + to;
     }
 
-    private void openFilters() {
+    void openFilters() {
         BottomSheetDialog sheet = new BottomSheetDialog(act);
         View v = LayoutInflater.from(act).inflate(R.layout.sheet_discover_filters, null);
         ChipGroup type = v.findViewById(R.id.dfType), score = v.findViewById(R.id.dfScore),
@@ -562,7 +615,9 @@ final class DiscoverPage {
 
     // ------------------------------------------------------------------ Fiche d'une série
 
-    private void openMedia(Discover.Media m) {
+    /** La fiche d'une série du catalogue (aussi ouverte depuis l'accueil). */
+    void openMedia(Discover.Media m) {
+        if (!started) wishIds = DbHelper.get(act).wishIds();
         BottomSheetDialog sheet = new BottomSheetDialog(act);
         View v = LayoutInflater.from(act).inflate(R.layout.sheet_discover, null);
         NetImages.load(v.findViewById(R.id.dsCover), m.cover, m.color);
@@ -696,7 +751,8 @@ final class DiscoverPage {
     }
 
     /** @return true si la série est maintenant dans « Ma liste à lire » */
-    private boolean toggleWish(Discover.Media m) {
+    boolean toggleWish(Discover.Media m) {
+        if (!started) wishIds = DbHelper.get(act).wishIds();
         DbHelper db = DbHelper.get(act);
         boolean in = wishIds.contains(m.id);
         if (in) {
@@ -710,6 +766,7 @@ final class DiscoverPage {
         }
         BackupManager.autoBackup(act);
         refreshWishes();
+        if (onWishChanged != null) onWishChanged.run();
         return !in;
     }
 
@@ -729,16 +786,6 @@ final class DiscoverPage {
     }
 
     // ------------------------------------------------------------------ Couvertures
-
-    private void bindCover(View v, Discover.Media m) {
-        NetImages.load(v.findViewById(R.id.dcCover), m.cover, m.color);
-        TextView score = v.findViewById(R.id.dcScore);
-        score.setVisibility(m.score > 0 ? View.VISIBLE : View.GONE);
-        score.setText("★ " + m.scoreText());
-        v.findViewById(R.id.dcWish).setVisibility(wishIds.contains(m.id) ? View.VISIBLE : View.GONE);
-        ((TextView) v.findViewById(R.id.dcTitle)).setText(m.title);
-        v.setOnClickListener(x -> openMedia(m));
-    }
 
     /** Vue recyclée au milieu d'une animation d'entrée : on la remet d'aplomb. */
     private static void settle(View v) {
@@ -790,8 +837,7 @@ final class DiscoverPage {
                 return;
             }
             Discover.Media m = results.get(position - 1);
-            bindCover(h.itemView, m);
-            ((TextView) h.itemView.findViewById(R.id.dcMeta)).setText(m.meta());
+            CoverCards.bind(h.itemView, m, wishIds.contains(m.id), cards);
             if (position > animatedUpTo) {   // les nouvelles couvertures arrivent en cascade
                 animatedUpTo = position;
                 Anim.enter(h.itemView, (position - 1) % 3);
@@ -825,47 +871,5 @@ final class DiscoverPage {
         }
         text.setVisibility(msg == null ? View.GONE : View.VISIBLE);
         text.setText(msg);
-    }
-
-    /** Carrousels « Pour toi » (avec la raison) et « Ma liste à lire ». */
-    private final class CardAdapter extends RecyclerView.Adapter<Holder> {
-        private final boolean reasons;
-        private final List<Discover.Media> items = new ArrayList<>();
-        private boolean animate = true;
-
-        CardAdapter(boolean reasons) {
-            this.reasons = reasons;
-        }
-
-        void setItems(List<Discover.Media> l) {
-            items.clear();
-            items.addAll(l);
-            animate = true;
-            notifyDataSetChanged();
-        }
-
-        @Override
-        public int getItemCount() {
-            return items.size();
-        }
-
-        @NonNull
-        @Override
-        public Holder onCreateViewHolder(@NonNull ViewGroup parent, int type) {
-            View v = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_discover_card, parent, false);
-            Anim.pressAll(v);
-            return new Holder(v);
-        }
-
-        @Override
-        public void onBindViewHolder(@NonNull Holder h, int position) {
-            Discover.Media m = items.get(position);
-            bindCover(h.itemView, m);
-            TextView meta = h.itemView.findViewById(R.id.dcMeta);
-            meta.setText(reasons && m.because != null ? m.because : m.meta());
-            if (animate && position < 4) Anim.enter(h.itemView, position);
-            else settle(h.itemView);
-            if (position >= 3) animate = false;
-        }
     }
 }

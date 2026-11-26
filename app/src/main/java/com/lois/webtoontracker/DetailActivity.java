@@ -1001,8 +1001,8 @@ public class DetailActivity extends AppCompatActivity {
             TextView score = new TextView(this);
             score.setText("★ " + SeriesAdapter.formatScore(r.score));
             score.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
-            score.setTypeface(android.graphics.Typeface.create("sans-serif-black", android.graphics.Typeface.NORMAL));
-            score.setTextColor(0xFF1A1203);
+            score.setTypeface(androidx.core.content.res.ResourcesCompat.getFont(this, R.font.inter_bold));
+            score.setTextColor(0xFFFFFFFF);
             score.setBackgroundResource(R.drawable.bg_new_badge);
             score.setPadding(dp(7), dp(2), dp(7), dp(2));
             android.widget.FrameLayout.LayoutParams sp = new android.widget.FrameLayout.LayoutParams(-2, -2);
@@ -1017,7 +1017,7 @@ public class DetailActivity extends AppCompatActivity {
         t.setMaxLines(2);
         t.setEllipsize(android.text.TextUtils.TruncateAt.END);
         t.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
-        t.setTypeface(android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL));
+        t.setTypeface(androidx.core.content.res.ResourcesCompat.getFont(this, R.font.inter_semibold));
         t.setTextColor(ContextCompat.getColor(this, R.color.text_main));
         t.setPadding(0, dp(7), 0, 0);
         card.addView(t);

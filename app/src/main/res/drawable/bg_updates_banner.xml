@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Bandeau « Nouveautés » : verre sombre, lueur violette à gauche, liseré violet -->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android" android:color="#26A78BFA">
+    <item>
+        <layer-list>
+            <item>
+                <shape android:shape="rectangle">
+                    <corners android:radius="22dp" />
+                    <solid android:color="@color/card_bg" />
+                </shape>
+            </item>
+            <item>
+                <shape android:shape="rectangle">
+                    <corners android:radius="22dp" />
+                    <gradient android:type="radial" android:centerX="0.0" android:centerY="0.5"
+                        android:gradientRadius="220dp" android:startColor="#408B5CF6" android:endColor="#008B5CF6" />
+                </shape>
+            </item>
+            <item>
+                <shape android:shape="rectangle">
+                    <corners android:radius="22dp" />
+                    <stroke android:width="1dp" android:color="#478B5CF6" />
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+</ripple>

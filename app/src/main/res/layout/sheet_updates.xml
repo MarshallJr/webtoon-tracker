@@ -54,7 +54,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:ellipsize="end"
-                    android:fontFamily="sans-serif-black"
+                    android:fontFamily="@font/inter_bold"
                     android:maxLines="1"
                     android:textColor="@color/text_main"
                     android:textSize="22sp" />
@@ -81,7 +81,7 @@
             android:layout_width="match_parent"
             android:layout_height="50dp"
             android:layout_marginTop="18dp"
-            android:fontFamily="sans-serif-medium"
+            android:fontFamily="@font/inter_semibold"
             android:insetTop="0dp"
             android:insetBottom="0dp"
             android:text="Vérifier maintenant"

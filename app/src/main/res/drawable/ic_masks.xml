@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Drame : masque -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+    <path android:fillColor="#FFFFFFFF" android:fillType="evenOdd" android:pathData="M4,4h16v7c0,4.42 -3.58,8 -8,8s-8,-3.58 -8,-8z M7,9.5a1.5,1.5 0 1,0 3,0a1.5,1.5 0 1,0 -3,0z M14,9.5a1.5,1.5 0 1,0 3,0a1.5,1.5 0 1,0 -3,0z M8.5,15.2c0.9,-1.3 2.1,-2 3.5,-2s2.6,0.7 3.5,2l-1.2,0.8c-0.6,-0.9 -1.4,-1.3 -2.3,-1.3s-1.7,0.4 -2.3,1.3z" />
+</vector>
