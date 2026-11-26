@@ -169,7 +169,6 @@ def bolt(dr, x0, y0, x1, y1, width, depth=7, spread=0.32):
 def bolts(dr):
     cx, cy = CX * W, CY * H
     bolt(dr, cx + 10, cy - 0.25 * H, W * 0.98, -20, 5)
-    bolt(dr, cx - 30, cy - 0.1 * H, W * 0.38, H * 0.02, 4)
     bolt(dr, cx + 20, cy + 0.2 * H, W * 1.02, H * 0.55, 4)
 
 
@@ -242,7 +241,7 @@ a = a * (1 - left[..., None])
 bg = np.array([7, 6, 11], np.float32)
 fade = np.clip((v - 0.66) / 0.33, 0, 1) ** 1.2
 a = a * (1 - fade[..., None]) + bg * fade[..., None]
-topfade = np.clip(1 - v / 0.06, 0, 1) * 0.5
+topfade = np.clip(1 - v / 0.16, 0, 1) ** 1.2 * 0.8
 a = a * (1 - topfade[..., None]) + bg * topfade[..., None]
 Image.fromarray(np.clip(a, 0, 255).astype(np.uint8), 'RGB').save(sys.argv[1], quality=86, optimize=True,
                                                                   progressive=True)
