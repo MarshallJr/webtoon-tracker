@@ -132,7 +132,7 @@
                     android:layout_width="18dp"
                     android:layout_height="18dp"
                     android:src="@drawable/ic_play"
-                    android:tint="#1A1203" />
+                    android:tint="#FFFFFF" />
 
                 <TextView
                     android:layout_width="wrap_content"
@@ -141,7 +141,7 @@
                     android:fontFamily="sans-serif"
                     android:maxLines="1"
                     android:text="Reprendre"
-                    android:textColor="#1A1203"
+                    android:textColor="#FFFFFF"
                     android:textSize="15sp"
                     android:textStyle="bold" />
             </LinearLayout>

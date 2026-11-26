@@ -18,6 +18,7 @@
             android:id="@+id/pageHome"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
+            android:clipChildren="false"
             android:clipToPadding="false"
             android:paddingBottom="@dimen/nav_space"
             android:scrollbars="none">
@@ -557,7 +558,7 @@
                         android:layout_marginStart="@dimen/page_padding_neg"
                         android:layout_marginTop="12dp"
                         android:layout_marginEnd="@dimen/page_padding_neg"
-                        android:minHeight="196dp">
+                        android:minHeight="@dimen/explore_min_h">
 
                         <androidx.recyclerview.widget.RecyclerView
                             android:id="@+id/exploreList"

@@ -831,7 +831,7 @@ public class DetailActivity extends AppCompatActivity {
         TextView format = findViewById(R.id.dFormat);
         TextView year = findViewById(R.id.dYear);
         if (i == null) {
-            meta.setText(s != null && s.score > 0 ? "★ " + SeriesAdapter.formatScore(s.score) + " / 10" : "");
+            meta.setText(CoverCards.goldStars(this, s != null && s.score > 0 ? "★ " + SeriesAdapter.formatScore(s.score) + " / 10" : ""));
             format.setVisibility(View.GONE);
             findViewById(R.id.dAuthors).setVisibility(View.GONE);
             year.setText("");
@@ -851,7 +851,7 @@ public class DetailActivity extends AppCompatActivity {
         List<String> parts = new ArrayList<>();
         if (i.status != null) parts.add("● " + i.status);
         if (i.score > 0) parts.add("★ " + String.format(Locale.FRANCE, "%.1f", i.score / 10.0) + " / 10");
-        meta.setText(String.join("   |   ", parts));
+        meta.setText(CoverCards.goldStars(this, String.join("   |   ", parts)));
 
         TextView sum = findViewById(R.id.dSummary);
         sum.setText(i.summary == null ? "Pas de résumé disponible pour cette série." : i.summary);

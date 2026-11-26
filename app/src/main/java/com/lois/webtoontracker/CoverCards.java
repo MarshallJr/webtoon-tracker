@@ -66,6 +66,18 @@ final class CoverCards {
         }
     }
 
+    /** « ★ 8,4 / 10 » avec l'étoile dorée (le reste garde la couleur du texte). */
+    static CharSequence goldStars(android.content.Context ctx, CharSequence s) {
+        android.text.SpannableString out = new android.text.SpannableString(s);
+        int gold = ContextCompat.getColor(ctx, R.color.star);
+        for (int i = 0; i < s.length(); i++) {
+            if (s.charAt(i) == '★') {
+                out.setSpan(new android.text.style.ForegroundColorSpan(gold), i, i + 1, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            }
+        }
+        return out;
+    }
+
     /** Étiquette de genre : libellé français et teinte de sa famille (Action violet, Aventure bleu…). */
     static void tintGenre(TextView tag, String genre) {
         tag.setText(Discover.genreFr(genre));

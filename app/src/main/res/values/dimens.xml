@@ -23,4 +23,5 @@
     <dimen name="hero_art_end">-50dp</dimen>
     <dimen name="resume_thumb_w">104dp</dimen>
     <dimen name="resume_thumb_h">66dp</dimen>
+    <dimen name="explore_min_h">132dp</dimen>
 </resources>

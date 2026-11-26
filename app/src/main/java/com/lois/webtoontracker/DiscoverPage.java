@@ -699,7 +699,7 @@ final class DiscoverPage {
         ((TextView) v.findViewById(R.id.dsCredit)).setText("Données : " + m.source.label);   // MangaDex demande d'être crédité
         ChipGroup genres = v.findViewById(R.id.dsGenres);
         genres.removeAllViews();
-        for (String g : m.genres) genres.addView(tagChip(genres, Discover.genreFr(g), me != null && me.topGenres(3).contains(g)));
+        for (String g : m.genres) genres.addView(genreChip(genres, g, me != null && me.topGenres(3).contains(g)));
         for (String t : m.tags) {
             if (genres.getChildCount() >= 9) break;
             if ("Male Protagonist".equals(t) || "Full Color".equals(t) || "Long Strip".equals(t) || "Web Comic".equals(t)) continue;
@@ -737,6 +737,17 @@ final class DiscoverPage {
             c.setChipBackgroundColor(android.content.res.ColorStateList.valueOf(ContextCompat.getColor(act, R.color.badge_bg)));
             c.setTextColor(ContextCompat.getColor(act, R.color.badge_text));
         }
+        return c;
+    }
+
+    /** Genre de la fiche aux couleurs de sa famille (comme sur les cartes) ; liseré si c'est un de tes genres. */
+    private Chip genreChip(ChipGroup parent, String genre, boolean mine) {
+        Chip c = tagChip(parent, Discover.genreFr(genre), false);
+        int[] col = CoverCards.genreColors(genre);
+        int fg = ContextCompat.getColor(act, col[0]);
+        c.setChipBackgroundColor(android.content.res.ColorStateList.valueOf(ContextCompat.getColor(act, col[1])));
+        c.setTextColor(fg);
+        c.setChipStrokeColor(android.content.res.ColorStateList.valueOf(mine ? fg : 0x00000000));
         return c;
     }
 
