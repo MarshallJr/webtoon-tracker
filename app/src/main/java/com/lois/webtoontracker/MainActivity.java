@@ -9,6 +9,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.text.Editable;
@@ -190,6 +191,46 @@ public class MainActivity extends AppCompatActivity {
         introPlayed = true;
         Anim.stagger(((ViewGroup) findViewById(R.id.pageHome)).getChildAt(0));
         Anim.enter(findViewById(R.id.bottomNav), 3);
+        findViewById(R.id.navLogo).postDelayed(this::playLogo, 380);   // le perso s'illumine à l'arrivée
+    }
+
+    // ------------------------------------------------------------------ Logo animé (centre du menu)
+
+    private String resumeTitle;   // série de la carte « Reprendre » (le logo la relance)
+
+    /** Le logo s'illumine (montée en puissance, éclairs) puis reste allumé. Android 9+ ; avant : image fixe. */
+    private void playLogo() {
+        if (Build.VERSION.SDK_INT < 28 || !Anim.on() || isFinishing()) return;
+        android.widget.ImageView logo = findViewById(R.id.navLogo);
+        android.content.res.Resources res = getResources();
+        new Thread(() -> {
+            try {
+                if (Build.VERSION.SDK_INT < 28) return;
+                android.graphics.drawable.Drawable d = LogoAnim.decode(res);
+                runOnUiThread(() -> {
+                    if (isDestroyed() || d == null) return;
+                    logo.setImageDrawable(d);
+                    if (Build.VERSION.SDK_INT >= 28) LogoAnim.start(d);
+                });
+            } catch (Throwable ignored) {
+            }
+        }).start();
+    }
+
+    /** Toucher le logo : il s'illumine et la lecture reprend là où tu t'es arrêté. */
+    private void onLogo() {
+        View logo = findViewById(R.id.navLogo);
+        logo.performHapticFeedback(android.view.HapticFeedbackConstants.CONFIRM);
+        Anim.pop(logo);
+        playLogo();
+        if (resumeTitle == null) {
+            Toast.makeText(this, "Rien à reprendre pour l'instant : lis un chapitre et je m'en souviens", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        final String t = resumeTitle;
+        logo.postDelayed(() -> {
+            if (!isFinishing()) Resume.open(this, t);
+        }, 420);
     }
 
     @Override
@@ -308,6 +349,7 @@ public class MainActivity extends AppCompatActivity {
             Anim.count(statChapters, d.total);
             Anim.count(statWeek, d.week);
             bindHome(d.series, d.fresh, d.resume, d.resumeUrl);
+            resumeTitle = d.series.isEmpty() ? null : d.series.get(0).title;
             ((TextView) findViewById(R.id.libCount)).setText(d.series.size() + (d.series.size() > 1 ? " séries" : " série")
                     + " · " + d.total + " chapitres");
             ((TextView) findViewById(R.id.libRhythmSub)).setText(d.week + (d.week > 1 ? " chapitres" : " chapitre") + " cette semaine");
@@ -338,9 +380,16 @@ public class MainActivity extends AppCompatActivity {
     private int page = PAGE_HOME;
 
     private void setupNavigation() {
+        ((GlassBar) findViewById(R.id.bottomNav)).setSource(findViewById(R.id.pages));   // effet verre
         findViewById(R.id.navHome).setOnClickListener(v -> showPage(PAGE_HOME));
         findViewById(R.id.navLibrary).setOnClickListener(v -> showPage(PAGE_LIBRARY));
         findViewById(R.id.navActivity).setOnClickListener(v -> showPage(PAGE_ACTIVITY));
+        findViewById(R.id.navUpdates).setOnClickListener(v -> {
+            Anim.ring(findViewById(R.id.navUpdatesIcon));
+            showUpdates(null);
+        });
+        findViewById(R.id.navLogo).setOnClickListener(v -> onLogo());
+        styleNav();
         getOnBackPressedDispatcher().addCallback(this, new androidx.activity.OnBackPressedCallback(true) {
             @Override
             public void handleOnBackPressed() {
@@ -392,22 +441,23 @@ public class MainActivity extends AppCompatActivity {
         styleNav();
         int[] icons = {R.id.navHomeIcon, R.id.navLibraryIcon, R.id.navActivityIcon};
         Anim.pop(findViewById(icons[p]));
-        Anim.fadeInBackground(findViewById(p == PAGE_LIBRARY ? R.id.navLibrary : p == PAGE_ACTIVITY ? R.id.navActivity : R.id.navHome));
+        Anim.fadeInBackground(findViewById(p == PAGE_LIBRARY ? R.id.navLibraryPill : p == PAGE_ACTIVITY ? R.id.navActivityPill : R.id.navHomePill));
     }
 
     private View pageView(int p) {
         return findViewById(p == PAGE_LIBRARY ? R.id.pageLibrary : p == PAGE_ACTIVITY ? R.id.pageActivity : R.id.pageHome);
     }
 
+    /** Entrée active : pastille lavande derrière l'icône, icône et libellé en couleur. */
     private void styleNav() {
         int[][] items = {
-                {R.id.navHome, R.id.navHomeIcon, R.id.navHomeLabel},
-                {R.id.navLibrary, R.id.navLibraryIcon, R.id.navLibraryLabel},
-                {R.id.navActivity, R.id.navActivityIcon, R.id.navActivityLabel}};
+                {R.id.navHomePill, R.id.navHomeIcon, R.id.navHomeLabel},
+                {R.id.navLibraryPill, R.id.navLibraryIcon, R.id.navLibraryLabel},
+                {R.id.navActivityPill, R.id.navActivityIcon, R.id.navActivityLabel}};
         for (int i = 0; i < 3; i++) {
             boolean on = i == page;
-            View item = findViewById(items[i][0]);
-            item.setBackgroundResource(on ? R.drawable.bg_nav_selected : 0);
+            View pill = findViewById(items[i][0]);
+            pill.setBackgroundResource(on ? R.drawable.bg_nav_selected : 0);
             int c = ContextCompat.getColor(this, on ? R.color.badge_text : R.color.text_soft);
             ((android.widget.ImageView) findViewById(items[i][1])).setImageTintList(android.content.res.ColorStateList.valueOf(c));
             TextView label = findViewById(items[i][2]);
@@ -446,9 +496,11 @@ public class MainActivity extends AppCompatActivity {
         // « FR · WEBTOON » + « Épisode 32 · arrêté à 63 % » + barre qui se remplit
         String unit = SourceRegistry.unit(lastUrl), ch = Detector.formatChapter(top.lastChapter);
         boolean inProgress = pr != null && !pr.finished();
-        ((TextView) findViewById(R.id.resumeLast)).setText(pr == null ? "Dernier lu : " + unit.toLowerCase(Locale.FRANCE) + " " + ch
+        String ago = DateUtils.getRelativeTimeSpanString(top.lastReadAt, System.currentTimeMillis(),
+                DateUtils.MINUTE_IN_MILLIS, DateUtils.FORMAT_ABBREV_RELATIVE).toString().toLowerCase(Locale.FRANCE);
+        ((TextView) findViewById(R.id.resumeLast)).setText((pr == null ? unit + " " + ch
                 : !inProgress ? unit + " " + ch + " · terminé"
-                : unit + " " + ch + " · " + (pr.hasPanel() ? pr.where() : "arrêté à " + pr.percent() + " %"));
+                : unit + " " + ch + " · " + (pr.hasPanel() ? pr.where() : "arrêté à " + pr.percent() + " %")) + " · " + ago);
         TextView source = findViewById(R.id.resumeSource);
         String badge = SourceRegistry.badge(lastUrl);
         source.setVisibility(badge == null ? View.GONE : View.VISIBLE);
@@ -748,6 +800,13 @@ public class MainActivity extends AppCompatActivity {
         boolean wasShown = card.getVisibility() == View.VISIBLE;
         card.setVisibility(map.isEmpty() ? View.GONE : View.VISIBLE);
         int n = map.size();
+        TextView navBadge = findViewById(R.id.navUpdatesBadge);
+        navBadge.setVisibility(n == 0 ? View.GONE : View.VISIBLE);
+        navBadge.setText(n > 9 ? "9+" : String.valueOf(n));
+        if (n > 0 && shownUpdates >= 0 && n > shownUpdates) {
+            Anim.pop(navBadge);
+            Anim.ring(findViewById(R.id.navUpdatesIcon));   // une nouveauté de plus : la cloche sonne
+        }
         if (n == 0) {
             shownUpdates = 0;
             return;

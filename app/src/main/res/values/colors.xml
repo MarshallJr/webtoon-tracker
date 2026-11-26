@@ -35,4 +35,9 @@
     <color name="ed_auth_bg">#1F2BB673</color>
     <color name="ed_auth_text">#167A4C</color>
     <color name="card_raised">#F4F1FC</color>
+    <color name="glass_tint">#B8FFFFFF</color>
+    <color name="glass_flat">#F5FFFFFF</color>
+    <color name="glass_stroke">#2417142B</color>
+    <color name="logo_ring">#B3FFC93C</color>
+    <color name="logo_glow">#FFFFB020</color>
 </resources>
