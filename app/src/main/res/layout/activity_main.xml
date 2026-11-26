@@ -18,7 +18,6 @@
             android:id="@+id/pageHome"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:clipChildren="false"
             android:clipToPadding="false"
             android:paddingBottom="@dimen/nav_space"
             android:scrollbars="none">
@@ -54,7 +53,7 @@
                         android:layout_height="360dp"
                         android:layout_gravity="top|end"
                         android:layout_marginTop="-70dp"
-                        android:layout_marginEnd="-120dp"
+                        android:layout_marginEnd="@dimen/hero_glow_end"
                         android:background="@drawable/bg_hero_glow"
                         android:importantForAccessibility="no" />
 
