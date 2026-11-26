@@ -33,12 +33,14 @@ import java.util.Calendar;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * Onglet « Découvrir » : recherche AniList, tri (note, popularité, tendance, date, coups de cœur),
+ * Onglet « Découvrir » : recherche AniList (+ catalogue MangaDex pour une recherche texte, voir
+ * {@link MultiSearch}), tri (note, popularité, tendance, date, coups de cœur),
  * filtres (type, note, statut, date de diffusion, genres, tes thèmes), « Pour toi » d'après ce que tu
  * lis, « Ma liste à lire ». Les séries que tu lis déjà n'apparaissent jamais.
  */
@@ -66,6 +68,7 @@ final class DiscoverPage {
     private String error, forYouError;
     private View header;
     private Runnable pendingSearch;
+    private MultiSearch multi;   // recherche texte en cours : AniList + MangaDex (null sinon)
 
     DiscoverPage(AppCompatActivity act) {
         this.act = act;
@@ -128,6 +131,7 @@ final class DiscoverPage {
         error = null;
         loading = false;
         animatedUpTo = 0;
+        multi = null;   // recréée au premier chargement d'une recherche texte
         // Pas de notifyDataSetChanged : l'en-tête (et le clavier de la recherche) reste en place.
         if (old > 0) grid.notifyItemRangeRemoved(1, old);
         grid.notifyItemChanged(grid.getItemCount() - 1);
@@ -137,6 +141,10 @@ final class DiscoverPage {
 
     private void loadMore() {
         if (loading || !hasNext || me == null) return;
+        if (query.searching()) {
+            loadMoreSearch();
+            return;
+        }
         loading = true;
         error = null;
         grid.notifyItemChanged(grid.getItemCount() - 1);
@@ -164,6 +172,48 @@ final class DiscoverPage {
                     loading = false;
                     error = friendly(e);
                     grid.notifyItemChanged(grid.getItemCount() - 1);
+                });
+            }
+        });
+    }
+
+    /**
+     * Recherche texte : la page AniList habituelle et une page MangaDex en parallèle, fusionnées sans
+     * doublons. Une source en panne n'empêche pas d'afficher l'autre.
+     */
+    private void loadMoreSearch() {
+        if (multi == null) multi = MultiSearch.of(query, me);
+        final MultiSearch ms = multi;
+        loading = true;
+        error = null;
+        grid.notifyItemChanged(grid.getItemCount() - 1);
+        final int gen = generation;
+        IO.execute(() -> {
+            try {
+                SearchMerge.Page r = ms.next();
+                ui.post(() -> {
+                    if (gen != generation) return;
+                    loading = false;
+                    for (Map.Entry<Integer, Discover.Media> e : r.replaced.entrySet()) {   // AniList prend la place de MangaDex
+                        if (e.getKey() >= results.size()) continue;
+                        results.set(e.getKey(), e.getValue());
+                        grid.notifyItemChanged(1 + e.getKey());
+                    }
+                    int start = 1 + results.size();
+                    results.addAll(r.added);
+                    hasNext = ms.hasMore() && ms.loads() < MAX_PAGES;
+                    grid.notifyItemRangeInserted(start, r.added.size());
+                    grid.notifyItemChanged(grid.getItemCount() - 1);
+                    bindHeader();
+                    if (r.added.size() < 6 && hasNext) loadMore();
+                });
+            } catch (Exception e) {
+                ui.post(() -> {
+                    if (gen != generation) return;
+                    loading = false;
+                    error = friendly(e);
+                    grid.notifyItemChanged(grid.getItemCount() - 1);
+                    bindHeader();
                 });
             }
         });
@@ -230,16 +280,23 @@ final class DiscoverPage {
         });
     }
 
+    /** Message d'erreur lisible (AniList par défaut, ou la source nommée par la recherche multi-sources). */
     private static String friendly(Exception e) {
-        String m = String.valueOf(e.getMessage());
+        Throwable c = e;
+        String src = Discover.Source.ANILIST.label;
+        if (e instanceof MultiSearch.SourceError && e.getCause() != null) {
+            src = ((MultiSearch.SourceError) e).source.label;
+            c = e.getCause();
+        }
+        String m = String.valueOf(c.getMessage());
         if (m.contains("429") || m.toLowerCase(Locale.ROOT).contains("too many")) {
-            return "AniList reçoit trop de demandes : réessaie dans une minute.";
+            return src + " reçoit trop de demandes : réessaie dans une minute.";
         }
-        if (e instanceof java.net.UnknownHostException || e instanceof java.net.SocketTimeoutException
-                || e instanceof java.net.ConnectException) {
-            return "Pas de connexion à AniList.";
+        if (c instanceof java.net.UnknownHostException || c instanceof java.net.SocketTimeoutException
+                || c instanceof java.net.ConnectException) {
+            return "Pas de connexion à " + src + ".";
         }
-        return "AniList ne répond pas pour l'instant.";
+        return src + " ne répond pas pour l'instant.";
     }
 
     // ------------------------------------------------------------------ En-tête
@@ -371,6 +428,7 @@ final class DiscoverPage {
         int read = me == null ? 0 : me.series;
         ((TextView) h.findViewById(R.id.dqInfo)).setText(query.searching()
                 ? "Résultats pour « " + query.search.trim() + " »" + (read > 0 ? " · sans tes " + read + " séries" : "")
+                + (multi == null ? "" : multi.sourcesNote())
                 : "Classées : " + sortName + (read > 0 ? " · sans les " + read + " séries que tu lis" : ""));
     }
 
@@ -516,7 +574,9 @@ final class DiscoverPage {
             bindWishButton(wish, now);
             Anim.pop(wish);
         });
-        v.findViewById(R.id.dsAnilist).setOnClickListener(x -> open(m.siteUrl != null ? m.siteUrl : "https://anilist.co/manga/" + m.id));
+        View anilist = v.findViewById(R.id.dsAnilist);
+        anilist.setVisibility(m.id > 0 ? View.VISIBLE : View.GONE);   // fiche MangaDex absente d'AniList : pas de page
+        anilist.setOnClickListener(x -> open(m.siteUrl != null ? m.siteUrl : "https://anilist.co/manga/" + m.id));
         TextView desc = v.findViewById(R.id.dsDesc), more = v.findViewById(R.id.dsMore);
         more.setOnClickListener(x -> {
             desc.setMaxLines(Integer.MAX_VALUE);
@@ -531,9 +591,13 @@ final class DiscoverPage {
             IO.execute(() -> {
                 Discover.Media full;
                 try {
-                    full = Discover.details(m.id);
+                    full = m.source == Discover.Source.MANGADEX ? MangaDex.details(m.extId) : Discover.details(m.id);
                 } catch (Exception e) {
                     full = null;
+                }
+                if (full != null && m.source == Discover.Source.MANGADEX) {   // note et abonnés gardés de la liste
+                    if (full.score == 0) full.score = m.score;
+                    if (full.popularity == 0) full.popularity = m.popularity;
                 }
                 final Discover.Media f = full;
                 ui.post(() -> {
@@ -541,7 +605,7 @@ final class DiscoverPage {
                     if (f == null) {
                         v.findViewById(R.id.dsLoading).setVisibility(View.GONE);
                         desc.setVisibility(View.VISIBLE);
-                        desc.setText("Résumé indisponible pour l'instant (AniList ne répond pas).");
+                        desc.setText("Résumé indisponible pour l'instant (" + m.source.label + " ne répond pas).");
                         return;
                     }
                     f.because = m.because;
@@ -566,6 +630,7 @@ final class DiscoverPage {
         status.setVisibility(st == null ? View.GONE : View.VISIBLE);
         status.setText(st);
         List<String> facts = new ArrayList<>();
+        if (!m.authors.isEmpty()) facts.add(String.join(", ", m.authors.subList(0, Math.min(2, m.authors.size()))));
         if (m.year > 0) facts.add(String.valueOf(m.year));
         if (m.chapters > 0) facts.add(m.chapters + " chapitres");
         if (m.popularity > 0) facts.add(readers(m.popularity) + " lecteurs");
@@ -576,6 +641,7 @@ final class DiscoverPage {
             because.setText(m.because.startsWith("Comme ")
                     ? "Recommandée par les lecteurs de " + m.because.substring(6) : m.because);
         }
+        ((TextView) v.findViewById(R.id.dsCredit)).setText("Données : " + m.source.label);   // MangaDex demande d'être crédité
         ChipGroup genres = v.findViewById(R.id.dsGenres);
         genres.removeAllViews();
         for (String g : m.genres) genres.addView(tagChip(genres, Discover.genreFr(g), me != null && me.topGenres(3).contains(g)));
@@ -590,7 +656,7 @@ final class DiscoverPage {
         v.findViewById(R.id.dsLoading).setVisibility(View.GONE);
         TextView desc = v.findViewById(R.id.dsDesc), more = v.findViewById(R.id.dsMore);
         desc.setVisibility(View.VISIBLE);
-        desc.setText(m.description == null ? "Pas de résumé sur AniList." : m.description);
+        desc.setText(m.description == null ? "Pas de résumé sur " + m.source.label + "." : m.description);
         desc.post(() -> {
             if (desc.getLayout() != null && desc.getLayout().getEllipsisCount(desc.getLineCount() - 1) > 0) more.setVisibility(View.VISIBLE);
         });
@@ -740,13 +806,19 @@ final class DiscoverPage {
         TextView text = f.findViewById(R.id.dfText);
         View retry = f.findViewById(R.id.dfRetry);
         spin.setVisibility(loading || (me == null && error == null) ? View.VISIBLE : View.GONE);
-        retry.setVisibility(error != null ? View.VISIBLE : View.GONE);
+        String partial = !loading && error == null && !hasNext && multi != null ? multi.failureNote() : null;
+        retry.setVisibility(error != null || partial != null ? View.VISIBLE : View.GONE);
         retry.setOnClickListener(v -> {
             error = null;
+            if (multi != null && multi.hasFailed()) {   // relance la source en échec, à sa page
+                multi.retryFailed();
+                hasNext = true;
+            }
             loadMore();
         });
         String msg = null;
         if (error != null) msg = error;
+        else if (partial != null) msg = partial;
         else if (!loading && me != null && !hasNext) {
             msg = results.isEmpty() ? (query.searching() ? "Aucune série trouvée (ou tu les lis déjà)."
                     : "Aucune série ne correspond : élargis les filtres.") : "C'est tout pour ces critères.";

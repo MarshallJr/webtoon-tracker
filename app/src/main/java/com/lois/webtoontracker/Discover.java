@@ -22,7 +22,8 @@ import java.util.regex.Pattern;
 /**
  * « Découvrir » : chercher des séries sur AniList (tri par note, popularité, tendance, date ; filtres
  * genre, thème, type, statut, note, période) et des recommandations d'après ce que tu lis.
- * Les séries que tu lis déjà sont écartées. Source : l'API publique d'AniList, rien d'autre.
+ * Les séries que tu lis déjà sont écartées. Source : l'API publique d'AniList ; une recherche texte
+ * interroge aussi le catalogue MangaDex (voir {@link MultiSearch}), le reste est 100 % AniList.
  */
 final class Discover {
 
@@ -32,7 +33,7 @@ final class Discover {
     static final String ANILIST = "https://graphql.anilist.co";
 
     /** Champs d'une carte (grille, carrousels). */
-    static final String CARD = "id siteUrl title{romaji english native} synonyms averageScore popularity genres"
+    static final String CARD = "id idMal siteUrl title{romaji english native} synonyms averageScore popularity genres"
             + " countryOfOrigin format status startDate{year} chapters coverImage{large color} isAdult";
 
     /** Champs de la fiche complète. */
@@ -90,19 +91,37 @@ final class Discover {
 
     // ------------------------------------------------------------------ Série
 
-    /** Une série AniList : carte de la grille, puis fiche complète. */
+    /** D'où vient une fiche. */
+    enum Source {
+        ANILIST("AniList"), MANGADEX("MangaDex");
+
+        final String label;
+
+        Source(String label) {
+            this.label = label;
+        }
+    }
+
+    /**
+     * Une série, quelle que soit sa source (modèle commun AniList / MangaDex) : carte de la grille, puis
+     * fiche complète. {@code id} est l'id AniList quand on le connaît (> 0) ; une fiche MangaDex absente
+     * d'AniList a un id négatif stable, tiré de son UUID ({@code extId}).
+     */
     static final class Media {
-        int id, score, popularity, year, chapters;
-        String title, alt, cover, color, siteUrl, status, country, format, description, because;
-        boolean adult, full;
+        int id, score, popularity, year, chapters, malId;
+        String title, alt, cover, color, siteUrl, status, country, format, description, because, extId;
+        boolean adult, full, webtoon;
+        Source source = Source.ANILIST;
         final List<String> genres = new ArrayList<>();
         final List<String> tags = new ArrayList<>();
         final List<String> names = new ArrayList<>();
+        final List<String> authors = new ArrayList<>();
         final List<String[]> links = new ArrayList<>();   // {site, adresse} : liens officiels
 
         static Media from(JSONObject m) {
             Media x = new Media();
             x.id = m.optInt("id", 0);
+            x.malId = m.optInt("idMal", 0);
             x.names.addAll(SeriesInfo.names(m));
             String pref = SeriesInfo.preferredTitle(m);
             x.title = pref == null ? (x.names.isEmpty() ? "?" : x.names.get(0)) : pref;
@@ -163,6 +182,7 @@ final class Discover {
             if ("CN".equals(country)) return "Manhua";
             if ("TW".equals(country)) return "Manhua (TW)";
             if ("ONE_SHOT".equals(format)) return "One-shot";
+            if (webtoon) return "Webtoon";   // bande verticale d'ailleurs (MangaDex) ; jamais vrai pour AniList
             return "Manga";
         }
 
@@ -214,6 +234,11 @@ final class Discover {
                 o.put("chapters", chapters);
                 o.put("genres", new JSONArray(genres));
                 o.put("names", new JSONArray(names));
+                if (source != Source.ANILIST) o.put("source", source.name());
+                if (extId != null) o.put("extId", extId);
+                if (malId > 0) o.put("malId", malId);
+                if (webtoon) o.put("webtoon", true);
+                if (!authors.isEmpty()) o.put("authors", new JSONArray(authors));
             } catch (Exception ignored) {
             }
             return o;
@@ -240,6 +265,12 @@ final class Discover {
             JSONArray n = o.optJSONArray("names");
             if (n != null) for (int i = 0; i < n.length(); i++) x.names.add(n.optString(i));
             if (x.names.isEmpty()) x.names.add(x.title);
+            x.source = "MANGADEX".equals(str(o, "source")) ? Source.MANGADEX : Source.ANILIST;
+            x.extId = str(o, "extId");
+            x.malId = o.optInt("malId", 0);
+            x.webtoon = o.optBoolean("webtoon", false);
+            JSONArray au = o.optJSONArray("authors");
+            if (au != null) for (int i = 0; i < au.length(); i++) x.authors.add(au.optString(i));
             return x;
         }
     }
