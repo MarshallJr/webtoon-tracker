@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Bouton « Reprendre » de l'épisode en cours : pilule jaune (l'action forte) -->
+<!-- Bouton « Reprendre » de l'épisode en cours : pilule violet → indigo (l'action forte) -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
     <corners android:radius="999dp" />
-    <solid android:color="@color/accent" />
+    <gradient android:angle="0" android:startColor="#FF8B5CF6" android:endColor="#FF4F46E5" />
 </shape>

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Carte mise en avant (Ton aventure) : reflet violet plus franc, liseré lumineux -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <corners android:radius="22dp" />
+            <gradient android:angle="315" android:startColor="#FF221846" android:centerColor="#FF15112A"
+                android:endColor="#FF0E0C1A" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <corners android:radius="22dp" />
+            <stroke android:width="1.5dp" android:color="#998B7CF6" />
+        </shape>
+    </item>
+</layer-list>

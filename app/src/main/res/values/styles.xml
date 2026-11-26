@@ -279,7 +279,7 @@
         <item name="android:layout_height">wrap_content</item>
         <item name="android:textColor">@color/text_main</item>
         <item name="android:textSize">16sp</item>
-        <item name="android:fontFamily">@font/inter_semibold</item>
+        <item name="android:fontFamily">@font/inter_bold</item>
     </style>
 
     <style name="Divider">

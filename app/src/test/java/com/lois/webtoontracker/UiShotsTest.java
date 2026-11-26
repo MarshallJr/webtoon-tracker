@@ -94,7 +94,14 @@ public class UiShotsTest {
         Shots.idle(2500);
         Shots.screen(d, "phone_detail");
         View scroll = d.findViewById(R.id.dScroll);
-        if (scroll != null) Shots.page(scroll, "phone_detail_full", 0xFF000000);
+        if (scroll != null) Shots.page(scroll, "phone_detail_full", 0xFF07060B);
+        com.google.android.material.tabs.TabLayout tabs = d.findViewById(R.id.dTabs);
+        tabs.getTabAt(1).select();   // Épisodes
+        Shots.idle(1500);
+        Shots.page(scroll, "phone_detail_episodes", 0xFF07060B);
+        tabs.getTabAt(2).select();   // Mon suivi
+        Shots.idle(1200);
+        Shots.page(scroll, "phone_detail_tracking", 0xFF07060B);
     }
 
     @Test

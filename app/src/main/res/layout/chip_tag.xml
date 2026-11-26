@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Tag de la fiche (Action, ＋) : pilule à contour violet -->
+<com.google.android.material.chip.Chip xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    style="@style/Widget.Material3.Chip.Assist"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:fontFamily="@font/inter_semibold"
+    android:textColor="#FFDDD6FE"
+    app:chipBackgroundColor="#1F8B5CF6"
+    app:chipCornerRadius="999dp"
+    app:chipIconVisible="false"
+    app:chipStrokeColor="#FFA78BFA"
+    app:chipStrokeWidth="1dp"
+    app:ensureMinTouchTargetSize="false" />

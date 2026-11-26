@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Bouton rond de l'en-tête : verre sombre, liseré violet -->
 <ripple xmlns:android="http://schemas.android.com/apk/res/android" android:color="#33A78BFA">
     <item>
         <shape android:shape="oval">
-            <solid android:color="#E616131F" />
-            <stroke android:width="1dp" android:color="@color/stroke_glass" />
+            <solid android:color="#E6110E1C" />
+            <stroke android:width="1dp" android:color="#59A78BFA" />
         </shape>
     </item>
 </ripple>

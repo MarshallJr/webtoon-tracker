@@ -5,7 +5,6 @@
     <dimen name="page_padding_neg">-32dp</dimen>
     <dimen name="grid_padding">24dp</dimen>
     <dimen name="hero_title">44sp</dimen>
-    <dimen name="hero_art">330dp</dimen>
     <dimen name="hero_text_end">300dp</dimen>
     <dimen name="card_width">150dp</dimen>
     <dimen name="card_height">244dp</dimen>
@@ -13,10 +12,9 @@
     <!-- En-tête de Découvrir : débord des carrousels jusqu'aux bords de l'écran -->
     <dimen name="header_bleed">30dp</dimen>
     <dimen name="header_bleed_neg">-30dp</dimen>
-    <dimen name="hero_art_top">8dp</dimen>
-    <dimen name="hero_art_end">0dp</dimen>
     <dimen name="resume_thumb_w">150dp</dimen>
     <dimen name="resume_thumb_h">92dp</dimen>
     <dimen name="explore_min_h">174dp</dimen>
-    <dimen name="hero_glow_end">0dp</dimen>
+    <dimen name="home_bg_h">520dp</dimen>
+    <dimen name="home_bg_overlap">-160dp</dimen>
 </resources>

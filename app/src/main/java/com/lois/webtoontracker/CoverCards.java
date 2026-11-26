@@ -66,6 +66,31 @@ final class CoverCards {
         }
     }
 
+    /**
+     * Couverture (en portrait) dans un cadre plus large que haut : cadrée sur son haut, là où sont les
+     * visages. @param bias 0 = tout en haut, 0.5 = centre
+     */
+    static void cropTop(android.widget.ImageView v, float bias) {
+        v.setScaleType(android.widget.ImageView.ScaleType.MATRIX);
+        Runnable fit = () -> {
+            android.graphics.drawable.Drawable d = v.getDrawable();
+            int vw = v.getWidth() - v.getPaddingLeft() - v.getPaddingRight();
+            int vh = v.getHeight() - v.getPaddingTop() - v.getPaddingBottom();
+            if (d == null || vw <= 0 || vh <= 0 || d.getIntrinsicWidth() <= 0 || d.getIntrinsicHeight() <= 0) return;
+            float sc = Math.max(vw / (float) d.getIntrinsicWidth(), vh / (float) d.getIntrinsicHeight());
+            android.graphics.Matrix m = new android.graphics.Matrix();
+            m.setScale(sc, sc);
+            m.postTranslate((vw - d.getIntrinsicWidth() * sc) / 2f, (vh - d.getIntrinsicHeight() * sc) * bias);
+            v.setImageMatrix(m);
+        };
+        if (v.getTag(R.id.crop_top) == null) {
+            v.setTag(R.id.crop_top, Boolean.TRUE);
+            v.addOnLayoutChangeListener((x, l, t, r, b, ol, ot, or, ob) -> fit.run());
+        }
+        if (v.getWidth() > 0) fit.run();
+        else v.post(fit);
+    }
+
     /** « ★ 8,4 / 10 » avec l'étoile dorée (le reste garde la couleur du texte). */
     static CharSequence goldStars(android.content.Context ctx, CharSequence s) {
         android.text.SpannableString out = new android.text.SpannableString(s);

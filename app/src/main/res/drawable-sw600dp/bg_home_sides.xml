@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Tablette : l'illustration s'arrête aux bords de la colonne ; on les fond dans le fond de l'appli -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:gravity="start|fill_vertical" android:width="120dp">
+        <shape android:shape="rectangle">
+            <gradient android:angle="0" android:startColor="@color/screen_bg" android:endColor="#0007060B" />
+        </shape>
+    </item>
+    <item android:gravity="end|fill_vertical" android:width="120dp">
+        <shape android:shape="rectangle">
+            <gradient android:angle="180" android:startColor="@color/screen_bg" android:endColor="#0007060B" />
+        </shape>
+    </item>
+</layer-list>

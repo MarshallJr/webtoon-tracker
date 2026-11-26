@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Barre de progression : rail sombre, remplissage violet → bleu -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:id="@android:id/background">
+        <shape android:shape="rectangle">
+            <corners android:radius="4dp" />
+            <solid android:color="#26FFFFFF" />
+        </shape>
+    </item>
+    <item android:id="@android:id/progress">
+        <scale android:scaleWidth="100%">
+            <shape android:shape="rectangle">
+                <corners android:radius="4dp" />
+                <gradient android:angle="0" android:startColor="#FFC084FC" android:centerColor="#FF8B5CF6"
+                    android:endColor="#FF60A5FA" />
+            </shape>
+        </scale>
+    </item>
+</layer-list>

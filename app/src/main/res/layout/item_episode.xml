@@ -22,7 +22,9 @@
 
         <FrameLayout
             android:layout_width="88dp"
-            android:layout_height="64dp">
+            android:layout_height="64dp"
+            android:background="@drawable/bg_resume_thumb_glow"
+            android:padding="1dp">
 
             <com.google.android.material.imageview.ShapeableImageView
                 android:id="@+id/eThumb"
@@ -98,7 +100,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:ellipsize="end"
-                    android:fontFamily="@font/inter_semibold"
+                    android:fontFamily="@font/inter_bold"
                     android:maxLines="1"
                     android:textColor="@color/text_main"
                     android:textSize="15.5sp" />
@@ -165,12 +167,13 @@
             android:layout_height="38dp"
             android:background="@drawable/bg_episode_btn"
             android:gravity="center"
-            android:minWidth="76dp"
-            android:paddingStart="14dp"
-            android:paddingEnd="14dp"
+            android:fontFamily="@font/inter_semibold"
+            android:minWidth="80dp"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
             android:text="Relire"
-            android:textColor="@color/text_main"
-            android:textSize="15sp" />
+            android:textColor="@color/badge_text"
+            android:textSize="14.5sp" />
     </LinearLayout>
 
     <ImageView

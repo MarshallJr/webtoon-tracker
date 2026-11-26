@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Téléphone : l'illustration de l'accueil va d'un bord à l'autre, rien à fondre -->
+<color xmlns:android="http://schemas.android.com/apk/res/android" android:color="@android:color/transparent" />

@@ -6,6 +6,15 @@
     android:layout_height="match_parent"
     android:background="@color/screen_bg">
 
+    <!-- Fumée violette et bleue du coin bas-droit (décor, voir tools/detail_smoke.py) -->
+    <ImageView
+        android:layout_width="300dp"
+        android:layout_height="480dp"
+        android:layout_gravity="bottom|end"
+        android:importantForAccessibility="no"
+        android:scaleType="fitXY"
+        android:src="@drawable/detail_smoke" />
+
     <androidx.core.widget.NestedScrollView
         android:id="@+id/dScroll"
         android:layout_width="match_parent"
@@ -23,7 +32,6 @@
                 android:id="@+id/dHero"
                 android:layout_width="match_parent"
                 android:layout_height="340dp"
-                android:background="@color/screen_bg"
                 android:clipChildren="true">
 
                 <ImageView
@@ -63,10 +71,11 @@
                     <FrameLayout
                         android:layout_width="132dp"
                         android:layout_height="196dp"
-                        android:background="@drawable/bg_card"
-                        android:elevation="16dp"
-                        android:outlineAmbientShadowColor="@color/shadow_strong"
-                        android:outlineSpotShadowColor="@color/shadow_strong">
+                        android:background="@drawable/bg_cover_glow"
+                        android:elevation="18dp"
+                        android:outlineAmbientShadowColor="@color/logo_glow"
+                        android:outlineSpotShadowColor="@color/logo_glow"
+                        android:padding="2dp">
 
                         <TextView
                             android:id="@+id/dAvatar"
@@ -105,14 +114,14 @@
                                 android:id="@+id/dFormat"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:background="@drawable/bg_pill_soft"
+                                android:background="@drawable/bg_badge_outline"
                                 android:fontFamily="@font/inter_bold"
                                 android:letterSpacing="0.08"
                                 android:paddingStart="10dp"
                                 android:paddingTop="3dp"
                                 android:paddingEnd="10dp"
                                 android:paddingBottom="3dp"
-                                android:textColor="@color/badge_text"
+                                android:textColor="#FFE9D5FF"
                                 android:textSize="11sp"
                                 android:visibility="gone" />
 
@@ -179,10 +188,11 @@
                         android:layout_height="wrap_content"
                         android:drawableStart="@drawable/ic_check"
                         android:drawablePadding="8dp"
-                        android:drawableTint="@color/text_main"
+                        android:drawableTint="@color/primary_bright"
+                        android:fontFamily="@font/inter_medium"
                         android:gravity="center_vertical"
                         android:text="Dans ma bibliothèque"
-                        android:textColor="@color/text_main"
+                        android:textColor="@color/badge_text"
                         android:textSize="14sp" />
 
                     <View
@@ -214,8 +224,9 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginStart="8dp"
+                            android:fontFamily="@font/inter_medium"
                             android:text="Alertes"
-                            android:textColor="@color/text_main"
+                            android:textColor="@color/badge_text"
                             android:textSize="14sp" />
                     </LinearLayout>
                 </LinearLayout>
@@ -226,12 +237,12 @@
                     android:layout_height="58dp"
                     android:layout_marginTop="8dp"
                     android:background="@drawable/bg_primary_button"
-                    android:elevation="10dp"
+                    android:elevation="14dp"
                     android:fontFamily="@font/inter_bold"
                     android:insetTop="0dp"
                     android:insetBottom="0dp"
-                    android:outlineAmbientShadowColor="@color/shadow_strong"
-                    android:outlineSpotShadowColor="@color/shadow_strong"
+                    android:outlineAmbientShadowColor="@color/logo_glow"
+                    android:outlineSpotShadowColor="@color/logo_glow"
                     android:text="Reprendre la lecture"
                     android:textColor="@color/on_accent"
                     android:textSize="16sp"
@@ -262,7 +273,7 @@
                     app:tabIndicatorFullWidth="false"
                     app:tabIndicatorHeight="3dp"
                     app:tabRippleColor="#1FA78BFA"
-                    app:tabSelectedTextColor="@color/text_main"
+                    app:tabSelectedTextColor="@color/primary_bright"
                     app:tabTextAppearance="@style/TabText"
                     app:tabTextColor="@color/text_soft" />
 
@@ -307,16 +318,14 @@
                                 android:textSize="20sp" />
                         </LinearLayout>
 
-                        <com.google.android.material.progressindicator.LinearProgressIndicator
+                        <ProgressBar
                             android:id="@+id/dProgress"
+                            style="?android:attr/progressBarStyleHorizontal"
                             android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="10dp"
+                            android:layout_height="7dp"
+                            android:layout_marginTop="14dp"
                             android:max="1000"
-                            app:indicatorColor="@color/brand"
-                            app:trackColor="@color/badge_bg"
-                            app:trackCornerRadius="3dp"
-                            app:trackThickness="6dp" />
+                            android:progressDrawable="@drawable/progress_glow" />
 
                         <TextView
                             android:id="@+id/dProgSub"
@@ -369,9 +378,9 @@
                             android:orientation="horizontal">
 
                             <FrameLayout
-                                android:layout_width="40dp"
-                                android:layout_height="40dp"
-                                android:background="@drawable/bg_pill_soft">
+                                android:layout_width="44dp"
+                                android:layout_height="44dp"
+                                android:background="@drawable/bg_icon_ring">
 
                                 <ImageView
                                     android:layout_width="22dp"
@@ -379,7 +388,7 @@
                                     android:layout_gravity="center"
                                     android:contentDescription="@null"
                                     android:src="@drawable/ic_language"
-                                    android:tint="@color/badge_text" />
+                                    android:tint="@color/primary_bright" />
                             </FrameLayout>
 
                             <LinearLayout
@@ -633,9 +642,9 @@
                             android:layout_weight="1"
                             android:ellipsize="end"
                             android:maxLines="1"
-                            android:fontFamily="@font/inter_semibold"
+                            android:fontFamily="@font/inter_bold"
                             android:textColor="@color/text_main"
-                            android:textSize="16sp" />
+                            android:textSize="17sp" />
 
                         <TextView
                             android:id="@+id/eSort"
@@ -643,8 +652,8 @@
                             android:layout_height="wrap_content"
                             android:layout_marginStart="8dp"
                             android:drawableEnd="@drawable/ic_sort"
-                            android:drawablePadding="2dp"
-                            android:drawableTint="@color/text_soft"
+                            android:drawablePadding="4dp"
+                            android:drawableTint="@color/primary_bright"
                             android:gravity="center_vertical"
                             android:padding="6dp"
                             android:textColor="@color/text_soft"
@@ -675,10 +684,10 @@
                             android:id="@+id/eJump"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:background="@drawable/bg_pill_soft"
+                            android:background="@drawable/bg_pill_outline"
                             android:drawableStart="@drawable/ic_jump"
                             android:drawablePadding="6dp"
-                            android:drawableTint="@color/badge_text"
+                            android:drawableTint="@color/primary_bright"
                             android:fontFamily="@font/inter_semibold"
                             android:gravity="center_vertical"
                             android:minHeight="36dp"
@@ -693,10 +702,10 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginStart="8dp"
-                            android:background="@drawable/bg_pill_soft"
+                            android:background="@drawable/bg_pill_outline"
                             android:drawableStart="@drawable/ic_add_small"
                             android:drawablePadding="6dp"
-                            android:drawableTint="@color/badge_text"
+                            android:drawableTint="@color/primary_bright"
                             android:fontFamily="@font/inter_semibold"
                             android:gravity="center_vertical"
                             android:minHeight="36dp"
@@ -750,10 +759,18 @@
                     <TextView
                         style="@style/SectionTitle"
                         android:layout_marginTop="18dp"
+                        android:drawableEnd="@drawable/ic_sparkle_small"
+                        android:drawablePadding="8dp"
+                        android:gravity="center_vertical"
                         android:text="Ton aventure"
                         android:textSize="22sp" />
 
-                    <LinearLayout style="@style/DetailCard">
+                    <LinearLayout
+                        style="@style/DetailCard"
+                        android:background="@drawable/bg_card_glow"
+                        android:elevation="8dp"
+                        android:outlineAmbientShadowColor="@color/shadow_strong"
+                        android:outlineSpotShadowColor="@color/shadow_strong">
 
                         <LinearLayout
                             android:layout_width="match_parent"
@@ -772,7 +789,7 @@
                                     android:layout_gravity="center"
                                     android:contentDescription="@null"
                                     android:src="@drawable/ic_library"
-                                    android:tint="@color/badge_text" />
+                                    android:tint="#FFEDE9FE" />
                             </FrameLayout>
 
                             <LinearLayout
@@ -887,7 +904,7 @@
                                 android:layout_height="24dp"
                                 android:contentDescription="@null"
                                 android:src="@drawable/ic_calendar"
-                                android:tint="@color/text_soft" />
+                                android:tint="@color/primary_bright" />
 
                             <LinearLayout
                                 android:layout_width="wrap_content"
@@ -941,7 +958,7 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="10dp"
-                            android:background="@drawable/bg_search"
+                            android:background="@drawable/bg_input"
                             android:gravity="top"
                             android:hint="Ajouter une note personnelle…"
                             android:importantForAutofill="no"
@@ -976,7 +993,7 @@
                             android:layout_height="26dp"
                             android:contentDescription="@null"
                             android:src="@drawable/ic_bell"
-                            android:tint="@color/text_main" />
+                            android:tint="@color/primary_bright" />
 
                         <LinearLayout
                             android:layout_width="0dp"
@@ -988,6 +1005,7 @@
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
+                                android:fontFamily="@font/inter_semibold"
                                 android:text="Suivre les prochaines sorties"
                                 android:textColor="@color/text_main"
                                 android:textSize="15sp" />
@@ -1068,13 +1086,13 @@
                         android:layout_height="54dp"
                         android:layout_marginTop="16dp"
                         android:text="Voir sur AniList"
-                        android:textColor="@color/brand"
+                        android:textColor="@color/primary_bright"
                         android:visibility="gone"
                         app:cornerRadius="16dp"
                         app:icon="@drawable/ic_open"
                         app:iconGravity="textStart"
-                        app:iconTint="@color/brand"
-                        app:strokeColor="@color/brand" />
+                        app:iconTint="@color/primary_bright"
+                        app:strokeColor="@color/primary_bright" />
 
                     <LinearLayout
                         android:id="@+id/dAltCard"
@@ -1186,12 +1204,12 @@
             android:layout_width="match_parent"
             android:layout_height="56dp"
             android:background="@drawable/bg_primary_button"
-            android:elevation="10dp"
+            android:elevation="14dp"
             android:fontFamily="@font/inter_bold"
             android:insetTop="0dp"
             android:insetBottom="0dp"
-            android:outlineAmbientShadowColor="@color/shadow_strong"
-            android:outlineSpotShadowColor="@color/shadow_strong"
+            android:outlineAmbientShadowColor="@color/logo_glow"
+            android:outlineSpotShadowColor="@color/logo_glow"
             android:text="Reprendre la lecture"
             android:textColor="@color/on_accent"
             android:textSize="16sp"

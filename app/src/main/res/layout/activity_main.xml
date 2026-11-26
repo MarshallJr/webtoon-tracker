@@ -47,26 +47,28 @@
                     android:clipChildren="false"
                     android:clipToPadding="false">
 
-                    <View
-                        android:id="@+id/heroGlow"
-                        android:layout_width="360dp"
-                        android:layout_height="360dp"
-                        android:layout_gravity="top|end"
-                        android:layout_marginTop="-70dp"
-                        android:layout_marginEnd="@dimen/hero_glow_end"
-                        android:background="@drawable/bg_hero_glow"
-                        android:importantForAccessibility="no" />
-
+                    <!-- Grande illustration de fond (originale, voir tools/home_bg.py) : faille violette et
+                         éclairs au-dessus de la ville ; elle déborde sous la recherche et s'y fond dans le noir -->
                     <ImageView
-                        android:id="@+id/heroArt"
-                        android:layout_width="@dimen/hero_art"
-                        android:layout_height="@dimen/hero_art"
-                        android:layout_gravity="top|end"
-                        android:layout_marginTop="@dimen/hero_art_top"
-                        android:layout_marginEnd="@dimen/hero_art_end"
-                        android:contentDescription="@null"
-                        android:scaleType="fitCenter"
-                        android:src="@drawable/splash_logo" />
+                        android:id="@+id/homeBg"
+                        android:layout_width="match_parent"
+                        android:layout_height="@dimen/home_bg_h"
+                        android:layout_marginStart="@dimen/page_padding_neg"
+                        android:layout_marginTop="-10dp"
+                        android:layout_marginBottom="@dimen/home_bg_overlap"
+                        android:importantForAccessibility="no"
+                        android:scaleType="centerCrop"
+                        android:src="@drawable/home_bg" />
+
+                    <!-- Bords fondus sur grand écran (la colonne de contenu est plus étroite que l'écran) -->
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="@dimen/home_bg_h"
+                        android:layout_marginStart="@dimen/page_padding_neg"
+                        android:layout_marginTop="-10dp"
+                        android:layout_marginBottom="@dimen/home_bg_overlap"
+                        android:background="@drawable/bg_home_sides"
+                        android:importantForAccessibility="no" />
 
                     <LinearLayout
                         android:layout_width="match_parent"

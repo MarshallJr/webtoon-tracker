@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Cadre de la couverture d'une fiche : liseré violet lumineux -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <corners android:radius="18dp" />
+    <solid android:color="#FF120E22" />
+    <stroke android:width="2dp" android:color="#FFA78BFA" />
+</shape>

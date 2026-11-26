@@ -8,7 +8,7 @@ import android.graphics.drawable.Drawable;
 import androidx.annotation.RequiresApi;
 
 /**
- * Logo animé du menu (res/raw/logo_anim.webp : le perso s'illumine, éclairs, puis reste allumé).
+ * Logo animé du menu (res/raw/logo_anim.webp : éclairs jaunes, puis le perso se transforme et reste violet).
  * Joué une fois à chaque fois, jamais en boucle : pas de batterie gâchée.
  */
 @RequiresApi(28)

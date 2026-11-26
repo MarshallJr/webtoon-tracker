@@ -1,10 +1,35 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Action principale : pilule en dégradé violet -->
+<!-- Action principale (Chapitre suivant, Reprendre) : violet → indigo, liseré lumineux lavande → bleu,
+     reflet blanc au centre du bord haut -->
 <ripple xmlns:android="http://schemas.android.com/apk/res/android" android:color="#40FFFFFF">
     <item>
-        <shape android:shape="rectangle">
-            <corners android:radius="999dp" />
-            <gradient android:angle="0" android:startColor="#FF7C3AED" android:endColor="#FFA855F7" />
-        </shape>
+        <layer-list>
+            <item>
+                <shape android:shape="rectangle">
+                    <corners android:radius="20dp" />
+                    <gradient android:angle="0" android:startColor="#FFC4B5FD" android:centerColor="#FFA78BFA"
+                        android:endColor="#FF7DD3FC" />
+                </shape>
+            </item>
+            <item android:bottom="1.5dp" android:left="1.5dp" android:right="1.5dp" android:top="1.5dp">
+                <shape android:shape="rectangle">
+                    <corners android:radius="18.5dp" />
+                    <gradient android:angle="0" android:startColor="#FF7C3AED" android:centerColor="#FF6D28D9"
+                        android:endColor="#FF4F46E5" />
+                </shape>
+            </item>
+            <item android:gravity="top|center_horizontal" android:width="150dp" android:height="2dp">
+                <shape android:shape="rectangle">
+                    <gradient android:angle="0" android:startColor="#00FFFFFF" android:centerColor="#E6FFFFFF"
+                        android:endColor="#00FFFFFF" />
+                </shape>
+            </item>
+            <item android:gravity="bottom|center_horizontal" android:width="90dp" android:height="1.5dp">
+                <shape android:shape="rectangle">
+                    <gradient android:angle="0" android:startColor="#00FFFFFF" android:centerColor="#99FFFFFF"
+                        android:endColor="#00FFFFFF" />
+                </shape>
+            </item>
+        </layer-list>
     </item>
 </ripple>

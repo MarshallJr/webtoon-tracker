@@ -42,7 +42,6 @@ import com.google.android.material.chip.ChipGroup;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.imageview.ShapeableImageView;
 import com.google.android.material.materialswitch.MaterialSwitch;
-import com.google.android.material.progressindicator.LinearProgressIndicator;
 import com.google.android.material.tabs.TabLayout;
 
 import java.text.SimpleDateFormat;
@@ -310,8 +309,9 @@ public class DetailActivity extends AppCompatActivity {
         }
         // Flou calculé une fois sur l'image (et non un effet en direct qui débordait du bandeau
         // en laissant une ligne claire sous le titre). Fondu vers le fond géré par dHeaderFade.
-        bg.setImageBitmap(ImageFx.blur(cover, 140, 2));
-        bg.setAlpha(0.92f);
+        bg.setImageBitmap(ImageFx.blur(cover, 300, 1));
+        bg.setAlpha(0.95f);
+        CoverCards.cropTop(bg, 0.12f);   // les visages sont en haut de l'affiche
     }
 
     private void bindTags(DbHelper.Series s) {
@@ -320,13 +320,13 @@ public class DetailActivity extends AppCompatActivity {
         List<String> tags = Titles.splitTags(s.tags);
         int shown = Math.min(3, tags.size());
         for (int i = 0; i < shown; i++) {
-            Chip c = (Chip) getLayoutInflater().inflate(R.layout.chip_site, g, false);
+            Chip c = (Chip) getLayoutInflater().inflate(R.layout.chip_tag, g, false);
             c.setText(tags.get(i));
             c.setChipIcon(null);
             c.setOnClickListener(v -> showTagEditor());
             g.addView(c);
         }
-        Chip more = (Chip) getLayoutInflater().inflate(R.layout.chip_site, g, false);
+        Chip more = (Chip) getLayoutInflater().inflate(R.layout.chip_tag, g, false);
         more.setChipIcon(null);
         more.setText(tags.size() > shown ? "+" + (tags.size() - shown) : tags.isEmpty() ? "＋ Ajouter des tags" : "＋");
         more.setOnClickListener(v -> showTagEditor());
@@ -337,10 +337,10 @@ public class DetailActivity extends AppCompatActivity {
         boolean on = db.isFollowed(title);
         ImageView icon = findViewById(R.id.dBellIcon);
         icon.setImageResource(on ? R.drawable.ic_bell_on : R.drawable.ic_bell);
-        icon.setImageTintList(ColorStateList.valueOf(ContextCompat.getColor(this, on ? R.color.accent : R.color.text_main)));
+        icon.setImageTintList(ColorStateList.valueOf(ContextCompat.getColor(this, on ? R.color.accent : R.color.primary_bright)));
         TextView label = findViewById(R.id.dBellLabel);
         label.setText(on ? "Alertes activées" : "Alertes");
-        label.setTextColor(ContextCompat.getColor(this, on ? R.color.accent : R.color.text_main));
+        label.setTextColor(ContextCompat.getColor(this, on ? R.color.accent : R.color.badge_text));
         MaterialSwitch sw = findViewById(R.id.dFollowSwitch);
         sw.setOnCheckedChangeListener(null);
         sw.setChecked(on);
@@ -410,7 +410,7 @@ public class DetailActivity extends AppCompatActivity {
 
         TextView value = findViewById(R.id.dProgValue);
         TextView sub = findViewById(R.id.dProgSub);
-        LinearProgressIndicator bar = findViewById(R.id.dProgress);
+        android.widget.ProgressBar bar = findViewById(R.id.dProgress);
         int target;
         if (latest > last) {
             int behind = (int) Math.ceil(latest - last);
@@ -439,9 +439,18 @@ public class DetailActivity extends AppCompatActivity {
         Object was = bar.getTag();
         if (!(was instanceof Integer) || (Integer) was != target) {
             bar.setTag(target);
-            bar.setProgressCompat(0, false);
+            bar.setProgress(0);
             final int to = target;
-            bar.postDelayed(() -> bar.setProgressCompat(to, Anim.on()), 300);
+            bar.postDelayed(() -> {
+                if (!Anim.on()) {
+                    bar.setProgress(to);
+                    return;
+                }
+                android.animation.ObjectAnimator a = android.animation.ObjectAnimator.ofInt(bar, "progress", 0, to);
+                a.setDuration(700);
+                a.setInterpolator(Anim.EASE);
+                a.start();
+            }, 300);
         }
 
         // Payants repérés sur tes sites, plus loin que ton dernier lu.
@@ -766,8 +775,8 @@ public class DetailActivity extends AppCompatActivity {
             ImageView star = new ImageView(this);
             star.setImageResource(i <= rating ? R.drawable.ic_star : R.drawable.ic_star_outline);
             star.setImageTintList(android.content.res.ColorStateList.valueOf(
-                    ContextCompat.getColor(this, i <= rating ? R.color.accent : R.color.text_soft)));
-            star.setPadding(dp(2), 0, dp(6), 0);
+                    ContextCompat.getColor(this, i <= rating ? R.color.accent : R.color.badge_text)));
+            star.setPadding(dp(2), dp(2), dp(8), dp(2));
             star.setTag(R.id.anim_press, Boolean.TRUE); // les étoiles ont leur propre animation
             final int value = i;
             star.setOnClickListener(v -> {
@@ -784,7 +793,7 @@ public class DetailActivity extends AppCompatActivity {
                     st.postDelayed(() -> Anim.pop(st), k * 55L);
                 }
             });
-            box.addView(star, new LinearLayout.LayoutParams(dp(40), dp(34)));
+            box.addView(star, new LinearLayout.LayoutParams(dp(46), dp(40)));
         }
     }
 
