@@ -1063,7 +1063,7 @@
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/dAniList"
-                        style="@style/Widget.Material3.Button.OutlinedButton"
+                        style="@style/WT.Button.Outlined"
                         android:layout_width="match_parent"
                         android:layout_height="54dp"
                         android:layout_marginTop="16dp"

@@ -451,7 +451,7 @@
 
                         <com.google.android.material.button.MaterialButton
                             android:id="@+id/dupButton"
-                            style="@style/Widget.Material3.Button.TextButton"
+                            style="@style/WT.Button.Text"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="Fusionner"
@@ -939,7 +939,7 @@
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/emptyRestoreButton"
-                        style="@style/Widget.Material3.Button.TonalButton"
+                        style="@style/WT.Button.Tonal"
                         android:layout_width="wrap_content"
                         android:layout_height="48dp"
                         android:layout_marginTop="18dp"
@@ -1106,7 +1106,7 @@
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/addButton"
-                    style="@style/Widget.Material3.Button.TonalButton"
+                    style="@style/WT.Button.Tonal"
                     android:layout_width="match_parent"
                     android:layout_height="52dp"
                     android:layout_marginTop="14dp"

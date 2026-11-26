@@ -242,7 +242,7 @@ public class MainActivity extends AppCompatActivity {
         input.setText("");
     }
 
-    private DiscoverPage discoverPage() {
+    DiscoverPage discoverPage() {
         if (discover == null) {
             discover = new DiscoverPage(this);
             discover.setOnWishChanged(() -> {

@@ -41,9 +41,12 @@
         <item name="android:textColorHint">@color/text_faint</item>
         <item name="android:textColorLink">@color/primary_bright</item>
 
-        <!-- Police : Inter partout (les textes sans police explicite compris) -->
+        <!-- Police : Inter partout (les textes sans police explicite compris). Seulement android:fontFamily :
+             l'attribut fontFamily d'AppCompat posé ici l'emporterait sur la police de chaque vue
+             (tout sortirait en Inter Regular, titres et cartes compris). -->
         <item name="android:fontFamily">@font/inter_regular</item>
-        <item name="fontFamily">@font/inter_regular</item>
+        <item name="materialButtonStyle">@style/WT.Button</item>
+        <item name="borderlessButtonStyle">@style/WT.Button.Text</item>
         <item name="textAppearanceDisplaySmall">@style/TextAppearance.WT.Display</item>
         <item name="textAppearanceHeadlineLarge">@style/TextAppearance.WT.Headline</item>
         <item name="textAppearanceHeadlineMedium">@style/TextAppearance.WT.Headline</item>
@@ -105,6 +108,7 @@
 
     <style name="WT.Dialog.Title" parent="MaterialAlertDialog.Material3.Title.Text">
         <item name="android:textAppearance">@style/TextAppearance.WT.Headline.Small</item>
+        <item name="android:fontFamily">@font/inter_display_bold</item>
         <item name="android:textColor">@color/text_main</item>
     </style>
 
@@ -114,6 +118,7 @@
     </style>
 
     <style name="WT.Dialog.Button" parent="Widget.Material3.Button.TextButton.Dialog">
+        <item name="android:fontFamily">@font/inter_semibold</item>
         <item name="android:textColor">@color/primary_bright</item>
     </style>
 
@@ -141,7 +146,21 @@
         <item name="cornerSizeBottomRight">0dp</item>
     </style>
 
+    <!-- Boutons : même police partout (la police du thème ne doit pas écraser celle des boutons) -->
+    <style name="WT.Button" parent="Widget.Material3.Button">
+        <item name="android:fontFamily">@font/inter_semibold</item>
+    </style>
+
+    <style name="WT.Button.Text" parent="Widget.Material3.Button.TextButton">
+        <item name="android:fontFamily">@font/inter_semibold</item>
+    </style>
+
+    <style name="WT.Button.Tonal" parent="Widget.Material3.Button.TonalButton">
+        <item name="android:fontFamily">@font/inter_semibold</item>
+    </style>
+
     <style name="WT.Button.Outlined" parent="Widget.Material3.Button.OutlinedButton">
+        <item name="android:fontFamily">@font/inter_semibold</item>
         <item name="strokeColor">@color/hairline_strong</item>
         <item name="android:textColor">@color/primary_bright</item>
         <item name="iconTint">@color/primary_bright</item>

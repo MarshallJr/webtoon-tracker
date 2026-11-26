@@ -65,6 +65,20 @@ public class UiShotsTest {
     }
 
     @Test
+    public void discoverSheet() throws Exception {
+        MainActivity a = main();
+        a.findViewById(R.id.navDiscover).performClick();
+        Shots.idle(3000);
+        org.json.JSONArray fy = new org.json.JSONArray(
+                ctx.getSharedPreferences("discover", Context.MODE_PRIVATE).getString("for_you", "[]"));
+        a.discoverPage().openMedia(Discover.Media.fromJson(fy.getJSONObject(2)));
+        Shots.idle(6000);   // fiche AniList (réseau de la CI)
+        Dialog d = ShadowDialog.getLatestDialog();
+        assertNotNull("Fiche Découvrir", d);
+        Shots.dialog(d, a, "phone_sheet");
+    }
+
+    @Test
     public void activity() throws Exception {
         MainActivity a = main();
         a.findViewById(R.id.navActivity).performClick();

@@ -105,6 +105,7 @@ final class Fixtures {
                 m.cover = img.optString("extraLarge", img.optString("large"));
                 m.color = img.optString("color", m.color);
                 if (r.optInt("averageScore") > 0) m.score = r.optInt("averageScore");
+                if (r.optInt("id") > 0) m.id = r.optInt("id");   // la fiche se charge avec le vrai identifiant
             }
             netImage(ctx, m.cover, b != null ? b : cover(i + 2, m.title, 300, 430));
             a.put(m.toJson());
