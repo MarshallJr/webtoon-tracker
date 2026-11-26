@@ -39,6 +39,16 @@ android {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
+
+    // Tests d'écrans (Robolectric) : chaque écran s'ouvre sans erreur, et une capture PNG est enregistrée.
+    testOptions {
+        unitTests {
+            includeAndroidResources = true
+            all {
+                maxHeapSize = '2g'
+            }
+        }
+    }
 }
 
 dependencies {
@@ -47,4 +57,9 @@ dependencies {
     implementation 'com.google.android.material:material:1.12.0'
     implementation 'androidx.work:work-runtime:2.9.1'
     implementation 'androidx.core:core-splashscreen:1.0.1'
+
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.robolectric:robolectric:4.14.1'
+    testImplementation 'androidx.test:core:1.6.1'
+    testImplementation 'androidx.work:work-testing:2.9.1'
 }

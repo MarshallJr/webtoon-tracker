@@ -1,0 +1,44 @@
+name: UI shots
+
+# Ouvre chaque écran dans Robolectric (données d'essai), vérifie qu'il s'affiche sans erreur,
+# et publie les captures PNG + le rapport de tests sur la branche « shots-out ».
+on:
+  push:
+    branches: [shots]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  shots:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Tests d'écrans et captures
+        run: |
+          chmod +x gradlew
+          ./gradlew testDebugUnitTest --no-daemon --tests 'com.lois.webtoontracker.UiShots*' || echo "failed" > tests-failed.txt
+
+      - name: Publier les captures
+        if: always()
+        run: |
+          mkdir -p /tmp/out
+          cp app/build/shots/*.png /tmp/out/ 2>/dev/null || true
+          cp app/build/test-results/testDebugUnitTest/*.xml /tmp/out/ 2>/dev/null || true
+          cp tests-failed.txt /tmp/out/ 2>/dev/null || true
+          echo "${{ github.sha }}" > /tmp/out/commit.txt
+          cd /tmp/out
+          git init -q
+          git checkout -q -b shots-out
+          git add -A
+          git -c user.name=ci -c user.email=ci@users.noreply.github.com commit -q -m "captures ${{ github.sha }}"
+          git push -q -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" shots-out
