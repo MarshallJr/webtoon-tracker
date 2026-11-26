@@ -200,9 +200,26 @@
                             android:ellipsize="end"
                             android:fontFamily="sans-serif-black"
                             android:letterSpacing="-0.01"
-                            android:maxLines="3"
+                            android:maxLines="2"
                             android:textColor="@color/text_main"
-                            android:textSize="20sp" />
+                            android:textSize="19sp" />
+
+                        <!-- « FR · WEBTOON » : langue et plateforme (ou site) du dernier chapitre lu -->
+                        <TextView
+                            android:id="@+id/resumeSource"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="7dp"
+                            android:background="@drawable/bg_tag_small"
+                            android:fontFamily="sans-serif-medium"
+                            android:maxLines="1"
+                            android:paddingStart="8dp"
+                            android:paddingTop="3dp"
+                            android:paddingEnd="8dp"
+                            android:paddingBottom="3dp"
+                            android:textColor="@color/badge_text"
+                            android:textSize="12sp"
+                            android:visibility="gone" />
 
                         <TextView
                             android:id="@+id/resumeRating"
@@ -222,10 +239,23 @@
                             android:textColor="@color/text_soft"
                             android:textSize="13sp" />
 
+                        <com.google.android.material.progressindicator.LinearProgressIndicator
+                            android:id="@+id/resumeProgress"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:max="1000"
+                            android:visibility="gone"
+                            app:indicatorColor="@color/brand"
+                            app:trackColor="@color/badge_bg"
+                            app:trackCornerRadius="3dp"
+                            app:trackThickness="6dp" />
+
                         <TextView
                             android:id="@+id/resumeWhen"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
                             android:textColor="@color/text_soft"
                             android:textSize="13sp" />
 
@@ -270,19 +300,11 @@
                     android:padding="12dp"
                     android:visibility="gone">
 
+                    <!-- Couvertures empilées des séries mises à jour (remplies dans le code) -->
                     <FrameLayout
-                        android:layout_width="44dp"
-                        android:layout_height="44dp"
-                        android:background="@drawable/bg_icon_box">
-
-                        <ImageView
-                            android:layout_width="22dp"
-                            android:layout_height="22dp"
-                            android:layout_gravity="center"
-                            android:contentDescription="@null"
-                            android:src="@drawable/ic_bell"
-                            android:tint="@color/badge_text" />
-                    </FrameLayout>
+                        android:id="@+id/updatesCovers"
+                        android:layout_width="68dp"
+                        android:layout_height="46dp" />
 
                     <LinearLayout
                         android:layout_width="0dp"
@@ -304,9 +326,9 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:ellipsize="end"
-                            android:maxLines="1"
+                            android:maxLines="2"
                             android:textColor="@color/text_soft"
-                            android:textSize="12sp" />
+                            android:textSize="12.5sp" />
                     </LinearLayout>
 
                     <TextView

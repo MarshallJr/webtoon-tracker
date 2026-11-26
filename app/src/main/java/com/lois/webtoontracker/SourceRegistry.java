@@ -128,6 +128,23 @@ final class SourceRegistry {
         return h == null ? "site" : h;
     }
 
+    /** « FR · WEBTOON », « comix.to » : langue et plateforme (ou site) d'une adresse de lecture. */
+    static String badge(String url) {
+        if (url == null || !url.matches("(?i)^https?://.+")) return null;
+        String lang = langFromUrl(url);
+        return (lang == null ? "" : lang.toUpperCase(java.util.Locale.ROOT) + " · ") + name(url);
+    }
+
+    /** « Épisode » sur WEBTOON, « Chapitre » ailleurs. */
+    static String unit(String url) {
+        return url != null && isWebtoons(url) ? "Épisode" : "Chapitre";
+    }
+
+    /** « ép. » sur WEBTOON, « ch. » ailleurs. */
+    static String unitShort(String url) {
+        return url != null && isWebtoons(url) ? "ép." : "ch.";
+    }
+
     static boolean isWebtoons(String url) {
         String h = host(url);
         return h != null && (h.equals("webtoons.com") || h.endsWith(".webtoons.com"));

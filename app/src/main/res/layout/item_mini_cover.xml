@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Mini couverture (carte « Nouveautés » de l'accueil) : image, sinon initiale sur couleur -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="34dp"
+    android:layout_height="46dp"
+    android:background="@drawable/bg_mini_cover"
+    android:padding="2dp">
+
+    <TextView
+        android:id="@+id/mcLetter"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/bg_avatar_small"
+        android:fontFamily="sans-serif-black"
+        android:gravity="center"
+        android:textColor="#FFFFFF"
+        android:textSize="15sp" />
+
+    <com.google.android.material.imageview.ShapeableImageView
+        android:id="@+id/mcCover"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:contentDescription="@null"
+        android:scaleType="centerCrop"
+        android:visibility="gone"
+        app:shapeAppearanceOverlay="@style/RoundedMini" />
+</FrameLayout>

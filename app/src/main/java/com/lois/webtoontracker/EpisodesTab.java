@@ -103,6 +103,7 @@ final class EpisodesTab {
 
     /** Lignes de la dernière liste affichée (pour « Aller au ch. » et « Marquer 1 → N »). */
     private List<Row> lastRows = new ArrayList<>();
+    private double lastFurthest;
 
     void bind(String title) {
         this.title = title;
@@ -156,6 +157,7 @@ final class EpisodesTab {
             if (rows.get(i).chapter == furthest && shown < i + 6) shown = ((i + 6) / PAGE + 1) * PAGE;
         }
         lastRows = rows;
+        lastFurthest = furthest;
 
         // En-tête
         TextView count = act.findViewById(R.id.eCount);
@@ -163,7 +165,7 @@ final class EpisodesTab {
                 + (entries.size() > 1 ? " lus" : " lu");
         count.setText(c);
         bindSiteLine(site, entries);
-        act.findViewById(R.id.eJump).setVisibility(rows.size() > PAGE ? View.VISIBLE : View.GONE);
+        act.findViewById(R.id.eJump).setVisibility(rows.size() > 12 ? View.VISIBLE : View.GONE);
         ((TextView) act.findViewById(R.id.eSort)).setText(newest ? "Plus récents" : "Plus anciens");
         bindBackfill(entries);
         bindLockCard(locks);
@@ -283,11 +285,14 @@ final class EpisodesTab {
         }
 
         Runnable action;
+        boolean lockedRow = false;
         if (r.release != null) {
             // Nouveau chapitre repéré en ligne
             badge.setText("NOUVEAU");
+            pill(badge, R.color.ed_free_bg, R.color.ed_free_text);
             badge.setVisibility(View.VISIBLE);
-            date.setText("Sorti · " + dayFmt.format(new Date(r.release.foundAt)));
+            Anim.attention(badge);
+            date.setText("Sorti le " + shortDay(r.release.foundAt));
             extra.setText("Sur " + (r.release.label == null ? r.release.source : r.release.label)
                     + (r.release.lang == null ? "" : " · " + r.release.lang.toUpperCase(Locale.ROOT)));
             extra.setTextColor(ContextCompat.getColor(act, R.color.text_soft));
@@ -307,20 +312,25 @@ final class EpisodesTab {
             final Runnable openIt = go;
             long now = System.currentTimeMillis();
             badge.setVisibility(View.VISIBLE);
-            extra.setVisibility(View.VISIBLE);
             if (l.active()) {
+                // Payant : vignette voilée + cadenas, délai avant gratuité ; toute la ligne ouvre le détail.
                 badge.setText("PAYANT");
-                badge.setTextColor(ContextCompat.getColor(act, R.color.ed_paid_text));
-                date.setText("Payant sur " + l.host);
-                extra.setText(l.freeAt > now ? "Gratuit " + ReadingTrackerService.inWords(l.freeAt - now)
-                        : "Je te préviens dès qu'il est gratuit");
+                pill(badge, R.color.ed_paid_bg, R.color.ed_paid_text);
+                v.findViewById(R.id.eLock).setVisibility(View.VISIBLE);
+                boolean soon = l.freeAt > now;
+                date.setText(soon ? "Gratuit " + ReadingTrackerService.inWords(l.freeAt - now).replace("~", "")
+                        : "Payant sur " + l.host);
+                if (soon && l.freeAt - now < 3L * 24 * 3600 * 1000) date.setTextColor(ContextCompat.getColor(act, R.color.ed_paid_text));
+                extra.setText(soon ? "Sur " + l.host + " · je te préviens" : "Je te préviens dès qu'il est gratuit");
                 extra.setTextColor(ContextCompat.getColor(act, R.color.text_soft));
-                btn.setText("Payant");
-                btn.setTextColor(ContextCompat.getColor(act, R.color.ed_paid_text));
+                extra.setVisibility(View.VISIBLE);
+                btn.setVisibility(View.GONE);
+                lockedRow = true;
                 action = () -> showLockDialog(l, openIt);
             } else {
+                extra.setVisibility(View.VISIBLE);
                 badge.setText("GRATUIT");
-                badge.setTextColor(ContextCompat.getColor(act, R.color.online));
+                pill(badge, R.color.ed_free_bg, R.color.ed_free_text);
                 date.setText("Payant avant · " + l.host);
                 extra.setText("Gratuit depuis le " + dayFmt.format(new Date(l.freedAt)));
                 extra.setTextColor(ContextCompat.getColor(act, R.color.online));
@@ -342,24 +352,26 @@ final class EpisodesTab {
             DbHelper.Entry e = r.entry;
             boolean current = e.chapter == furthest;
             boolean before = DbHelper.SOURCE_BEFORE.equals(e.source);
-            date.setText(before ? "Lu ailleurs" : dayFmt.format(new Date(e.readAt)));
+            date.setText(before ? "Lu ailleurs" : "Lu le " + shortDay(e.readAt));
             if (current) {
-                v.setBackgroundColor(ContextCompat.getColor(act, R.color.episode_current));
-                v.findViewById(R.id.eFold).setVisibility(View.VISIBLE);
+                // En cours : carte arrondie lavande, pastille, bouton jaune
+                v.setBackgroundResource(R.drawable.bg_episode_current);
+                v.setPadding(dp(20), dp(12), dp(20), dp(12));   // le fond (inset) remplace le padding : on le repose
                 badge.setText("EN COURS");
-                badge.setTextColor(ContextCompat.getColor(act, R.color.brand));
+                pill(badge, R.color.badge_bg, R.color.badge_text);
                 badge.setVisibility(View.VISIBLE);
             } else {
-                // Déjà lu : grisé, comme sur WEBTOON
-                v.findViewById(R.id.eContent).setAlpha(0.42f);
+                // Déjà lu : atténué
+                v.findViewById(R.id.eContent).setAlpha(0.5f);
                 name.setTextColor(ContextCompat.getColor(act, R.color.text_soft));
             }
             boolean inProgress = current && progress != null && progress.chapter == e.chapter
                     && progress.pct > 0.02f && !progress.finished();
             if (inProgress) {
                 int pct = Math.round(progress.pct * 100);
-                bar.setProgress(pct);
                 bar.setVisibility(View.VISIBLE);
+                bar.setProgressCompat(0, false);
+                bar.postDelayed(() -> bar.setProgressCompat(pct, Anim.on()), 350);   // se remplit à l'affichage
                 extra.setText("Arrêté à " + progress.where());
                 extra.setTextColor(ContextCompat.getColor(act, R.color.brand));
                 extra.setVisibility(View.VISIBLE);
@@ -373,8 +385,9 @@ final class EpisodesTab {
             }
             if (current) {
                 btn.setText("Reprendre");
-                btn.setBackgroundResource(R.drawable.bg_episode_btn_new);
-                btn.setTextColor(0xFFFFFFFF);
+                btn.setBackgroundResource(R.drawable.bg_episode_btn_accent);
+                btn.setTextColor(ContextCompat.getColor(act, R.color.on_accent));
+                btn.setTypeface(android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.BOLD));
                 action = () -> Resume.open(act, title);
             } else {
                 action = linkAction(meta, entries, e.chapter);
@@ -398,10 +411,34 @@ final class EpisodesTab {
             final Runnable a = action;
             btn.setOnClickListener(x -> a.run());
             v.setOnClickListener(x -> a.run());
-            Anim.press(btn);
-            btn.setTag(R.id.anim_press, Boolean.TRUE);
+            if (!lockedRow) {
+                Anim.press(btn);
+                btn.setTag(R.id.anim_press, Boolean.TRUE);
+            }
         }
         return v;
+    }
+
+    /** Pastille d'état arrondie (NOUVEAU, PAYANT, GRATUIT, EN COURS). */
+    private void pill(TextView v, int bg, int fg) {
+        android.graphics.drawable.GradientDrawable g = new android.graphics.drawable.GradientDrawable();
+        g.setCornerRadius(dp(6));
+        g.setColor(ContextCompat.getColor(act, bg));
+        v.setBackground(g);
+        v.setTextColor(ContextCompat.getColor(act, fg));
+    }
+
+    private int dp(float d) {
+        return Math.round(d * act.getResources().getDisplayMetrics().density);
+    }
+
+    /** « 24 nov. » cette année, « 24 nov. 2025 » sinon. */
+    private String shortDay(long t) {
+        java.util.Calendar c = java.util.Calendar.getInstance();
+        int year = c.get(java.util.Calendar.YEAR);
+        c.setTimeInMillis(t);
+        return new SimpleDateFormat(c.get(java.util.Calendar.YEAR) == year ? "d MMM" : "d MMM yyyy", Locale.FRANCE)
+                .format(new Date(t));
     }
 
     /**
@@ -431,15 +468,16 @@ final class EpisodesTab {
         for (DbHelper.Edition e : editions) if (e.has(ch)) here.add(e);
         if (here.isEmpty()) return;
         java.util.LinkedHashSet<String> flags = new java.util.LinkedHashSet<>();
-        for (DbHelper.Edition e : here) flags.add(SourceRegistry.flag(e.lang));
+        for (DbHelper.Edition e : here) flags.add(e.lang == null ? "?" : e.lang.toUpperCase(Locale.ROOT));
         StringBuilder sb = new StringBuilder("Aussi en ");
         int k = 0;
         for (String f : flags) {
-            if (k++ == 4) {
+            if (k == 4) {
                 sb.append(" +").append(flags.size() - 4);
                 break;
             }
-            sb.append(f).append(' ');
+            if (k++ > 0) sb.append(" · ");
+            sb.append(f);
         }
         TextView also = v.findViewById(R.id.eAlso);
         also.setText(sb.toString().trim());
@@ -645,45 +683,124 @@ final class EpisodesTab {
 
     // ------------------------------------------------------------------ Aller au chapitre
 
+    /**
+     * Feuille « Aller à l'épisode » : un numéro (ou une tranche d'un appui), le bouton dit où il
+     * t'emmène ; « Marquer 1 → N comme lus » si des épisodes d'avant ne le sont pas encore.
+     */
     private void showJumpDialog() {
         if (lastRows.isEmpty()) return;
-        float dp = act.getResources().getDisplayMetrics().density;
-        android.widget.EditText input = new android.widget.EditText(act);
-        input.setInputType(android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);
-        input.setHint("Numéro du chapitre");
-        input.setSingleLine(true);
-        android.widget.FrameLayout box = new android.widget.FrameLayout(act);
-        box.setPadding((int) (24 * dp), (int) (8 * dp), (int) (24 * dp), 0);
-        box.addView(input);
         double lo = Double.MAX_VALUE, hi = 0;
+        int read = 0;
         for (Row r : lastRows) {
             lo = Math.min(lo, r.chapter);
             hi = Math.max(hi, r.chapter);
+            if (r.entry != null) read++;
         }
-        final boolean[] went = {false};
-        Runnable go = () -> {
-            if (went[0]) return;   // Entrée du clavier physique : appelé à l'appui ET au relâchement
-            went[0] = true;
-            jumpTo(input.getText().toString());
+        com.google.android.material.bottomsheet.BottomSheetDialog sheet =
+                new com.google.android.material.bottomsheet.BottomSheetDialog(act);
+        View content = LayoutInflater.from(act).inflate(R.layout.sheet_jump, null);
+        ((TextView) content.findViewById(R.id.jSub)).setText("De " + Detector.formatChapter(lo) + " à "
+                + Detector.formatChapter(hi) + " · " + read + (read > 1 ? " lus" : " lu"));
+        android.widget.EditText input = content.findViewById(R.id.jInput);
+        com.google.android.material.button.MaterialButton go = content.findViewById(R.id.jGo);
+        com.google.android.material.button.MaterialButton mark = content.findViewById(R.id.jMark);
+        com.google.android.material.chip.ChipGroup ranges = content.findViewById(R.id.jRanges);
+        double next = Double.NaN;                       // le prochain à lire, proposé en exemple
+        for (Row r : lastRows) if (r.entry == null && (Double.isNaN(next) || Math.abs(r.chapter - lastFurthest - 1) < Math.abs(next - lastFurthest - 1))) next = r.chapter;
+        input.setHint(Detector.formatChapter(Double.isNaN(next) ? hi : next));
+
+        // Tranches : 1–10, 11–20… (4 au plus ; 1–250, 251–500… pour les longues séries)
+        int first = (int) Math.max(1, Math.floor(lo)), last = (int) Math.ceil(hi);
+        int step = 10;
+        for (int st : new int[]{10, 20, 25, 50, 100, 200, 250, 500, 1000, 2500}) {
+            step = st;
+            if ((last - first) / st + 1 <= 4) break;
+        }
+        List<int[]> buckets = new ArrayList<>();
+        for (int a = first; a <= last; a += step) buckets.add(new int[]{a, Math.min(last, a + step - 1)});
+        ranges.setVisibility(buckets.size() > 1 ? View.VISIBLE : View.GONE);
+        List<com.google.android.material.chip.Chip> chips = new ArrayList<>();
+        for (int[] b : buckets) {
+            com.google.android.material.chip.Chip c = (com.google.android.material.chip.Chip)
+                    LayoutInflater.from(act).inflate(R.layout.chip_filter, ranges, false);
+            c.setId(View.generateViewId());
+            c.setText(b[0] == b[1] ? String.valueOf(b[0]) : b[0] + "–" + b[1]);
+            c.setOnClickListener(x -> {
+                input.setText(String.valueOf(b[0]));
+                input.setSelection(input.getText().length());
+                Anim.pop(c);
+            });
+            ranges.addView(c);
+            chips.add(c);
+        }
+
+        Runnable refresh = () -> {
+            double v;
+            try {
+                v = Double.parseDouble(input.getText().toString().trim().replace(',', '.'));
+            } catch (Exception e) {
+                v = Double.NaN;
+            }
+            boolean ok = !Double.isNaN(v) && v >= 0;
+            go.setEnabled(ok);
+            go.setAlpha(ok ? 1f : 0.55f);
+            go.setText(ok ? "Aller à l'épisode " + Detector.formatChapter(v) : "Aller à l'épisode");
+            int todo = 0;
+            if (ok) for (Row r : lastRows) if (r.entry == null && r.chapter <= v) todo++;
+            boolean show = ok && todo > 0;
+            if (show && mark.getVisibility() != View.VISIBLE) Anim.enter(mark, 0);
+            mark.setVisibility(show ? View.VISIBLE : View.GONE);
+            if (show) mark.setText("Marquer 1 → " + Detector.formatChapter(v) + " comme lus (" + todo + ")");
+            for (int i = 0; i < chips.size(); i++) {
+                int[] b = buckets.get(i);
+                chips.get(i).setChecked(ok && v >= b[0] && v < b[1] + 1);
+            }
         };
-        androidx.appcompat.app.AlertDialog d = new MaterialAlertDialogBuilder(act)
-                .setTitle("Aller au chapitre")
-                .setMessage("De " + Detector.formatChapter(lo) + " à " + Detector.formatChapter(hi))
-                .setView(box)
-                .setPositiveButton("Aller", (x, w) -> go.run())
-                .setNegativeButton("Annuler", null)
-                .create();
+        input.addTextChangedListener(new android.text.TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence t, int a, int b, int c) {}
+            @Override public void onTextChanged(CharSequence t, int a, int b, int c) {}
+            @Override public void afterTextChanged(android.text.Editable e) {
+                refresh.run();
+            }
+        });
+        final boolean[] went = {false};
+        go.setOnClickListener(x -> {
+            if (went[0] || !go.isEnabled()) return;   // Entrée du clavier physique : appui ET relâchement
+            went[0] = true;
+            sheet.dismiss();
+            jumpTo(input.getText().toString());
+        });
         input.setOnEditorActionListener((v, actionId, ev) -> {
-            go.run();
-            d.dismiss();
+            go.performClick();
             return true;
         });
-        d.setOnShowListener(x -> {
+        mark.setOnClickListener(x -> {
+            double v;
+            try {
+                v = Double.parseDouble(input.getText().toString().trim().replace(',', '.'));
+            } catch (Exception e) {
+                return;
+            }
+            List<Double> todo = new ArrayList<>();
+            for (Row r : lastRows) if (r.entry == null && r.chapter <= v) todo.add(r.chapter);
+            int added = db.markChaptersRead(title, todo, System.currentTimeMillis() - 60_000, DbHelper.SOURCE_BEFORE);
+            Toast.makeText(act, added + (added > 1 ? " épisodes marqués comme lus" : " épisode marqué comme lu"),
+                    Toast.LENGTH_SHORT).show();
+            sheet.dismiss();
+            animateNext = true;
+            host.onEpisodesChanged();
+        });
+        Anim.press(go);
+        Anim.press(mark);
+        sheet.setContentView(content);
+        sheet.setOnShowListener(x -> {
+            sheet.getBehavior().setState(com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_EXPANDED);
             input.requestFocus();
             android.view.inputmethod.InputMethodManager im = act.getSystemService(android.view.inputmethod.InputMethodManager.class);
-            if (im != null) input.postDelayed(() -> im.showSoftInput(input, 0), 120);
+            if (im != null) input.postDelayed(() -> im.showSoftInput(input, 0), 150);
         });
-        d.show();
+        refresh.run();
+        sheet.show();
     }
 
     private void jumpTo(String text) {

@@ -67,6 +67,14 @@ public final class Banner {
         }, delayMs);
     }
 
+    /**
+     * Chapitre payant : surtitre « WEBTOON TRACKER », texte sur 3 lignes, liseré orange, cadenas qui
+     * tremble. Un appui (ou la croix) la ferme ; le reste de l'écran reste utilisable.
+     */
+    public void showLocked(String title, String body, long visibleMs) {
+        show(NotifyPolicy.Kind.LOCKED, title, body, visibleMs, 0, null, this::hide);
+    }
+
     /** Met à jour le texte de la bannière affichée (ex : progression du défilement). */
     public void update(String title, String subtitle) {
         handler.post(() -> {
@@ -130,6 +138,21 @@ public final class Banner {
         icon.setColorFilter(lighter(color));
 
         float density = service.getResources().getDisplayMetrics().density;
+        boolean alert = kind == NotifyPolicy.Kind.LOCKED;
+        if (alert) {
+            TextView kicker = root.findViewById(R.id.bKicker);
+            kicker.setVisibility(View.VISIBLE);
+            kicker.setTextColor(lighter(color));
+            ((TextView) root.findViewById(R.id.bSubtitle)).setMaxLines(3);
+            root.findViewById(R.id.bClose).setVisibility(action != null && actionLabel == null ? View.VISIBLE : View.GONE);
+            android.graphics.drawable.Drawable bg = banner.getBackground().mutate();
+            if (bg instanceof android.graphics.drawable.LayerDrawable
+                    && ((android.graphics.drawable.LayerDrawable) bg).getNumberOfLayers() > 1
+                    && ((android.graphics.drawable.LayerDrawable) bg).getDrawable(1) instanceof GradientDrawable) {
+                ((GradientDrawable) ((android.graphics.drawable.LayerDrawable) bg).getDrawable(1))
+                        .setStroke(Math.max(1, Math.round(density)), (color & 0x00FFFFFF) | 0x73000000);
+            }
+        }
         // Largeur fixe : écran − marges (440 dp max) → le bouton ne se fait jamais écraser.
         int screenW = service.getResources().getDisplayMetrics().widthPixels;
         ViewGroup.LayoutParams blp = banner.getLayoutParams();
@@ -163,6 +186,14 @@ public final class Banner {
                 .setInterpolator(new OvershootInterpolator(3f)).start();
         icon.setRotation(kind == NotifyPolicy.Kind.NEW_SERIES ? -90 : 0);
         icon.animate().rotation(0).setStartDelay(220).setDuration(420).start();
+        if (alert) {
+            // Le cadenas tremble une fois, après son apparition.
+            android.animation.ObjectAnimator shake = android.animation.ObjectAnimator.ofFloat(icon, View.ROTATION,
+                    0f, -16f, 13f, -9f, 5f, -2f, 0f);
+            shake.setStartDelay(640);
+            shake.setDuration(620);
+            shake.start();
+        }
 
         banner.performHapticFeedback(HapticFeedbackConstants.CONFIRM);
 

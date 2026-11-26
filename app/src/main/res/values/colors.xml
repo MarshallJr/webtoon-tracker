@@ -34,4 +34,5 @@
     <color name="ed_paid_text">#B4460A</color>
     <color name="ed_auth_bg">#1F2BB673</color>
     <color name="ed_auth_text">#167A4C</color>
+    <color name="card_raised">#F4F1FC</color>
 </resources>

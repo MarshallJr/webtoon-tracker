@@ -447,9 +447,23 @@ public class ReadingTrackerService extends AccessibilityService {
         Long last = lockBanners.get(key);
         if (banner == null || (last != null && now - last < 30 * 60_000)) return;
         lockBanners.put(key, now);
-        String when = in > 0 ? "gratuit " + inWords(in) : "je te préviens dès qu'il est gratuit";
-        banner.show(NotifyPolicy.Kind.LOCKED, "Chapitre " + Detector.formatChapter(r.chapter) + " payant ici",
-                (undone ? "Retiré de tes lectures · " : "Pas compté comme lu · ") + when, 5500, 0);
+        // Le premier à redevenir gratuit sur ce site (celui-ci ou un autre de la série).
+        DbHelper.Lock soon = null;
+        for (DbHelper.Lock l : db.getLocks(title)) {
+            if (l.active() && host.equals(l.host) && l.freeAt > now && (soon == null || l.freeAt < soon.freeAt)) soon = l;
+        }
+        String unit = SourceRegistry.unit(r.url);
+        String when;
+        if (soon == null) {
+            when = "Je te préviens dès qu'il est gratuit.";
+        } else if (soon.chapter == r.chapter) {
+            when = "Gratuit " + inWords(soon.freeAt - now).replace("~", "") + " : je te préviens.";
+        } else {
+            when = "Le " + Detector.formatChapter(soon.chapter) + " redevient gratuit "
+                    + inWords(soon.freeAt - now).replace("~", "") + " : je te préviens.";
+        }
+        banner.showLocked(unit + " " + Detector.formatChapter(r.chapter) + " payant ici",
+                (undone ? "Retiré de tes lectures. " : "Pas compté comme lu. ") + when, 6500);
     }
 
     /** « dans ~2 j », « dans ~5 h », « dans ~20 min » */

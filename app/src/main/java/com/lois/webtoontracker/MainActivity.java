@@ -19,6 +19,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.EditText;
+import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -241,6 +242,8 @@ public class MainActivity extends AppCompatActivity {
         final java.util.Map<String, Double> fresh = new java.util.HashMap<>();
         List<List<String>> duplicates;
         int week, total;
+        Progress resume;      // où tu t'es arrêté dans la série à reprendre
+        String resumeUrl;     // adresse du dernier chapitre lu de cette série
     }
 
     private static HomeData loadHome(Context ctx) {
@@ -257,6 +260,12 @@ public class MainActivity extends AppCompatActivity {
             d.fresh.put(e.getKey(), e.getValue().get(0).chapter);
         }
         d.duplicates = Titles.duplicateGroups(titles);
+        if (!d.series.isEmpty()) {
+            String top = d.series.get(0).title;
+            d.resume = Progress.forResume(ctx, top);
+            DbHelper.Meta m = db.getMeta(top);
+            d.resumeUrl = m == null ? null : m.lastUrl;
+        }
         d.week = db.countSince(System.currentTimeMillis() - 7L * 24 * 3600 * 1000);
         d.total = db.totalChapters();
         return d;
@@ -298,7 +307,7 @@ public class MainActivity extends AppCompatActivity {
             Anim.count(statSeries, d.series.size());
             Anim.count(statChapters, d.total);
             Anim.count(statWeek, d.week);
-            bindHome(d.series, d.fresh);
+            bindHome(d.series, d.fresh, d.resume, d.resumeUrl);
             ((TextView) findViewById(R.id.libCount)).setText(d.series.size() + (d.series.size() > 1 ? " séries" : " série")
                     + " · " + d.total + " chapitres");
             ((TextView) findViewById(R.id.libRhythmSub)).setText(d.week + (d.week > 1 ? " chapitres" : " chapitre") + " cette semaine");
@@ -419,7 +428,7 @@ public class MainActivity extends AppCompatActivity {
 
     // ------------------------------------------------------------------ Accueil
 
-    private void bindHome(List<DbHelper.Series> series, java.util.Map<String, Double> fresh) {
+    private void bindHome(List<DbHelper.Series> series, java.util.Map<String, Double> fresh, Progress pr, String lastUrl) {
         boolean any = !series.isEmpty();
         findViewById(R.id.resumeSection).setVisibility(any ? View.VISIBLE : View.GONE);
         findViewById(R.id.resumeCard).setVisibility(any ? View.VISIBLE : View.GONE);
@@ -434,9 +443,28 @@ public class MainActivity extends AppCompatActivity {
         TextView rating = findViewById(R.id.resumeRating);
         rating.setVisibility(top.score > 0 ? View.VISIBLE : View.GONE);
         rating.setText("★ " + SeriesAdapter.formatScore(top.score));
-        Progress pr = Progress.forResume(this, top.title);
-        ((TextView) findViewById(R.id.resumeLast)).setText("Dernier chapitre lu : " + Detector.formatChapter(top.lastChapter)
-                + (pr != null && !pr.finished() ? " · " + pr.where() : ""));
+        // « FR · WEBTOON » + « Épisode 32 · arrêté à 63 % » + barre qui se remplit
+        String unit = SourceRegistry.unit(lastUrl), ch = Detector.formatChapter(top.lastChapter);
+        boolean inProgress = pr != null && !pr.finished();
+        ((TextView) findViewById(R.id.resumeLast)).setText(pr == null ? "Dernier lu : " + unit.toLowerCase(Locale.FRANCE) + " " + ch
+                : !inProgress ? unit + " " + ch + " · terminé"
+                : unit + " " + ch + " · " + (pr.hasPanel() ? pr.where() : "arrêté à " + pr.percent() + " %"));
+        TextView source = findViewById(R.id.resumeSource);
+        String badge = SourceRegistry.badge(lastUrl);
+        source.setVisibility(badge == null ? View.GONE : View.VISIBLE);
+        source.setText(badge);
+        com.google.android.material.progressindicator.LinearProgressIndicator bar = findViewById(R.id.resumeProgress);
+        bar.setVisibility(inProgress ? View.VISIBLE : View.GONE);
+        if (inProgress) {
+            int v = Math.max(20, Math.round(pr.pct * 1000));
+            Object was = bar.getTag(R.id.anim_count);
+            if (!(was instanceof Integer) || (Integer) was != v || !top.title.equals(bar.getTag())) {
+                bar.setTag(top.title);
+                bar.setTag(R.id.anim_count, v);
+                bar.setProgressCompat(0, false);
+                bar.postDelayed(() -> bar.setProgressCompat(v, Anim.on()), 260);   // se remplit sous tes yeux
+            }
+        }
         String when = DateUtils.getRelativeTimeSpanString(top.lastReadAt, System.currentTimeMillis(),
                 DateUtils.MINUTE_IN_MILLIS).toString();
         ((TextView) findViewById(R.id.resumeWhen)).setText(cap(when));
@@ -712,74 +740,129 @@ public class MainActivity extends AppCompatActivity {
         return map;
     }
 
+    private int shownUpdates = -1;
+
+    /** Carte « Nouveautés » : couvertures empilées, « Ch. 25 · ép. 36 · ch. 61 t'attendent », pastille. */
     private void bindUpdates(java.util.LinkedHashMap<String, List<DbHelper.Release>> map) {
         View card = findViewById(R.id.updatesCard);
+        boolean wasShown = card.getVisibility() == View.VISIBLE;
         card.setVisibility(map.isEmpty() ? View.GONE : View.VISIBLE);
-        if (!map.isEmpty()) {
-            int n = map.size();
-            ((TextView) findViewById(R.id.updatesTitle)).setText(n + (n > 1 ? " séries mises à jour" : " série mise à jour"));
-            ((TextView) findViewById(R.id.updatesCount)).setText(String.valueOf(n));
-            ((TextView) findViewById(R.id.updatesSub)).setText(n > 1
-                    ? "De nouveaux chapitres t'attendent"
-                    : map.values().iterator().next().get(0).title + " · ch. "
-                    + Detector.formatChapter(map.values().iterator().next().get(0).chapter));
+        int n = map.size();
+        if (n == 0) {
+            shownUpdates = 0;
+            return;
         }
+        ((TextView) findViewById(R.id.updatesTitle)).setText(n + (n > 1 ? " séries mises à jour" : " série mise à jour"));
+        TextView count = findViewById(R.id.updatesCount);
+        count.setText(String.valueOf(n));
+        StringBuilder sub = new StringBuilder();
+        int k = 0;
+        for (List<DbHelper.Release> l : map.values()) {
+            DbHelper.Release r = l.get(0);
+            if (k == 3) {
+                sub.append(" · +").append(n - 3);
+                break;
+            }
+            if (k++ > 0) sub.append(" · ");
+            sub.append(SourceRegistry.unitShort(r.url)).append(' ').append(Detector.formatChapter(r.chapter));
+        }
+        DbHelper.Release first = map.values().iterator().next().get(0);
+        ((TextView) findViewById(R.id.updatesSub)).setText(n > 1 ? cap(sub.toString()) + " t'attendent"
+                : first.title + " · " + SourceRegistry.unitShort(first.url) + " " + Detector.formatChapter(first.chapter));
+
+        // Couvertures empilées (3 au plus), qui glissent en place l'une après l'autre.
+        FrameLayout covers = findViewById(R.id.updatesCovers);
+        covers.removeAllViews();
+        float dp = getResources().getDisplayMetrics().density;
+        int i = 0;
+        for (List<DbHelper.Release> l : map.values()) {
+            if (i == 3) break;
+            View mc = getLayoutInflater().inflate(R.layout.item_mini_cover, covers, false);
+            FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) mc.getLayoutParams();
+            lp.gravity = android.view.Gravity.CENTER_VERTICAL | android.view.Gravity.START;
+            lp.setMarginStart((int) (i * 17 * dp));
+            mc.setLayoutParams(lp);
+            SeriesAdapter.bindCover(mc.findViewById(R.id.mcLetter), mc.findViewById(R.id.mcCover), l.get(0).title);
+            covers.addView(mc);
+            if (Anim.on() && (!wasShown || shownUpdates != n)) {
+                mc.setAlpha(0f);
+                mc.setTranslationX(-14 * dp);
+                mc.animate().alpha(1f).translationX(0f).setStartDelay(120 + i * 90L).setDuration(320)
+                        .setInterpolator(Anim.EASE).start();
+            }
+            i++;
+        }
+        ViewGroup.LayoutParams clp = covers.getLayoutParams();
+        clp.width = (int) ((34 + (i - 1) * 17) * dp);
+        covers.setLayoutParams(clp);
+        if (!wasShown) Anim.enter(card, 0);
+        if (shownUpdates >= 0 && shownUpdates != n) Anim.pop(count);   // une série de plus : la pastille rebondit
+        else Anim.attention(count);
+        shownUpdates = n;
     }
 
-    /** Panneau "Nouveaux chapitres" : pour chaque série, les sites où lire, en EN et FR. */
+    private static final int CHIP_SITE = 0, CHIP_PAID = 1, CHIP_FREE = 2;
+
+    /** Panneau « Nouveaux chapitres » : une carte par série, les sites et éditions où lire, les payants. */
     private void showUpdates(String onlyTitle) {
         java.util.LinkedHashMap<String, List<DbHelper.Release>> map = groupedUpdates(this, onlyTitle);
+        DbHelper db = DbHelper.get(this);
         BottomSheetDialog sheet = new BottomSheetDialog(this);
-        float dp = getResources().getDisplayMetrics().density;
-        LinearLayout box = new LinearLayout(this);
-        box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding((int) (20 * dp), (int) (8 * dp), (int) (20 * dp), (int) (24 * dp));
+        View content = getLayoutInflater().inflate(R.layout.sheet_updates, null);
+        LinearLayout box = content.findViewById(R.id.suList);
+        int n = map.size();
+        ((TextView) content.findViewById(R.id.suTitle)).setText(onlyTitle == null ? "Nouveaux chapitres" : onlyTitle);
+        ((TextView) content.findViewById(R.id.suSub)).setText(n == 0 ? "Rien de neuf pour l'instant : tu es à jour"
+                : (n > 1 ? n + " séries · " : "") + "touche un site pour ouvrir le chapitre");
 
-        TextView head = new TextView(this);
-        head.setText(onlyTitle == null ? "🔔 Nouveaux chapitres" : "🔔 " + onlyTitle);
-        head.setTextSize(20);
-        head.setTypeface(android.graphics.Typeface.create("sans-serif-black", android.graphics.Typeface.NORMAL));
-        head.setTextColor(ContextCompat.getColor(this, R.color.text_main));
-        box.addView(head);
-        TextView hint = new TextView(this);
-        hint.setText("Touche un site pour ouvrir le chapitre dans ton navigateur (nouvel onglet) ou dans l'appli du site.");
-        hint.setTextColor(ContextCompat.getColor(this, R.color.text_soft));
-        hint.setTextSize(13);
-        hint.setPadding(0, (int) (4 * dp), 0, (int) (8 * dp));
-        box.addView(hint);
-
-        if (map.isEmpty()) {
-            TextView none = new TextView(this);
-            none.setText("Rien de neuf pour l'instant : tu es à jour 🎉");
-            none.setTextColor(ContextCompat.getColor(this, R.color.text_main));
-            none.setPadding(0, (int) (12 * dp), 0, 0);
-            box.addView(none);
-        }
-
+        int index = 0;
         for (List<DbHelper.Release> list : map.values()) {
             DbHelper.Release top = list.get(0);
             View row = getLayoutInflater().inflate(R.layout.item_update, box, false);
             SeriesAdapter.bindCover(row.findViewById(R.id.uAvatar), row.findViewById(R.id.uCover), top.title);
             ((TextView) row.findViewById(R.id.uTitle)).setText(top.title);
-            double last = DbHelper.get(this).lastRead(top.title);
-            ((TextView) row.findViewById(R.id.uSub)).setText("Ch. " + Detector.formatChapter(top.chapter)
-                    + " dispo · tu en es au " + Detector.formatChapter(last));
+            double last = db.lastRead(top.title);
+            ((TextView) row.findViewById(R.id.uSub)).setText(cap(SourceRegistry.unitShort(top.url)) + " "
+                    + Detector.formatChapter(top.chapter) + " dispo · tu en es au " + Detector.formatChapter(last));
             com.google.android.material.chip.ChipGroup sites = row.findViewById(R.id.uSites);
+            List<DbHelper.Edition> eds = db.getEditions(top.title);
             java.util.Set<String> seen = new java.util.HashSet<>();
             for (DbHelper.Release r : list) {
-                if (r.url == null || !seen.add(r.label + r.lang)) continue;
-                com.google.android.material.chip.Chip c = (com.google.android.material.chip.Chip)
-                        getLayoutInflater().inflate(R.layout.chip_site, sites, false);
-                c.setText((r.lang == null || r.lang.isEmpty() ? "" : r.lang + " · ") + r.label + " · ch. "
-                        + Detector.formatChapter(r.chapter));
-                c.setOnClickListener(x -> {
-                    try {
-                        startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(r.url)));
-                    } catch (Exception e) {
-                        Toast.makeText(this, "Impossible d'ouvrir le lien", Toast.LENGTH_SHORT).show();
+                if (r.url == null || !seen.add(r.label + "|" + r.lang)) continue;
+                String ch = SourceRegistry.unitShort(r.url) + " " + Detector.formatChapter(r.chapter);
+                int kind = CHIP_SITE;
+                String text;
+                if ("Site".equals(r.source)) {
+                    text = "Nouveau sur " + r.label + " · " + ch;
+                } else {
+                    text = (r.lang == null || r.lang.isEmpty() ? "" : r.lang + " · ") + r.label + " · " + ch;
+                    Boolean free = null;
+                    for (DbHelper.Edition e : eds) {
+                        if (e.platform != null && e.platform.equals(r.label) && e.lang != null && e.lang.equalsIgnoreCase(r.lang)) {
+                            free = e.freeFor(r.chapter);
+                        }
                     }
-                });
-                sites.addView(c);
+                    if (free != null) {
+                        kind = free ? CHIP_FREE : CHIP_PAID;
+                        text += free ? " · gratuit" : " · payant";
+                    }
+                }
+                final String url = r.url;
+                sites.addView(siteChip(sites, text, kind, () -> openLink(url)));
+            }
+            // Payants repérés sur tes sites : « WEBTOON · 33 → 36 payants »
+            java.util.TreeMap<String, java.util.TreeSet<Double>> locked = new java.util.TreeMap<>();
+            for (DbHelper.Lock l : db.getLocks(top.title)) {
+                if (l.active() && l.chapter > last) locked.computeIfAbsent(l.host, k -> new java.util.TreeSet<>()).add(l.chapter);
+            }
+            for (java.util.Map.Entry<String, java.util.TreeSet<Double>> e : locked.entrySet()) {
+                java.util.TreeSet<Double> c = e.getValue();
+                String range = c.size() == 1 ? Detector.formatChapter(c.first()) + " payant"
+                        : Detector.formatChapter(c.first()) + " → " + Detector.formatChapter(c.last()) + " payants";
+                sites.addView(siteChip(sites, SourceRegistry.name("https://" + e.getKey() + "/") + " · " + range, CHIP_PAID, () -> {
+                    sheet.dismiss();
+                    DetailActivity.open(this, top.title);
+                }));
             }
             row.findViewById(R.id.uResume).setOnClickListener(x -> Resume.open(this, top.title));
             row.setOnClickListener(x -> {
@@ -787,24 +870,50 @@ public class MainActivity extends AppCompatActivity {
                 DetailActivity.open(this, top.title);
             });
             box.addView(row);
+            Anim.pressAll(row);
+            Anim.enter(row, index++);
         }
 
-        com.google.android.material.button.MaterialButton check = new com.google.android.material.button.MaterialButton(
-                this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle);
-        check.setText("Vérifier maintenant");
-        check.setOnClickListener(x -> {
+        content.findViewById(R.id.suCheck).setOnClickListener(x -> {
             ChapterCheckWorker.checkNow(this);
             Toast.makeText(this, "Vérification lancée…", Toast.LENGTH_SHORT).show();
             sheet.dismiss();
         });
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
-        lp.topMargin = (int) (12 * dp);
-        box.addView(check, lp);
-
-        androidx.core.widget.NestedScrollView scroll = new androidx.core.widget.NestedScrollView(this);
-        scroll.addView(box);
-        sheet.setContentView(scroll);
+        long at = getSharedPreferences(NoteWriter.PREFS, MODE_PRIVATE).getLong("last_check", 0);
+        ((TextView) content.findViewById(R.id.suLast)).setText((at == 0 ? "Pas encore vérifié"
+                : "Vérifié " + DateUtils.getRelativeTimeSpanString(at, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS)
+                .toString().toLowerCase(Locale.FRANCE)) + " · listes complètes en Wi-Fi");
+        Anim.press(content.findViewById(R.id.suCheck));
+        sheet.setContentView(content);
         sheet.show();
+        View bell = content.findViewById(R.id.suBell);
+        bell.postDelayed(() -> Anim.ring(bell), 280);   // la cloche sonne à l'ouverture
+    }
+
+    /** Pastille d'un site ou d'une édition : lavande (site), orange (payant), vert (gratuit). */
+    private com.google.android.material.chip.Chip siteChip(ViewGroup parent, String text, int kind, Runnable click) {
+        com.google.android.material.chip.Chip c = (com.google.android.material.chip.Chip)
+                getLayoutInflater().inflate(R.layout.chip_site, parent, false);
+        c.setText(text);
+        if (kind != CHIP_SITE) {
+            int bg = ContextCompat.getColor(this, kind == CHIP_PAID ? R.color.ed_paid_bg : R.color.ed_free_bg);
+            int fg = ContextCompat.getColor(this, kind == CHIP_PAID ? R.color.ed_paid_text : R.color.ed_free_text);
+            c.setChipBackgroundColor(android.content.res.ColorStateList.valueOf(bg));
+            c.setTextColor(fg);
+            c.setChipIconTint(android.content.res.ColorStateList.valueOf(fg));
+            if (kind == CHIP_PAID) c.setChipIconResource(R.drawable.ic_lock);
+            else c.setChipIconVisible(false);
+        }
+        c.setOnClickListener(x -> click.run());
+        return c;
+    }
+
+    private void openLink(String url) {
+        try {
+            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+        } catch (Exception e) {
+            Toast.makeText(this, "Impossible d'ouvrir le lien", Toast.LENGTH_SHORT).show();
+        }
     }
 
     // ------------------------------------------------------------------ Tags

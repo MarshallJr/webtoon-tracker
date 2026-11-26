@@ -239,6 +239,8 @@ public class DetailActivity extends AppCompatActivity {
     private void onScrolled(int y) {
         View hero = findViewById(R.id.dHero);
         View topBar = findViewById(R.id.dTopBar);
+        // Parallaxe : l'image floutée du haut défile moins vite que la page.
+        if (Anim.on()) findViewById(R.id.dHeaderBg).setTranslationY(Math.min(y, hero.getHeight()) * 0.45f);
         float t = Math.max(0f, Math.min(1f, (y - hero.getHeight() * 0.35f) / (hero.getHeight() * 0.4f)));
         topBar.setBackgroundColor(ColorUtils.setAlphaComponent(ContextCompat.getColor(this, R.color.screen_bg), (int) (245 * t)));
         topBar.setElevation(t * dp(4));
@@ -365,11 +367,18 @@ public class DetailActivity extends AppCompatActivity {
 
     private void bindResume(DbHelper.Series s) {
         Progress pr = Progress.forResume(this, s.title);
-        String label = pr != null && pr.finished() ? "Chapitre suivant" : "Reprendre la lecture";
+        DbHelper.Meta m = db.getMeta(title);
+        boolean ep = "Épisode".equals(SourceRegistry.unit(m == null ? null : m.lastUrl));
+        String ch = Detector.formatChapter(s.lastChapter);
+        String label = pr != null && pr.finished() ? (ep ? "Épisode suivant" : "Chapitre suivant")
+                : "Reprendre " + (ep ? "l'épisode " : "le chapitre ") + ch;
         ((MaterialButton) findViewById(R.id.dResume)).setText(label);
         ((MaterialButton) findViewById(R.id.dStickyResume)).setText(label);
-        ((TextView) findViewById(R.id.dResumeHint)).setText("Dernier chapitre lu : " + Detector.formatChapter(s.lastChapter)
-                + (pr != null && !pr.finished() ? " · " + pr.where() : ""));
+        String when = "lu " + DateUtils.getRelativeTimeSpanString(s.lastReadAt, System.currentTimeMillis(),
+                DateUtils.MINUTE_IN_MILLIS).toString().toLowerCase(Locale.FRANCE);
+        ((TextView) findViewById(R.id.dResumeHint)).setText(pr != null && !pr.finished()
+                ? "Arrêté " + (pr.hasPanel() ? pr.where() : "à " + pr.percent() + " %") + " · " + when
+                : (ep ? "Épisode " : "Chapitre ") + ch + (pr != null ? " terminé · " : " · ") + when);
     }
 
     private void bindTracking(DbHelper.Series s) {
@@ -389,6 +398,7 @@ public class DetailActivity extends AppCompatActivity {
                 : new SimpleDateFormat("d MMM yyyy", Locale.FRANCE).format(new Date(first)));
     }
 
+    /** « Ta progression » : 32 / 36, barre qui se remplit, retard, et les payants de ton site. */
     private void bindProgress(DbHelper.Series s) {
         double last = s.lastChapter;
         List<DbHelper.Release> fresh = db.newReleases(title);
@@ -396,30 +406,60 @@ public class DetailActivity extends AppCompatActivity {
         SeriesInfo info = m == null ? null : SeriesInfo.parse(m.detailsJson);
         double latest = !fresh.isEmpty() ? fresh.get(0).chapter : (info != null && info.chapters > 0 ? info.chapters : 0);
         latest = Math.max(latest, db.siteLatest(title, null));   // liste complète du site où tu lis
+        String unit = SourceRegistry.unit(m == null ? null : m.lastUrl).toLowerCase(Locale.FRANCE);
 
         TextView value = findViewById(R.id.dProgValue);
         TextView sub = findViewById(R.id.dProgSub);
-        Progress pr = Progress.forResume(this, title);
-        String where = pr == null ? "" : "\n📍 " + (pr.finished()
-                ? "Chapitre " + Detector.formatChapter(pr.chapter) + " terminé"
-                : "Arrêté au ch. " + Detector.formatChapter(pr.chapter) + ", " + pr.where());
         LinearProgressIndicator bar = findViewById(R.id.dProgress);
+        int target;
         if (latest > last) {
             int behind = (int) Math.ceil(latest - last);
-            value.setText(Detector.formatChapter(last) + " / " + Detector.formatChapter(latest));
-            bar.setProgressCompat((int) (1000 * last / latest), true);
-            sub.setText(behind + (behind > 1 ? " chapitres" : " chapitre") + " de retard · ≈ "
-                    + StatsCalc.formatDuration((long) behind * StatsCalc.MINUTES_PER_CHAPTER) + " de lecture" + where);
+            String total = " / " + Detector.formatChapter(latest);
+            android.text.SpannableString v = new android.text.SpannableString(Detector.formatChapter(last) + total);
+            v.setSpan(new android.text.style.ForegroundColorSpan(ContextCompat.getColor(this, R.color.text_soft)),
+                    v.length() - total.length(), v.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            v.setSpan(new android.text.style.RelativeSizeSpan(0.78f), v.length() - total.length(), v.length(),
+                    android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            value.setText(v);
+            target = (int) (1000 * last / latest);
+            sub.setText(behind + " " + unit + (behind > 1 ? "s" : "") + " de retard · ≈ "
+                    + StatsCalc.formatDuration((long) behind * StatsCalc.MINUTES_PER_CHAPTER) + " de lecture");
         } else if (latest > 0) {
-            value.setText("À jour ✓");
-            bar.setProgressCompat(1000, true);
-            sub.setText("Tu as lu le dernier chapitre connu (ch. " + Detector.formatChapter(last) + ")." + where);
+            value.setText("À jour");
+            target = 1000;
+            sub.setText("Tu as lu le dernier " + unit + " connu (" + Detector.formatChapter(last) + ").");
         } else {
-            value.setText("Ch. " + Detector.formatChapter(last));
-            bar.setProgressCompat(1000, true);
-            sub.setText((db.isFollowed(title)
+            value.setText(Detector.formatChapter(last));
+            target = 1000;
+            sub.setText(db.isFollowed(title)
                     ? "Dernière sortie en cours de recherche…"
-                    : "Active la cloche 🔔 pour connaître la dernière sortie.") + where);
+                    : "Active les alertes pour connaître la dernière sortie.");
+        }
+        // La barre se remplit à l'ouverture de la fiche (et quand la valeur change).
+        Object was = bar.getTag();
+        if (!(was instanceof Integer) || (Integer) was != target) {
+            bar.setTag(target);
+            bar.setProgressCompat(0, false);
+            final int to = target;
+            bar.postDelayed(() -> bar.setProgressCompat(to, Anim.on()), 300);
+        }
+
+        // Payants repérés sur tes sites, plus loin que ton dernier lu.
+        TextView paid = findViewById(R.id.dProgPaid);
+        long now = System.currentTimeMillis();
+        int n = 0;
+        DbHelper.Lock soon = null;
+        for (DbHelper.Lock l : db.getLocks(title)) {
+            if (!l.active() || l.chapter <= last) continue;
+            n++;
+            if (l.freeAt > now && (soon == null || l.freeAt < soon.freeAt)) soon = l;
+        }
+        paid.setVisibility(n == 0 ? View.GONE : View.VISIBLE);
+        if (n > 0) {
+            paid.setText((n > 1 ? n + " payants ici · " : "Payant ici · ") + (soon != null
+                    ? "le " + Detector.formatChapter(soon.chapter) + " redevient gratuit "
+                    + ReadingTrackerService.inWords(soon.freeAt - now).replace("~", "")
+                    : "je te préviens dès qu'ils sont gratuits"));
         }
     }
 
@@ -450,6 +490,8 @@ public class DetailActivity extends AppCompatActivity {
      * Carte « Langues & sources » : les éditions officielles (et autorisées) de la série, dans toutes
      * les langues, avec le dernier chapitre connu et s'il est gratuit ou payant. Activée série par série.
      */
+    private int edShown = -1;
+
     private void bindEditions() {
         DbHelper.Meta m = db.getMeta(title);
         boolean on = m != null && m.editionsOn;
@@ -490,7 +532,14 @@ public class DetailActivity extends AppCompatActivity {
             }
         } else {
             sub.setText(editionsSummary(eds));
-            for (DbHelper.Edition e : eds) list.addView(editionRow(list, e));
+            double lastRead = db.lastRead(title);
+            boolean animate = eds.size() != edShown;
+            for (int i = 0; i < eds.size(); i++) {
+                View row = editionRow(list, eds.get(i), lastRead);
+                list.addView(row);
+                if (animate) Anim.enter(row, i);   // les langues arrivent en cascade
+            }
+            edShown = eds.size();
         }
         status.setVisibility(m.editionsAt > 0 || loading ? View.VISIBLE : View.GONE);
         status.setText(loading ? "Recherche sur AniList, MangaDex et WEBTOON…"
@@ -501,50 +550,68 @@ public class DetailActivity extends AppCompatActivity {
         if (!loading && now - m.editionsAt > Editions.STALE_MS && now - editionsTriedAt > 5 * 60_000) refreshEditions(false);
     }
 
-    /** « 🇰🇷 🇬🇧 🇪🇸 · plus avancée : ch. 36 🇬🇧 » */
+    /** « 3 éditions · 2 langues · la plus avancée : ép. 40 (EN) » */
     private String editionsSummary(List<DbHelper.Edition> eds) {
-        StringBuilder flags = new StringBuilder();
         Set<String> langs = new HashSet<>();
         DbHelper.Edition top = null;
+        int official = 0;
         for (DbHelper.Edition e : eds) {
-            String l = e.lang == null ? "?" : e.lang;
-            if (langs.add(l) && langs.size() <= 7) flags.append(SourceRegistry.flag(e.lang)).append(' ');
+            langs.add(e.lang == null ? "?" : e.lang);
+            if (e.category == SourceRegistry.OFFICIAL) official++;
             if (e.latest > 0 && (top == null || e.latest > top.latest)) top = e;
         }
-        String out = flags.toString().trim() + "  ·  " + langs.size() + (langs.size() > 1 ? " langues" : " langue");
-        if (top != null) out += "\nPlus avancée : ch. " + Detector.formatChapter(top.latest) + " " + SourceRegistry.flag(top.lang)
-                + " " + top.platform;
+        String out = eds.size() + (eds.size() > 1 ? " éditions" : " édition")
+                + (official == eds.size() ? (eds.size() > 1 ? " officielles" : " officielle") : "")
+                + " · " + langs.size() + (langs.size() > 1 ? " langues" : " langue");
+        if (top != null) out += "\nLa plus avancée : " + SourceRegistry.unitShort(top.url) + " " + Detector.formatChapter(top.latest)
+                + " (" + (top.lang == null ? "?" : top.lang.toUpperCase(Locale.ROOT)) + ")";
         return out;
     }
 
-    private View editionRow(LinearLayout parent, DbHelper.Edition e) {
+    /** Une édition en une ligne : « FR · WEBTOON · ép. 36 · [gratuit → 32] ». */
+    private View editionRow(LinearLayout parent, DbHelper.Edition e, double lastRead) {
         View row = getLayoutInflater().inflate(R.layout.item_edition, parent, false);
-        ((TextView) row.findViewById(R.id.edFlag)).setText(SourceRegistry.flag(e.lang));
-        ((TextView) row.findViewById(R.id.edName)).setText(e.platform == null ? SourceRegistry.name(e.url) : e.platform);
+        ((TextView) row.findViewById(R.id.edFlag)).setText(e.lang == null ? "?" : e.lang.toUpperCase(Locale.ROOT));
+        String name = e.platform == null ? SourceRegistry.name(e.url) : e.platform;
+        ((TextView) row.findViewById(R.id.edName)).setText(e.latest > 0
+                ? name + " · " + SourceRegistry.unitShort(e.url) + " " + Detector.formatChapter(e.latest) : name);
         TextView tag = row.findViewById(R.id.edTag);
-        boolean official = e.category == SourceRegistry.OFFICIAL;
-        tag.setText(official ? "OFFICIELLE" : "AUTORISÉE");
-        tint(tag, official ? R.color.badge_bg : R.color.ed_auth_bg, official ? R.color.badge_text : R.color.ed_auth_text);
+        if (e.category != SourceRegistry.OFFICIAL) {   // officielle : le cas courant, rien à signaler
+            tag.setText("AUTORISÉE");
+            tint(tag, R.color.ed_auth_bg, R.color.ed_auth_text);
+            tag.setVisibility(View.VISIBLE);
+        }
 
         StringBuilder d = new StringBuilder(SourceRegistry.langName(e.lang));
-        if (e.latest > 0) d.append(" · ch. ").append(Detector.formatChapter(e.latest));
         if (SourceRegistry.FASTPASS.equals(e.model) && e.freeUpto > 0) d.append(" · suivants en Fast Pass (appli)");
         else if (SourceRegistry.PREVIEW.equals(e.model)) d.append(" · derniers en avant-première payante");
+        else if (SourceRegistry.WAIT.equals(e.model)) d.append(" · gratuit en attendant");
         else if (e.userAdded && e.evidence != null) d.append(" · ").append(e.evidence.toLowerCase(Locale.FRANCE));
         ((TextView) row.findViewById(R.id.edDetail)).setText(d);
 
+        // Gratuit / payant, vu depuis ton dernier chapitre lu : « gratuit → 32 » ou « payant dès 33 ».
         TextView badge = row.findViewById(R.id.edBadge);
         String b = null;
         int bg = R.color.badge_bg, fg = R.color.badge_text;
-        if (SourceRegistry.FREE.equals(e.model) || SourceRegistry.PREVIEW.equals(e.model)
-                || (SourceRegistry.FASTPASS.equals(e.model) && e.freeUpto > 0)) {
-            b = "Gratuit";
+        boolean freeAll = SourceRegistry.FREE.equals(e.model);
+        if (e.freeUpto > 0 && !freeAll) {
+            if (lastRead >= e.freeUpto) {
+                b = "payant dès " + Detector.formatChapter(Math.floor(e.freeUpto) + 1);
+                bg = R.color.ed_paid_bg;
+                fg = R.color.ed_paid_text;
+            } else {
+                b = "gratuit → " + Detector.formatChapter(e.freeUpto);
+                bg = R.color.ed_free_bg;
+                fg = R.color.ed_free_text;
+            }
+        } else if (freeAll || SourceRegistry.PREVIEW.equals(e.model)) {
+            b = "gratuit";
             bg = R.color.ed_free_bg;
             fg = R.color.ed_free_text;
         } else if (SourceRegistry.WAIT.equals(e.model)) {
-            b = "Gratuit en attendant";
+            b = "attente";
         } else if (SourceRegistry.PAID.equals(e.model)) {
-            b = "Payant";
+            b = "payant";
             bg = R.color.ed_paid_bg;
             fg = R.color.ed_paid_text;
         }
@@ -766,6 +833,7 @@ public class DetailActivity extends AppCompatActivity {
         if (i == null) {
             meta.setText(s != null && s.score > 0 ? "★ " + SeriesAdapter.formatScore(s.score) + " / 10" : "");
             format.setVisibility(View.GONE);
+            findViewById(R.id.dAuthors).setVisibility(View.GONE);
             year.setText("");
             findViewById(R.id.dGenresTitle).setVisibility(View.GONE);
             findViewById(R.id.dCreditsTitle).setVisibility(View.GONE);
@@ -774,6 +842,11 @@ public class DetailActivity extends AppCompatActivity {
         }
         format.setVisibility(i.format == null ? View.GONE : View.VISIBLE);
         if (i.format != null) format.setText(i.format.toUpperCase(Locale.FRANCE));
+        java.util.LinkedHashSet<String> names = new java.util.LinkedHashSet<>();
+        for (String[] c : i.credits) if (names.size() < 3 && c[0] != null && !c[0].trim().isEmpty()) names.add(c[0].trim());
+        TextView authors = findViewById(R.id.dAuthors);
+        authors.setVisibility(names.isEmpty() ? View.GONE : View.VISIBLE);
+        authors.setText(String.join(" · ", names));
         year.setText(i.year > 0 ? String.valueOf(i.year) : "");
         List<String> parts = new ArrayList<>();
         if (i.status != null) parts.add("● " + i.status);

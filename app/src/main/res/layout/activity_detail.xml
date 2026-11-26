@@ -145,6 +145,17 @@
                             android:maxLines="4"
                             android:textColor="@color/text_main"
                             android:textSize="24sp" />
+
+                        <TextView
+                            android:id="@+id/dAuthors"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:ellipsize="end"
+                            android:maxLines="1"
+                            android:textColor="@color/text_soft"
+                            android:textSize="13sp"
+                            android:visibility="gone" />
                     </LinearLayout>
                 </LinearLayout>
 
@@ -269,6 +280,65 @@
                     android:clipChildren="false"
                     android:orientation="vertical">
 
+                    <!-- Ta progression : 32 / 36, retard, payants -->
+                    <LinearLayout
+                        android:id="@+id/dProgCard"
+                        style="@style/DetailCard">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:baselineAligned="true"
+                            android:orientation="horizontal">
+
+                            <TextView
+                                style="@style/CardTitle"
+                                android:layout_width="0dp"
+                                android:layout_weight="1"
+                                android:text="Ta progression" />
+
+                            <TextView
+                                android:id="@+id/dProgValue"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:fontFamily="sans-serif-black"
+                                android:textColor="@color/text_main"
+                                android:textSize="20sp" />
+                        </LinearLayout>
+
+                        <com.google.android.material.progressindicator.LinearProgressIndicator
+                            android:id="@+id/dProgress"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="10dp"
+                            android:max="1000"
+                            app:indicatorColor="@color/brand"
+                            app:trackColor="@color/badge_bg"
+                            app:trackCornerRadius="3dp"
+                            app:trackThickness="6dp" />
+
+                        <TextView
+                            android:id="@+id/dProgSub"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:textColor="@color/text_soft"
+                            android:textSize="13.5sp" />
+
+                        <TextView
+                            android:id="@+id/dProgPaid"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="5dp"
+                            android:drawableStart="@drawable/ic_lock_small"
+                            android:drawablePadding="6dp"
+                            android:drawableTint="@color/ed_paid_text"
+                            android:gravity="center_vertical"
+                            android:textColor="@color/ed_paid_text"
+                            android:textSize="13sp"
+                            android:visibility="gone" />
+                    </LinearLayout>
+
                     <LinearLayout
                         android:id="@+id/dWhereCard"
                         style="@style/DetailCard"
@@ -276,7 +346,7 @@
 
                         <TextView
                             style="@style/CardTitle"
-                            android:text="🔔 Où lire la suite" />
+                            android:text="Où lire la suite" />
 
                         <com.google.android.material.chip.ChipGroup
                             android:id="@+id/dWhere"
@@ -613,7 +683,7 @@
                             android:minHeight="36dp"
                             android:paddingStart="12dp"
                             android:paddingEnd="14dp"
-                            android:text="Aller au ch."
+                            android:text="Aller à l'épisode"
                             android:textColor="@color/badge_text"
                             android:textSize="13sp" />
 
@@ -840,50 +910,6 @@
                                     android:textSize="16sp" />
                             </LinearLayout>
                         </LinearLayout>
-                    </LinearLayout>
-
-                    <!-- Progression -->
-                    <LinearLayout style="@style/DetailCard">
-
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:gravity="bottom"
-                            android:orientation="horizontal">
-
-                            <TextView
-                                style="@style/CardTitle"
-                                android:layout_width="0dp"
-                                android:layout_weight="1"
-                                android:text="Progression" />
-
-                            <TextView
-                                android:id="@+id/dProgValue"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:fontFamily="sans-serif-black"
-                                android:textColor="@color/text_main"
-                                android:textSize="18sp" />
-                        </LinearLayout>
-
-                        <com.google.android.material.progressindicator.LinearProgressIndicator
-                            android:id="@+id/dProgress"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="10dp"
-                            android:max="1000"
-                            app:indicatorColor="@color/accent"
-                            app:trackColor="@color/chart_grid"
-                            app:trackCornerRadius="99dp"
-                            app:trackThickness="8dp" />
-
-                        <TextView
-                            android:id="@+id/dProgSub"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="8dp"
-                            android:textColor="@color/text_soft"
-                            android:textSize="13sp" />
                     </LinearLayout>
 
                     <!-- Mon avis -->
