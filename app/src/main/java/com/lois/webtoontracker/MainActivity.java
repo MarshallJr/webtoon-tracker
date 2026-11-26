@@ -376,16 +376,25 @@ public class MainActivity extends AppCompatActivity {
 
     // ------------------------------------------------------------------ Navigation
 
-    private static final int PAGE_HOME = 0, PAGE_LIBRARY = 1, PAGE_ACTIVITY = 2;
+    // Dans l'ordre du menu (le sens de glissement en dépend).
+    private static final int PAGE_HOME = 0, PAGE_LIBRARY = 1, PAGE_DISCOVER = 2, PAGE_ACTIVITY = 3;
+    private static final int[] PAGES = {R.id.pageHome, R.id.pageLibrary, R.id.pageDiscover, R.id.pageActivity};
+    private static final int[][] NAV = {
+            {R.id.navHomePill, R.id.navHomeIcon, R.id.navHomeLabel},
+            {R.id.navLibraryPill, R.id.navLibraryIcon, R.id.navLibraryLabel},
+            {R.id.navDiscoverPill, R.id.navDiscoverIcon, R.id.navDiscoverLabel},
+            {R.id.navActivityPill, R.id.navActivityIcon, R.id.navActivityLabel}};
     private int page = PAGE_HOME;
+    private DiscoverPage discover;
 
     private void setupNavigation() {
         ((GlassBar) findViewById(R.id.bottomNav)).setSource(findViewById(R.id.pages));   // effet verre
         findViewById(R.id.navHome).setOnClickListener(v -> showPage(PAGE_HOME));
         findViewById(R.id.navLibrary).setOnClickListener(v -> showPage(PAGE_LIBRARY));
+        findViewById(R.id.navDiscover).setOnClickListener(v -> showPage(PAGE_DISCOVER));
         findViewById(R.id.navActivity).setOnClickListener(v -> showPage(PAGE_ACTIVITY));
-        findViewById(R.id.navUpdates).setOnClickListener(v -> {
-            Anim.ring(findViewById(R.id.navUpdatesIcon));
+        findViewById(R.id.homeBell).setOnClickListener(v -> {
+            Anim.ring(v);
             showUpdates(null);
         });
         findViewById(R.id.navLogo).setOnClickListener(v -> onLogo());
@@ -405,14 +414,18 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void showPage(int p) {
-        if (p == page) {
-            ((androidx.core.widget.NestedScrollView) pageView(p)).smoothScrollTo(0, 0);
+        if (p == page) {   // onglet déjà ouvert : retour en haut
+            if (p == PAGE_DISCOVER) {
+                if (discover != null) discover.scrollTop();
+            } else {
+                ((androidx.core.widget.NestedScrollView) pageView(p)).smoothScrollTo(0, 0);
+            }
             return;
         }
         View from = pageView(page), to = pageView(p);
         int dir = p > page ? 1 : -1;   // vers la droite ou la gauche selon l'onglet choisi
         page = p;
-        for (int i = 0; i < 3; i++) {
+        for (int i = 0; i < PAGES.length; i++) {
             View pv = pageView(i);
             pv.animate().cancel();
             if (pv != from && pv != to) pv.setVisibility(View.GONE);
@@ -437,24 +450,23 @@ public class MainActivity extends AppCompatActivity {
         } else if (p == PAGE_LIBRARY) {
             RecyclerView list = findViewById(R.id.seriesList);
             if (list.getAdapter() != null) list.getAdapter().notifyDataSetChanged(); // les cartes arrivent en cascade
+        } else if (p == PAGE_DISCOVER) {
+            if (discover == null) discover = new DiscoverPage(this);
+            discover.onShow();
         }
         styleNav();
-        int[] icons = {R.id.navHomeIcon, R.id.navLibraryIcon, R.id.navActivityIcon};
-        Anim.pop(findViewById(icons[p]));
-        Anim.fadeInBackground(findViewById(p == PAGE_LIBRARY ? R.id.navLibraryPill : p == PAGE_ACTIVITY ? R.id.navActivityPill : R.id.navHomePill));
+        Anim.pop(findViewById(NAV[p][1]));
+        Anim.fadeInBackground(findViewById(NAV[p][0]));
     }
 
     private View pageView(int p) {
-        return findViewById(p == PAGE_LIBRARY ? R.id.pageLibrary : p == PAGE_ACTIVITY ? R.id.pageActivity : R.id.pageHome);
+        return findViewById(PAGES[p]);
     }
 
     /** Entrée active : pastille lavande derrière l'icône, icône et libellé en couleur. */
     private void styleNav() {
-        int[][] items = {
-                {R.id.navHomePill, R.id.navHomeIcon, R.id.navHomeLabel},
-                {R.id.navLibraryPill, R.id.navLibraryIcon, R.id.navLibraryLabel},
-                {R.id.navActivityPill, R.id.navActivityIcon, R.id.navActivityLabel}};
-        for (int i = 0; i < 3; i++) {
+        int[][] items = NAV;
+        for (int i = 0; i < items.length; i++) {
             boolean on = i == page;
             View pill = findViewById(items[i][0]);
             pill.setBackgroundResource(on ? R.drawable.bg_nav_selected : 0);
@@ -800,12 +812,12 @@ public class MainActivity extends AppCompatActivity {
         boolean wasShown = card.getVisibility() == View.VISIBLE;
         card.setVisibility(map.isEmpty() ? View.GONE : View.VISIBLE);
         int n = map.size();
-        TextView navBadge = findViewById(R.id.navUpdatesBadge);
+        TextView navBadge = findViewById(R.id.homeBellBadge);
         navBadge.setVisibility(n == 0 ? View.GONE : View.VISIBLE);
         navBadge.setText(n > 9 ? "9+" : String.valueOf(n));
         if (n > 0 && shownUpdates >= 0 && n > shownUpdates) {
             Anim.pop(navBadge);
-            Anim.ring(findViewById(R.id.navUpdatesIcon));   // une nouveauté de plus : la cloche sonne
+            Anim.ring(findViewById(R.id.homeBell));   // une nouveauté de plus : la cloche sonne
         }
         if (n == 0) {
             shownUpdates = 0;

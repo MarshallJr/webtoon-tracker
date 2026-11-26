@@ -70,6 +70,37 @@
                             android:textSize="24sp" />
                     </LinearLayout>
 
+                    <!-- Nouveautés : la cloche et sa pastille -->
+                    <FrameLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content">
+
+                        <ImageButton
+                            android:id="@+id/homeBell"
+                            style="@style/HeaderIcon"
+                            android:layout_width="46dp"
+                            android:layout_height="46dp"
+                            android:contentDescription="Nouveautés"
+                            android:src="@drawable/ic_bell" />
+
+                        <TextView
+                            android:id="@+id/homeBellBadge"
+                            android:layout_width="wrap_content"
+                            android:layout_height="18dp"
+                            android:layout_gravity="top|end"
+                            android:background="@drawable/bg_nav_badge"
+                            android:elevation="4dp"
+                            android:fontFamily="sans-serif-black"
+                            android:gravity="center"
+                            android:importantForAccessibility="no"
+                            android:minWidth="18dp"
+                            android:paddingStart="4dp"
+                            android:paddingEnd="4dp"
+                            android:textColor="@color/on_accent"
+                            android:textSize="10sp"
+                            android:visibility="gone" />
+                    </FrameLayout>
+
                     <ImageButton
                         android:id="@+id/settingsButton"
                         style="@style/HeaderIcon"
@@ -859,6 +890,19 @@
                 android:id="@+id/activityContent"
                 layout="@layout/stats_content" />
         </androidx.core.widget.NestedScrollView>
+
+        <!-- ═════════════════════ DÉCOUVRIR ═════════════════════ -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/pageDiscover"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:overScrollMode="ifContentScrolls"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
+            android:paddingBottom="@dimen/nav_space"
+            android:scrollbars="none"
+            android:visibility="gone" />
     </com.lois.webtoontracker.GlassSource>
 
     <!-- ═════════════════════ NAVIGATION ═════════════════════ -->
@@ -945,40 +989,23 @@
         </FrameLayout>
 
         <LinearLayout
-            android:id="@+id/navUpdates"
+            android:id="@+id/navDiscover"
             style="@style/NavItem">
 
             <FrameLayout
-                android:id="@+id/navUpdatesPill"
+                android:id="@+id/navDiscoverPill"
                 style="@style/NavPill">
 
                 <ImageView
-                    android:id="@+id/navUpdatesIcon"
+                    android:id="@+id/navDiscoverIcon"
                     style="@style/NavIcon"
-                    android:src="@drawable/ic_bell" />
-
-                <TextView
-                    android:id="@+id/navUpdatesBadge"
-                    android:layout_width="wrap_content"
-                    android:layout_height="16dp"
-                    android:layout_gravity="top|end"
-                    android:layout_marginTop="-2dp"
-                    android:layout_marginEnd="6dp"
-                    android:background="@drawable/bg_nav_badge"
-                    android:fontFamily="sans-serif-black"
-                    android:gravity="center"
-                    android:minWidth="16dp"
-                    android:paddingStart="4dp"
-                    android:paddingEnd="4dp"
-                    android:textColor="@color/on_accent"
-                    android:textSize="10sp"
-                    android:visibility="gone" />
+                    android:src="@drawable/ic_explore" />
             </FrameLayout>
 
             <TextView
-                android:id="@+id/navUpdatesLabel"
+                android:id="@+id/navDiscoverLabel"
                 style="@style/NavLabel"
-                android:text="Nouveautés" />
+                android:text="Découvrir" />
         </LinearLayout>
 
         <LinearLayout

@@ -7,6 +7,7 @@ import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Calendar;
 import java.util.List;
 import java.util.Set;
@@ -16,7 +17,7 @@ import java.util.TreeSet;
 public class DbHelper extends SQLiteOpenHelper {
 
     private static final String DB_NAME = "webtoons.db";
-    private static final int DB_VERSION = 10;
+    private static final int DB_VERSION = 11;
     private static DbHelper instance;
 
     public static synchronized DbHelper get(Context ctx) {
@@ -49,6 +50,12 @@ public class DbHelper extends SQLiteOpenHelper {
         upgradeTo8(db);
         upgradeTo9(db);
         upgradeTo10(db);
+        upgradeTo11(db);
+    }
+
+    /** v11 : « Ma liste à lire » (séries repérées dans Découvrir), identifiées par leur numéro AniList. */
+    private void upgradeTo11(SQLiteDatabase db) {
+        db.execSQL("CREATE TABLE IF NOT EXISTS wishlist (id INTEGER PRIMARY KEY, title TEXT NOT NULL, data TEXT, added_at INTEGER)");
     }
 
     /** v10 : index — historique d'une série (dernier lu, retard…) et statistiques par date, sans tout parcourir. */
@@ -170,6 +177,7 @@ public class DbHelper extends SQLiteOpenHelper {
         if (oldV < 8) upgradeTo8(db);
         if (oldV < 9) upgradeTo9(db);
         if (oldV < 10) upgradeTo10(db);
+        if (oldV < 11) upgradeTo11(db);
     }
 
     // ------------------------------------------------------------------ Modèles
@@ -1040,6 +1048,51 @@ public class DbHelper extends SQLiteOpenHelper {
         Meta m = metaOrNew(title);
         m.score = score;
         saveMeta(m);
+    }
+
+    /** Tous les noms connus (normalisés) des séries de la bibliothèque. */
+    public Set<String> aliasKeys() {
+        Set<String> out = new HashSet<>();
+        try (Cursor c = getReadableDatabase().rawQuery("SELECT alias_key FROM aliases", null)) {
+            while (c.moveToNext()) out.add(c.getString(0));
+        }
+        return out;
+    }
+
+    // ------------------------------------------------------------------ Ma liste à lire
+
+    /** Ajoute (ou met à jour) une série de « Ma liste à lire ». data : la carte AniList en JSON. */
+    public synchronized void addWish(int id, String title, String data, long at) {
+        ContentValues v = new ContentValues();
+        v.put("id", id);
+        v.put("title", title);
+        v.put("data", data);
+        v.put("added_at", at);
+        getWritableDatabase().insertWithOnConflict("wishlist", null, v, SQLiteDatabase.CONFLICT_REPLACE);
+    }
+
+    public synchronized void removeWish(int id) {
+        getWritableDatabase().delete("wishlist", "id = ?", new String[]{String.valueOf(id)});
+    }
+
+    /** {id, titre, données JSON, date d'ajout}, la plus récente d'abord. */
+    public List<String[]> wishes() {
+        List<String[]> out = new ArrayList<>();
+        try (Cursor c = getReadableDatabase().rawQuery("SELECT id, title, data, added_at FROM wishlist ORDER BY added_at DESC", null)) {
+            while (c.moveToNext()) {
+                out.add(new String[]{String.valueOf(c.getInt(0)), c.getString(1), c.isNull(2) ? null : c.getString(2),
+                        String.valueOf(c.getLong(3))});
+            }
+        }
+        return out;
+    }
+
+    public Set<Integer> wishIds() {
+        Set<Integer> out = new HashSet<>();
+        try (Cursor c = getReadableDatabase().rawQuery("SELECT id FROM wishlist", null)) {
+            while (c.moveToNext()) out.add(c.getInt(0));
+        }
+        return out;
     }
 
     /** Enregistre d'autres noms (anglais, romanisé, synonymes…) qui désignent la série "title". */

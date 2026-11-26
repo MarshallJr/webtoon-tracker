@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Filtres de « Découvrir » : type, note, statut, date de diffusion, genres, tes thèmes -->
+<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingStart="20dp"
+        android:paddingTop="10dp"
+        android:paddingEnd="20dp"
+        android:paddingBottom="24dp">
+
+        <View
+            android:layout_width="40dp"
+            android:layout_height="4dp"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginBottom="12dp"
+            android:background="@drawable/bg_handle" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:fontFamily="sans-serif-black"
+                android:text="Filtres"
+                android:textColor="@color/text_main"
+                android:textSize="22sp" />
+
+            <TextView
+                android:id="@+id/dfReset"
+                android:layout_width="wrap_content"
+                android:layout_height="44dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:fontFamily="sans-serif-medium"
+                android:gravity="center_vertical"
+                android:paddingStart="8dp"
+                android:paddingEnd="8dp"
+                android:text="Réinitialiser"
+                android:textColor="@color/brand"
+                android:textSize="14sp" />
+        </LinearLayout>
+
+        <TextView
+            style="@style/FilterTitle"
+            android:text="Type" />
+
+        <com.google.android.material.chip.ChipGroup
+            android:id="@+id/dfType"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            app:chipSpacingHorizontal="6dp"
+            app:chipSpacingVertical="0dp" />
+
+        <TextView
+            style="@style/FilterTitle"
+            android:text="Note minimale" />
+
+        <com.google.android.material.chip.ChipGroup
+            android:id="@+id/dfScore"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            app:chipSpacingHorizontal="6dp"
+            app:chipSpacingVertical="0dp" />
+
+        <TextView
+            style="@style/FilterTitle"
+            android:text="Statut" />
+
+        <com.google.android.material.chip.ChipGroup
+            android:id="@+id/dfStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            app:chipSpacingHorizontal="6dp"
+            app:chipSpacingVertical="0dp" />
+
+        <TextView
+            style="@style/FilterTitle"
+            android:text="Date de diffusion" />
+
+        <com.google.android.material.chip.ChipGroup
+            android:id="@+id/dfYear"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            app:chipSpacingHorizontal="6dp"
+            app:chipSpacingVertical="0dp" />
+
+        <TextView
+            style="@style/FilterTitle"
+            android:text="Genres" />
+
+        <com.google.android.material.chip.ChipGroup
+            android:id="@+id/dfGenres"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            app:chipSpacingHorizontal="6dp"
+            app:chipSpacingVertical="0dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Plusieurs genres : la série doit les avoir tous."
+            android:textColor="@color/text_soft"
+            android:textSize="12sp" />
+
+        <TextView
+            style="@style/FilterTitle"
+            android:id="@+id/dfTagsTitle"
+            android:text="Tes thèmes" />
+
+        <com.google.android.material.chip.ChipGroup
+            android:id="@+id/dfTags"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            app:chipSpacingHorizontal="6dp"
+            app:chipSpacingVertical="0dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/dfApply"
+            android:layout_width="match_parent"
+            android:layout_height="54dp"
+            android:layout_marginTop="22dp"
+            android:fontFamily="sans-serif-medium"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            android:text="Afficher les séries"
+            android:textColor="@color/on_accent"
+            android:textSize="16sp"
+            app:backgroundTint="@color/accent"
+            app:cornerRadius="27dp" />
+    </LinearLayout>
+</androidx.core.widget.NestedScrollView>

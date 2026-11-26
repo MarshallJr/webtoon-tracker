@@ -142,6 +142,15 @@ final class Anim {
         pop(v);
     }
 
+    /** Un tour complet (bouton « actualiser »). */
+    static void spin(View v) {
+        if (v == null || !on()) return;
+        v.animate().cancel();
+        v.setRotation(0f);
+        v.animate().rotation(360f).setStartDelay(0).setDuration(560).setInterpolator(EASE)
+                .withEndAction(() -> v.setRotation(0f)).start();
+    }
+
     /** Fond qui apparaît en fondu (pastille de la barre de navigation). */
     static void fadeInBackground(View v) {
         Drawable d = v.getBackground();

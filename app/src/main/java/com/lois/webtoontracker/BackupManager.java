@@ -81,6 +81,16 @@ public final class BackupManager {
         root.put("exportedAt", System.currentTimeMillis());
         root.put("settings", settings);
         root.put("reads", reads);
+        JSONArray wishes = new JSONArray();   // « Ma liste à lire »
+        for (String[] w : db.wishes()) {
+            JSONObject o = new JSONObject();
+            o.put("id", Integer.parseInt(w[0]));
+            o.put("title", w[1]);
+            if (w[2] != null) o.put("data", w[2]);
+            o.put("addedAt", Long.parseLong(w[3]));
+            wishes.put(o);
+        }
+        root.put("wishlist", wishes);
         return root.toString(1);
     }
 
@@ -156,6 +166,13 @@ public final class BackupManager {
                 if (m.note == null || m.note.isEmpty()) m.note = emptyToNull(o.optString("note"));
                 db.saveMeta(m);
             }
+        }
+        JSONArray wishes = root.optJSONArray("wishlist");
+        if (wishes != null) for (int i = 0; i < wishes.length(); i++) {
+            JSONObject o = wishes.optJSONObject(i);
+            if (o == null || o.optInt("id", 0) == 0) continue;
+            db.addWish(o.optInt("id"), o.optString("title", "?"), o.optString("data", null),
+                    o.optLong("addedAt", System.currentTimeMillis()));
         }
         JSONObject s = root.optJSONObject("settings");
         if (s != null) {

@@ -4,4 +4,5 @@
     <item name="anim_count" type="id" />
     <item name="anim_seen" type="id" />
     <item name="anim_counter" type="id" />
+    <item name="net_url" type="id" />
 </resources>
