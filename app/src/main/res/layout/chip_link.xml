@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Plateforme officielle d'une fiche Découvrir (KakaoPage · KO) : pilule de verre à contour violet -->
+<com.google.android.material.chip.Chip xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    style="@style/Widget.Material3.Chip.Assist"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:fontFamily="@font/inter_medium"
+    android:textColor="#FFF5F3FF"
+    android:textSize="14sp"
+    app:chipBackgroundColor="#D9120E20"
+    app:chipCornerRadius="999dp"
+    app:chipIcon="@drawable/ic_open"
+    app:chipIconSize="18dp"
+    app:chipIconTint="#FFC4B5FD"
+    app:chipMinHeight="44dp"
+    app:chipStartPadding="12dp"
+    app:chipEndPadding="14dp"
+    app:iconStartPadding="2dp"
+    app:textStartPadding="8dp"
+    app:chipStrokeColor="#808B7CF6"
+    app:chipStrokeWidth="1dp"
+    app:ensureMinTouchTargetSize="false" />

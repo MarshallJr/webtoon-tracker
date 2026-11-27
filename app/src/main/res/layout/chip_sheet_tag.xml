@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Genre ou thème d'une fiche Découvrir : contour violet ; plein violet quand c'est l'un de tes préférés -->
+<com.google.android.material.chip.Chip xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    style="@style/Widget.Material3.Chip.Assist"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:clickable="false"
+    android:fontFamily="@font/inter_semibold"
+    android:textColor="#FFEDE9FE"
+    android:textSize="14.5sp"
+    app:chipBackgroundColor="#B3120E20"
+    app:chipCornerRadius="999dp"
+    app:chipIconVisible="false"
+    app:chipMinHeight="42dp"
+    app:chipStartPadding="10dp"
+    app:chipEndPadding="10dp"
+    app:chipStrokeColor="#998B7CF6"
+    app:chipStrokeWidth="1dp"
+    app:ensureMinTouchTargetSize="false" />

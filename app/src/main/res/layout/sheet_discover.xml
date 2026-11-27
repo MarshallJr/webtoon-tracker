@@ -1,256 +1,354 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Fiche d'une série de « Découvrir » : note, genres, résumé, où la lire officiellement, ma liste -->
-<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<!-- Fiche d'une série de « Découvrir » : fond illustré (château, pics ou ruines sous l'orage), couverture
+     lumineuse, note, type, statut, chapitres disponibles, genres, résumé, où la lire officiellement, ma liste -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content">
 
-    <LinearLayout
+    <!-- Fond : l'une des trois illustrations (voir tools/sheet_bg.py), choisie par série -->
+    <com.google.android.material.imageview.ShapeableImageView
+        android:id="@+id/dsBg"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:paddingStart="20dp"
-        android:paddingTop="10dp"
-        android:paddingEnd="20dp"
-        android:paddingBottom="24dp">
+        android:layout_height="match_parent"
+        android:importantForAccessibility="no"
+        android:scaleType="centerCrop"
+        android:src="@drawable/sheet_bg_castle"
+        app:shapeAppearanceOverlay="@style/RoundedTopSheet" />
 
-        <View
-            android:layout_width="40dp"
-            android:layout_height="4dp"
-            android:layout_gravity="center_horizontal"
-            android:layout_marginBottom="16dp"
-            android:background="@drawable/bg_handle" />
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/bg_sheet_scrim"
+        android:importantForAccessibility="no" />
+
+    <androidx.core.widget.NestedScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal">
+            android:orientation="vertical"
+            android:paddingStart="20dp"
+            android:paddingTop="12dp"
+            android:paddingEnd="20dp"
+            android:paddingBottom="22dp">
 
-            <com.google.android.material.imageview.ShapeableImageView
-                android:id="@+id/dsCover"
-                android:layout_width="104dp"
-                android:layout_height="150dp"
-                android:contentDescription="@null"
-                android:scaleType="centerCrop"
-                app:shapeAppearanceOverlay="@style/RoundedGrid" />
+            <View
+                android:layout_width="48dp"
+                android:layout_height="5dp"
+                android:layout_gravity="center_horizontal"
+                android:layout_marginBottom="22dp"
+                android:background="@drawable/bg_handle_violet" />
 
             <LinearLayout
-                android:layout_width="0dp"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="16dp"
-                android:layout_weight="1"
-                android:orientation="vertical">
+                android:orientation="horizontal">
 
-                <TextView
-                    android:id="@+id/dsTitle"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:ellipsize="end"
-                    android:fontFamily="@font/inter_bold"
-                    android:maxLines="3"
-                    android:textColor="@color/text_main"
-                    android:textSize="20sp" />
+                <!-- Couverture à liseré violet lumineux -->
+                <FrameLayout
+                    android:layout_width="122dp"
+                    android:layout_height="158dp"
+                    android:background="@drawable/bg_cover_glow"
+                    android:elevation="14dp"
+                    android:outlineAmbientShadowColor="@color/logo_glow"
+                    android:outlineSpotShadowColor="@color/logo_glow"
+                    android:padding="2dp">
 
-                <TextView
-                    android:id="@+id/dsAlt"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
-                    android:ellipsize="end"
-                    android:maxLines="2"
-                    android:textColor="@color/text_soft"
-                    android:textSize="12.5sp" />
+                    <com.google.android.material.imageview.ShapeableImageView
+                        android:id="@+id/dsCover"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:contentDescription="@null"
+                        android:scaleType="centerCrop"
+                        app:shapeAppearanceOverlay="@style/RoundedCover" />
+                </FrameLayout>
 
                 <LinearLayout
-                    android:layout_width="match_parent"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    android:orientation="horizontal">
+                    android:layout_marginStart="16dp"
+                    android:layout_weight="1"
+                    android:orientation="vertical"
+                    android:paddingTop="4dp">
 
                     <TextView
-                        android:id="@+id/dsScore"
-                        android:layout_width="wrap_content"
+                        android:id="@+id/dsTitle"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginEnd="6dp"
-                        android:background="@drawable/bg_tag_small"
-                        android:fontFamily="@font/inter_bold"
-                        android:paddingStart="8dp"
-                        android:paddingTop="3dp"
-                        android:paddingEnd="8dp"
-                        android:paddingBottom="3dp"
-                        android:textColor="@color/accent"
+                        android:ellipsize="end"
+                        android:fontFamily="@font/inter_display_bold"
+                        android:letterSpacing="-0.01"
+                        android:lineSpacingExtra="1dp"
+                        android:maxLines="3"
+                        android:shadowColor="#99000000"
+                        android:shadowDy="1"
+                        android:shadowRadius="4"
+                        android:textColor="@color/text_main"
+                        android:textSize="21sp" />
+
+                    <TextView
+                        android:id="@+id/dsAlt"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:ellipsize="end"
+                        android:maxLines="2"
+                        android:textColor="#FFB4A8DC"
                         android:textSize="13sp" />
 
-                    <TextView
-                        android:id="@+id/dsType"
-                        android:layout_width="wrap_content"
+                    <!-- ★ 7,5 · Manhwa · En cours -->
+                    <com.google.android.material.chip.ChipGroup
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginEnd="6dp"
-                        android:background="@drawable/bg_tag_small"
-                        android:fontFamily="@font/inter_semibold"
-                        android:paddingStart="8dp"
-                        android:paddingTop="3dp"
-                        android:paddingEnd="8dp"
-                        android:paddingBottom="3dp"
-                        android:textColor="@color/badge_text"
-                        android:textSize="12.5sp" />
+                        android:layout_marginTop="12dp"
+                        app:chipSpacingHorizontal="8dp"
+                        app:chipSpacingVertical="8dp">
+
+                        <TextView
+                            android:id="@+id/dsScore"
+                            style="@style/SheetPill"
+                            android:drawableStart="@drawable/ic_star_small"
+                            android:drawablePadding="5dp"
+                            android:fontFamily="@font/inter_bold"
+                            android:textColor="#FFFFFFFF" />
+
+                        <TextView
+                            android:id="@+id/dsType"
+                            style="@style/SheetPill" />
+
+                        <TextView
+                            android:id="@+id/dsStatus"
+                            style="@style/SheetPill" />
+                    </com.google.android.material.chip.ChipGroup>
+
+                    <!-- 2021 · 39 k lecteurs · 201 chapitres (chapitres en violet souligné) -->
+                    <TextView
+                        android:id="@+id/dsFacts"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:lineSpacingExtra="2dp"
+                        android:textColor="#FFD4CEE8"
+                        android:textSize="13.5sp" />
 
                     <TextView
-                        android:id="@+id/dsStatus"
-                        android:layout_width="wrap_content"
+                        android:id="@+id/dsAuthors"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:background="@drawable/bg_tag_small"
-                        android:fontFamily="@font/inter_semibold"
-                        android:paddingStart="8dp"
-                        android:paddingTop="3dp"
-                        android:paddingEnd="8dp"
-                        android:paddingBottom="3dp"
-                        android:textColor="@color/badge_text"
-                        android:textSize="12.5sp" />
+                        android:layout_marginTop="4dp"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:textColor="@color/text_soft"
+                        android:textSize="12.5sp"
+                        android:visibility="gone" />
                 </LinearLayout>
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/dsBecause"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:drawableStart="@drawable/ic_sparkle_small"
+                android:drawablePadding="8dp"
+                android:gravity="center_vertical"
+                android:textColor="@color/badge_text"
+                android:textSize="13.5sp"
+                android:visibility="gone" />
+
+            <com.google.android.material.chip.ChipGroup
+                android:id="@+id/dsGenres"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                app:chipSpacingHorizontal="8dp"
+                app:chipSpacingVertical="4dp" />
+
+            <!-- ✦ Résumé ───────── -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <ImageView
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_sparkle_grad" />
 
                 <TextView
-                    android:id="@+id/dsFacts"
+                    style="@style/SheetSectionTitle"
+                    android:text="Résumé" />
+
+                <View style="@style/SheetSectionLine" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:background="@drawable/bg_synopsis"
+                android:elevation="6dp"
+                android:orientation="vertical"
+                android:outlineAmbientShadowColor="@color/shadow"
+                android:outlineSpotShadowColor="@color/shadow"
+                android:paddingStart="16dp"
+                android:paddingTop="14dp"
+                android:paddingEnd="16dp"
+                android:paddingBottom="6dp">
+
+                <ProgressBar
+                    android:id="@+id/dsLoading"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_marginBottom="8dp"
+                    android:indeterminateTint="@color/primary_bright" />
+
+                <TextView
+                    android:id="@+id/dsDesc"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:textColor="@color/text_soft"
+                    android:ellipsize="end"
+                    android:lineSpacingExtra="4dp"
+                    android:maxLines="7"
+                    android:textColor="#FFEDE9FE"
+                    android:textSize="14.5sp"
+                    android:visibility="gone" />
+
+                <TextView
+                    android:id="@+id/dsMore"
+                    android:layout_width="wrap_content"
+                    android:layout_height="40dp"
+                    android:drawableEnd="@drawable/ic_chevron_right"
+                    android:drawablePadding="4dp"
+                    android:drawableTint="@color/primary_bright"
+                    android:fontFamily="@font/inter_semibold"
+                    android:gravity="center_vertical"
+                    android:text="Lire la suite"
+                    android:textColor="@color/primary_bright"
+                    android:textSize="14.5sp"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+            <!-- ▶ Où la lire ───────── -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="22dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <ImageView
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_play_badge" />
+
+                <TextView
+                    style="@style/SheetSectionTitle"
+                    android:text="Où la lire" />
+
+                <View style="@style/SheetSectionLine" />
+            </LinearLayout>
+
+            <com.google.android.material.chip.ChipGroup
+                android:id="@+id/dsLinks"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                app:chipSpacingHorizontal="10dp"
+                app:chipSpacingVertical="2dp" />
+
+            <TextView
+                android:id="@+id/dsNoLink"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="Aucune plateforme officielle connue pour l'instant."
+                android:textColor="@color/text_soft"
+                android:textSize="13sp"
+                android:visibility="gone" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
+                android:orientation="horizontal">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/dsWish"
+                    android:layout_width="0dp"
+                    android:layout_height="58dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_primary_button"
+                    android:elevation="12dp"
+                    android:fontFamily="@font/inter_bold"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
+                    android:outlineAmbientShadowColor="@color/logo_glow"
+                    android:outlineSpotShadowColor="@color/logo_glow"
+                    android:textSize="16sp"
+                    app:backgroundTint="@null"
+                    app:iconGravity="textStart"
+                    app:iconPadding="10dp"
+                    app:iconSize="20dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/dsAnilist"
+                    android:layout_width="wrap_content"
+                    android:layout_height="58dp"
+                    android:layout_marginStart="12dp"
+                    android:background="@drawable/bg_button_glass"
+                    android:fontFamily="@font/inter_semibold"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
+                    android:paddingStart="20dp"
+                    android:paddingEnd="22dp"
+                    android:text="AniList"
+                    android:textColor="@color/badge_text"
+                    android:textSize="15sp"
+                    app:backgroundTint="@null"
+                    app:icon="@drawable/ic_outward"
+                    app:iconGravity="textStart"
+                    app:iconPadding="8dp"
+                    app:iconSize="18dp"
+                    app:iconTint="@color/badge_text" />
+            </LinearLayout>
+
+            <!-- ─── Données : AniList ─── -->
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_horizontal"
+                android:layout_marginTop="18dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <View
+                    android:layout_width="44dp"
+                    android:layout_height="1dp"
+                    android:background="@drawable/bg_credit_line" />
+
+                <TextView
+                    android:id="@+id/dsCredit"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp"
+                    android:layout_marginEnd="12dp"
+                    android:text="Données : AniList"
+                    android:textColor="#FFB4A8DC"
                     android:textSize="12.5sp" />
+
+                <View
+                    android:layout_width="44dp"
+                    android:layout_height="1dp"
+                    android:background="@drawable/bg_credit_line" />
             </LinearLayout>
         </LinearLayout>
-
-        <TextView
-            android:id="@+id/dsBecause"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="14dp"
-            android:drawableStart="@drawable/ic_star"
-            android:drawablePadding="8dp"
-            android:drawableTint="@color/brand"
-            android:gravity="center_vertical"
-            android:textColor="@color/badge_text"
-            android:textSize="13.5sp"
-            android:visibility="gone" />
-
-        <com.google.android.material.chip.ChipGroup
-            android:id="@+id/dsGenres"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            app:chipSpacingHorizontal="6dp"
-            app:chipSpacingVertical="2dp" />
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:fontFamily="@font/inter_bold"
-            android:text="Résumé"
-            android:textColor="@color/text_main"
-            android:textSize="16sp" />
-
-        <ProgressBar
-            android:id="@+id/dsLoading"
-            android:layout_width="24dp"
-            android:layout_height="24dp"
-            android:layout_marginTop="8dp"
-            android:indeterminateTint="@color/brand" />
-
-        <TextView
-            android:id="@+id/dsDesc"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:ellipsize="end"
-            android:lineSpacingExtra="3dp"
-            android:maxLines="7"
-            android:textColor="@color/text_main"
-            android:textSize="14sp"
-            android:visibility="gone" />
-
-        <TextView
-            android:id="@+id/dsMore"
-            android:layout_width="wrap_content"
-            android:layout_height="40dp"
-            android:fontFamily="@font/inter_semibold"
-            android:gravity="center_vertical"
-            android:text="Lire la suite"
-            android:textColor="@color/brand"
-            android:textSize="13.5sp"
-            android:visibility="gone" />
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="14dp"
-            android:fontFamily="@font/inter_bold"
-            android:text="Où la lire"
-            android:textColor="@color/text_main"
-            android:textSize="16sp" />
-
-        <com.google.android.material.chip.ChipGroup
-            android:id="@+id/dsLinks"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            app:chipSpacingHorizontal="6dp" />
-
-        <TextView
-            android:id="@+id/dsNoLink"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:text="Aucune plateforme officielle connue pour l'instant."
-            android:textColor="@color/text_soft"
-            android:textSize="13sp"
-            android:visibility="gone" />
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
-            android:orientation="horizontal">
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/dsWish"
-                android:layout_width="0dp"
-                android:layout_height="52dp"
-                android:layout_weight="1"
-                android:fontFamily="@font/inter_semibold"
-                android:insetTop="0dp"
-                android:insetBottom="0dp"
-                android:textSize="15sp"
-                app:cornerRadius="26dp"
-                app:iconGravity="textStart"
-                app:iconSize="18dp" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/dsAnilist"
-                style="@style/WT.Button.Outlined"
-                android:layout_width="wrap_content"
-                android:layout_height="52dp"
-                android:layout_marginStart="10dp"
-                android:fontFamily="@font/inter_semibold"
-                android:insetTop="0dp"
-                android:insetBottom="0dp"
-                android:text="AniList"
-                android:textColor="@color/badge_text"
-                app:cornerRadius="26dp"
-                app:icon="@drawable/ic_outward"
-                app:iconGravity="textStart"
-                app:iconSize="16dp"
-                app:iconTint="@color/badge_text"
-                app:strokeColor="@color/hairline_strong" />
-        </LinearLayout>
-
-        <TextView
-            android:id="@+id/dsCredit"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:gravity="center"
-            android:text="Données : AniList"
-            android:textColor="@color/text_soft"
-            android:textSize="11.5sp" />
-    </LinearLayout>
-</androidx.core.widget.NestedScrollView>
+    </androidx.core.widget.NestedScrollView>
+</FrameLayout>

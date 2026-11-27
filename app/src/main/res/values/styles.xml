@@ -198,6 +198,47 @@
         <item name="cornerSize">17dp</item>
     </style>
 
+    <style name="RoundedTopSheet">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSizeTopLeft">28dp</item>
+        <item name="cornerSizeTopRight">28dp</item>
+        <item name="cornerSizeBottomLeft">0dp</item>
+        <item name="cornerSizeBottomRight">0dp</item>
+    </style>
+
+    <!-- Fiche Découvrir : titre de section (Résumé, Où la lire) -->
+    <style name="SheetSectionTitle">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginStart">12dp</item>
+        <item name="android:fontFamily">@font/inter_display_bold</item>
+        <item name="android:textColor">@color/text_main</item>
+        <item name="android:textSize">19sp</item>
+    </style>
+
+    <style name="SheetSectionLine">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">1.5dp</item>
+        <item name="android:layout_marginStart">14dp</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:background">@drawable/bg_section_line</item>
+    </style>
+
+    <style name="SheetPill">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:background">@drawable/bg_pill_violet</item>
+        <item name="android:fontFamily">@font/inter_semibold</item>
+        <item name="android:gravity">center_vertical</item>
+        <item name="android:includeFontPadding">false</item>
+        <item name="android:paddingStart">12dp</item>
+        <item name="android:paddingTop">7dp</item>
+        <item name="android:paddingEnd">12dp</item>
+        <item name="android:paddingBottom">7dp</item>
+        <item name="android:textColor">#FFE9D5FF</item>
+        <item name="android:textSize">13.5sp</item>
+    </style>
+
     <style name="RoundedTile">
         <item name="cornerFamily">rounded</item>
         <item name="cornerSize">14dp</item>

@@ -616,10 +616,19 @@ final class DiscoverPage {
     // ------------------------------------------------------------------ Fiche d'une série
 
     /** La fiche d'une série du catalogue (aussi ouverte depuis l'accueil). */
+    /** Fonds illustrés de la fiche (images originales, voir tools/sheet_bg.py) : un par série, au hasard stable. */
+    private static final int[] SHEET_BGS = {R.drawable.sheet_bg_castle, R.drawable.sheet_bg_peaks, R.drawable.sheet_bg_ruins};
+
+    /** Chapitres publiés sur WEBTOON (flux officiel), par série : {nombre, langue}. */
+    private final java.util.Map<Integer, String[]> webtoonCount = new java.util.HashMap<>();
+
     void openMedia(Discover.Media m) {
         if (!started) wishIds = DbHelper.get(act).wishIds();
         BottomSheetDialog sheet = new BottomSheetDialog(act);
         View v = LayoutInflater.from(act).inflate(R.layout.sheet_discover, null);
+        android.widget.ImageView bg = v.findViewById(R.id.dsBg);
+        bg.setImageResource(SHEET_BGS[Math.floorMod(m.id != 0 ? m.id : m.title.hashCode(), SHEET_BGS.length)]);
+        CoverCards.cropTop(bg, 0f);
         NetImages.load(v.findViewById(R.id.dsCover), m.cover, m.color);
         bindSheet(v, m);
         MaterialButton wish = v.findViewById(R.id.dsWish);
@@ -642,6 +651,7 @@ final class DiscoverPage {
         Anim.pop(v.findViewById(R.id.dsCover));
         if (m.full) {
             bindDetails(v, m);
+            loadWebtoonCount(v, sheet, m);
         } else {
             IO.execute(() -> {
                 Discover.Media full;
@@ -666,6 +676,7 @@ final class DiscoverPage {
                     f.because = m.because;
                     bindSheet(v, f);
                     bindDetails(v, f);
+                    loadWebtoonCount(v, sheet, f);
                 });
             });
         }
@@ -684,12 +695,10 @@ final class DiscoverPage {
         String st = m.statusFr();
         status.setVisibility(st == null ? View.GONE : View.VISIBLE);
         status.setText(st);
-        List<String> facts = new ArrayList<>();
-        if (!m.authors.isEmpty()) facts.add(String.join(", ", m.authors.subList(0, Math.min(2, m.authors.size()))));
-        if (m.year > 0) facts.add(String.valueOf(m.year));
-        if (m.chapters > 0) facts.add(m.chapters + " chapitres");
-        if (m.popularity > 0) facts.add(readers(m.popularity) + " lecteurs");
-        ((TextView) v.findViewById(R.id.dsFacts)).setText(String.join(" · ", facts));
+        bindFacts(v, m);
+        TextView authors = v.findViewById(R.id.dsAuthors);
+        authors.setVisibility(m.authors.isEmpty() ? View.GONE : View.VISIBLE);
+        if (!m.authors.isEmpty()) authors.setText("de " + String.join(", ", m.authors.subList(0, Math.min(2, m.authors.size()))));
         TextView because = v.findViewById(R.id.dsBecause);
         because.setVisibility(m.because == null ? View.GONE : View.VISIBLE);
         if (m.because != null) {
@@ -707,6 +716,65 @@ final class DiscoverPage {
         }
     }
 
+    /**
+     * « 2021 · 39 k lecteurs · 201 chapitres » : chapitres en violet souligné. Le nombre vient d'AniList
+     * (séries terminées) ou, pour une série en cours publiée sur WEBTOON, de son flux officiel.
+     */
+    private void bindFacts(View v, Discover.Media m) {
+        android.text.SpannableStringBuilder sb = new android.text.SpannableStringBuilder();
+        if (m.year > 0) sb.append(String.valueOf(m.year));
+        if (m.popularity > 0) sb.append(sb.length() > 0 ? " · " : "").append(readers(m.popularity)).append(" lecteurs");
+        String[] wt = webtoonCount.get(countKey(m));
+        String ch = m.chapters > 0 ? m.chapters + " chapitres"
+                : wt != null ? wt[0] + " chapitres sur WEBTOON" + (wt[1] == null ? "" : " " + wt[1]) : null;
+        if (ch != null) {
+            if (sb.length() > 0) sb.append(" · ");
+            int start = sb.length();
+            sb.append(ch);
+            sb.setSpan(new android.text.style.ForegroundColorSpan(ContextCompat.getColor(act, R.color.primary_bright)),
+                    start, sb.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            sb.setSpan(new android.text.style.UnderlineSpan(), start, sb.length(), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        }
+        TextView facts = v.findViewById(R.id.dsFacts);
+        facts.setVisibility(sb.length() == 0 ? View.GONE : View.VISIBLE);
+        facts.setText(sb);
+    }
+
+    /**
+     * Série en cours (AniList ne donne pas son nombre de chapitres) publiée sur WEBTOON : le dernier
+     * épisode public se lit dans le flux officiel de la série (le même que pour tes éditions).
+     */
+    private static int countKey(Discover.Media m) {
+        return m.id != 0 ? m.id : m.title.hashCode();   // fiche MangaDex seule : pas d'identifiant AniList
+    }
+
+    private void loadWebtoonCount(View v, BottomSheetDialog sheet, Discover.Media m) {
+        if (m.chapters > 0 || webtoonCount.containsKey(countKey(m))) return;
+        String url = null;
+        for (String[] l : m.links) {
+            if (!SourceRegistry.isWebtoons(l[1]) || Detector.parseSeriesLink(l[1]) == null) continue;
+            String lang = SourceRegistry.langFromUrl(l[1]);
+            if (url == null || "fr".equals(lang) || ("en".equals(lang) && !"fr".equals(SourceRegistry.langFromUrl(url)))) url = l[1];
+        }
+        if (url == null) return;
+        final String link = url;
+        IO.execute(() -> {
+            try {
+                DbHelper.Edition e = Editions.edition(link, "WEBTOON", SourceRegistry.langFromUrl(link),
+                        SourceRegistry.classify(link, true), "Fiche Découvrir", SourceRegistry.FASTPASS);
+                Editions.webtoonEpisodes(e);
+                if (e.latest < 1) return;
+                String lang = e.lang == null ? null : e.lang.toUpperCase(java.util.Locale.ROOT);
+                ui.post(() -> {
+                    webtoonCount.put(countKey(m), new String[]{Detector.formatChapter(e.latest), lang});
+                    if (sheet.isShowing()) bindFacts(v, m);
+                });
+            } catch (Exception ignored) {
+                // pas de flux lisible : on n'affiche simplement pas de nombre
+            }
+        });
+    }
+
     private void bindDetails(View v, Discover.Media m) {
         v.findViewById(R.id.dsLoading).setVisibility(View.GONE);
         TextView desc = v.findViewById(R.id.dsDesc), more = v.findViewById(R.id.dsMore);
@@ -718,7 +786,7 @@ final class DiscoverPage {
         ChipGroup links = v.findViewById(R.id.dsLinks);
         links.removeAllViews();
         for (String[] l : m.links) {
-            Chip c = (Chip) LayoutInflater.from(act).inflate(R.layout.chip_site, links, false);
+            Chip c = (Chip) LayoutInflater.from(act).inflate(R.layout.chip_link, links, false);
             c.setText(l[0]);
             c.setOnClickListener(x -> open(l[1]));
             links.addView(c);
@@ -729,34 +797,29 @@ final class DiscoverPage {
 
     /** Pastille de genre ou de thème ; en couleur si c'est l'un de tes préférés. */
     private Chip tagChip(ChipGroup parent, String label, boolean mine) {
-        Chip c = (Chip) LayoutInflater.from(act).inflate(R.layout.chip_filter, parent, false);
+        Chip c = (Chip) LayoutInflater.from(act).inflate(R.layout.chip_sheet_tag, parent, false);
         c.setText(label);
         c.setCheckable(false);
         c.setClickable(false);
         if (mine) {
-            c.setChipBackgroundColor(android.content.res.ColorStateList.valueOf(ContextCompat.getColor(act, R.color.badge_bg)));
-            c.setTextColor(ContextCompat.getColor(act, R.color.badge_text));
+            c.setChipBackgroundColor(android.content.res.ColorStateList.valueOf(ContextCompat.getColor(act, R.color.brand)));
+            c.setChipStrokeColor(android.content.res.ColorStateList.valueOf(ContextCompat.getColor(act, R.color.primary_bright)));
+            c.setTextColor(0xFFFFFFFF);
         }
         return c;
     }
 
-    /** Genre de la fiche aux couleurs de sa famille (comme sur les cartes) ; liseré si c'est un de tes genres. */
+    /** Genre de la fiche ; plein violet si c'est l'un de tes genres préférés. */
     private Chip genreChip(ChipGroup parent, String genre, boolean mine) {
-        Chip c = tagChip(parent, Discover.genreFr(genre), false);
-        int[] col = CoverCards.genreColors(genre);
-        int fg = ContextCompat.getColor(act, col[0]);
-        c.setChipBackgroundColor(android.content.res.ColorStateList.valueOf(ContextCompat.getColor(act, col[1])));
-        c.setTextColor(fg);
-        c.setChipStrokeColor(android.content.res.ColorStateList.valueOf(mine ? fg : 0x00000000));
-        return c;
+        return tagChip(parent, Discover.genreFr(genre), mine);
     }
 
     private void bindWishButton(MaterialButton b, boolean in) {
         b.setText(in ? "Dans ma liste" : "Ajouter à ma liste");
         b.setIconResource(in ? R.drawable.ic_check : R.drawable.ic_bookmark_border);
-        int bg = ContextCompat.getColor(act, in ? R.color.badge_bg : R.color.accent);
-        int fg = ContextCompat.getColor(act, in ? R.color.badge_text : R.color.on_accent);
-        b.setBackgroundTintList(android.content.res.ColorStateList.valueOf(bg));
+        b.setBackgroundTintList(null);
+        b.setBackgroundResource(in ? R.drawable.bg_button_glass : R.drawable.bg_primary_button);
+        int fg = in ? ContextCompat.getColor(act, R.color.badge_text) : 0xFFFFFFFF;
         b.setTextColor(fg);
         b.setIconTint(android.content.res.ColorStateList.valueOf(fg));
     }

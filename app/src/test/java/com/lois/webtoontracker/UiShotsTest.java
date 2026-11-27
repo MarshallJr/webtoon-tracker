@@ -78,6 +78,26 @@ public class UiShotsTest {
         Shots.dialog(d, a, "phone_sheet");
     }
 
+    /** Série en cours publiée sur WEBTOON (Tower of God) : le nombre de chapitres vient du flux officiel. */
+    @Test
+    public void discoverSheetWebtoon() throws Exception {
+        org.json.JSONObject real = Fixtures.anilist(Fixtures.TITLES);
+        org.json.JSONObject tog = real == null ? null : real.optJSONObject("a6");
+        org.junit.Assume.assumeTrue("AniList injoignable", tog != null);
+        MainActivity a = main();
+        a.findViewById(R.id.navDiscover).performClick();
+        Shots.idle(2000);
+        Discover.Media m = new Discover.Media();
+        m.id = tog.optInt("id");
+        m.title = Fixtures.TITLES[6];
+        m.cover = tog.optJSONObject("coverImage").optString("extraLarge");
+        a.discoverPage().openMedia(m);
+        Shots.idle(9000);   // fiche AniList puis flux WEBTOON (réseau de la CI)
+        Dialog d = ShadowDialog.getLatestDialog();
+        assertNotNull("Fiche Découvrir", d);
+        Shots.dialog(d, a, "phone_sheet_webtoon");
+    }
+
     @Test
     public void activity() throws Exception {
         MainActivity a = main();

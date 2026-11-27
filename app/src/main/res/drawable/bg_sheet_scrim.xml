@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Voile sur le fond illustré de la fiche : texte lisible, l'image reste visible sur les bords -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <corners android:topLeftRadius="28dp" android:topRightRadius="28dp" />
+            <gradient android:angle="270" android:startColor="#4D090714" android:centerColor="#8C090714"
+                android:endColor="#40090714" />
+        </shape>
+    </item>
+</layer-list>
