@@ -1,0 +1,376 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.lois.webtoontracker.UiShotsTest" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-11-27T07:04:14.697Z" hostname="runnervm3lb7s" time="66.441">
+  <properties/>
+  <testcase name="activity" classname="com.lois.webtoontracker.UiShotsTest" time="5.287"/>
+  <testcase name="detail" classname="com.lois.webtoontracker.UiShotsTest" time="8.471"/>
+  <testcase name="updates" classname="com.lois.webtoontracker.UiShotsTest" time="4.249"/>
+  <testcase name="home" classname="com.lois.webtoontracker.UiShotsTest" time="3.681"/>
+  <testcase name="library" classname="com.lois.webtoontracker.UiShotsTest" time="4.741"/>
+  <testcase name="discover" classname="com.lois.webtoontracker.UiShotsTest" time="9.271"/>
+  <testcase name="settings" classname="com.lois.webtoontracker.UiShotsTest" time="4.055"/>
+  <testcase name="discoverSheetWebtoon" classname="com.lois.webtoontracker.UiShotsTest" time="14.298"/>
+  <testcase name="discoverSheet" classname="com.lois.webtoontracker.UiShotsTest" time="12.388"/>
+  <system-out><![CDATA[inter_regular path=res/font/inter_regular.ttf cookie=2 file=true weight=400 same=true
+inter_medium path=res/font/inter_medium.ttf cookie=2 file=true weight=500 same=true
+inter_semibold path=res/font/inter_semibold.ttf cookie=2 file=true weight=600 same=true
+inter_bold path=res/font/inter_bold.ttf cookie=2 file=true weight=700 same=true
+inter_display_bold path=res/font/inter_display_bold.ttf cookie=2 file=true weight=700 same=true
+inter_display_extrabold path=res/font/inter_display_extrabold.ttf cookie=2 file=true weight=800 same=true
+
+inter_regular path=res/font/inter_regular.ttf cookie=2 file=true weight=400 same=true
+inter_medium path=res/font/inter_medium.ttf cookie=2 file=true weight=500 same=true
+inter_semibold path=res/font/inter_semibold.ttf cookie=2 file=true weight=600 same=true
+inter_bold path=res/font/inter_bold.ttf cookie=2 file=true weight=700 same=true
+inter_display_bold path=res/font/inter_display_bold.ttf cookie=2 file=true weight=700 same=true
+inter_display_extrabold path=res/font/inter_display_extrabold.ttf cookie=2 file=true weight=800 same=true
+
+inter_regular path=res/font/inter_regular.ttf cookie=2 file=true weight=400 same=true
+inter_medium path=res/font/inter_medium.ttf cookie=2 file=true weight=500 same=true
+inter_semibold path=res/font/inter_semibold.ttf cookie=2 file=true weight=600 same=true
+inter_bold path=res/font/inter_bold.ttf cookie=2 file=true weight=700 same=true
+inter_display_bold path=res/font/inter_display_bold.ttf cookie=2 file=true weight=700 same=true
+inter_display_extrabold path=res/font/inter_display_extrabold.ttf cookie=2 file=true weight=800 same=true
+
+inter_regular path=res/font/inter_regular.ttf cookie=2 file=true weight=400 same=true
+inter_medium path=res/font/inter_medium.ttf cookie=2 file=true weight=500 same=true
+inter_semibold path=res/font/inter_semibold.ttf cookie=2 file=true weight=600 same=true
+inter_bold path=res/font/inter_bold.ttf cookie=2 file=true weight=700 same=true
+inter_display_bold path=res/font/inter_display_bold.ttf cookie=2 file=true weight=700 same=true
+inter_display_extrabold path=res/font/inter_display_extrabold.ttf cookie=2 file=true weight=800 same=true
+
+inter_regular path=res/font/inter_regular.ttf cookie=2 file=true weight=400 same=true
+inter_medium path=res/font/inter_medium.ttf cookie=2 file=true weight=500 same=true
+inter_semibold path=res/font/inter_semibold.ttf cookie=2 file=true weight=600 same=true
+inter_bold path=res/font/inter_bold.ttf cookie=2 file=true weight=700 same=true
+inter_display_bold path=res/font/inter_display_bold.ttf cookie=2 file=true weight=700 same=true
+inter_display_extrabold path=res/font/inter_display_extrabold.ttf cookie=2 file=true weight=800 same=true
+
+inter_regular path=res/font/inter_regular.ttf cookie=2 file=true weight=400 same=true
+inter_medium path=res/font/inter_medium.ttf cookie=2 file=true weight=500 same=true
+inter_semibold path=res/font/inter_semibold.ttf cookie=2 file=true weight=600 same=true
+inter_bold path=res/font/inter_bold.ttf cookie=2 file=true weight=700 same=true
+inter_display_bold path=res/font/inter_display_bold.ttf cookie=2 file=true weight=700 same=true
+inter_display_extrabold path=res/font/inter_display_extrabold.ttf cookie=2 file=true weight=800 same=true
+
+inter_regular path=res/font/inter_regular.ttf cookie=2 file=true weight=400 same=true
+inter_medium path=res/font/inter_medium.ttf cookie=2 file=true weight=500 same=true
+inter_semibold path=res/font/inter_semibold.ttf cookie=2 file=true weight=600 same=true
+inter_bold path=res/font/inter_bold.ttf cookie=2 file=true weight=700 same=true
+inter_display_bold path=res/font/inter_display_bold.ttf cookie=2 file=true weight=700 same=true
+inter_display_extrabold path=res/font/inter_display_extrabold.ttf cookie=2 file=true weight=800 same=true
+
+inter_regular path=res/font/inter_regular.ttf cookie=2 file=true weight=400 same=true
+inter_medium path=res/font/inter_medium.ttf cookie=2 file=true weight=500 same=true
+inter_semibold path=res/font/inter_semibold.ttf cookie=2 file=true weight=600 same=true
+inter_bold path=res/font/inter_bold.ttf cookie=2 file=true weight=700 same=true
+inter_display_bold path=res/font/inter_display_bold.ttf cookie=2 file=true weight=700 same=true
+inter_display_extrabold path=res/font/inter_display_extrabold.ttf cookie=2 file=true weight=800 same=true
+
+inter_regular path=res/font/inter_regular.ttf cookie=2 file=true weight=400 same=true
+inter_medium path=res/font/inter_medium.ttf cookie=2 file=true weight=500 same=true
+inter_semibold path=res/font/inter_semibold.ttf cookie=2 file=true weight=600 same=true
+inter_bold path=res/font/inter_bold.ttf cookie=2 file=true weight=700 same=true
+inter_display_bold path=res/font/inter_display_bold.ttf cookie=2 file=true weight=700 same=true
+inter_display_extrabold path=res/font/inter_display_extrabold.ttf cookie=2 file=true weight=800 same=true
+
+]]></system-out>
+  <system-err><![CDATA[Invalid ID 0x00000000.
+System.logW: A resource was acquired at attached stack trace but never released. See java.io.Closeable for information on avoiding resource leaks.
+java.lang.Throwable: Explicit termination method 'close' not called
+	at dalvik.system.CloseGuard.$$robo$$dalvik_system_CloseGuard$openWithCallSite(CloseGuard.java:288)
+	at dalvik.system.CloseGuard.openWithCallSite(CloseGuard.java)
+	at dalvik.system.CloseGuard.$$robo$$dalvik_system_CloseGuard$open(CloseGuard.java:257)
+	at jdk.internal.reflect.GeneratedMethodAccessor3.invoke(Unknown Source)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at org.robolectric.shadows.ShadowCloseGuard$CloseGuardReflector$$Reflector17.open(Unknown Source)
+	at org.robolectric.shadows.ShadowCloseGuard.open(ShadowCloseGuard.java:38)
+	at dalvik.system.CloseGuard.open(CloseGuard.java)
+	at android.database.sqlite.SQLiteDatabase.$$robo$$android_database_sqlite_SQLiteDatabase$openInner(SQLiteDatabase.java:1088)
+	at android.database.sqlite.SQLiteDatabase.openInner(SQLiteDatabase.java)
+	at android.database.sqlite.SQLiteDatabase.$$robo$$android_database_sqlite_SQLiteDatabase$open(SQLiteDatabase.java:1067)
+	at android.database.sqlite.SQLiteDatabase.open(SQLiteDatabase.java)
+	at android.database.sqlite.SQLiteDatabase.$$robo$$android_database_sqlite_SQLiteDatabase$openDatabase(SQLiteDatabase.java:931)
+	at android.database.sqlite.SQLiteDatabase.openDatabase(SQLiteDatabase.java)
+	at android.database.sqlite.SQLiteDatabase.$$robo$$android_database_sqlite_SQLiteDatabase$createInMemory(SQLiteDatabase.java:1127)
+	at android.database.sqlite.SQLiteDatabase.createInMemory(SQLiteDatabase.java)
+	at android.database.sqlite.SQLiteOpenHelper.$$robo$$android_database_sqlite_SQLiteOpenHelper$getDatabaseLocked(SQLiteOpenHelper.java:368)
+	at android.database.sqlite.SQLiteOpenHelper.getDatabaseLocked(SQLiteOpenHelper.java)
+	at android.database.sqlite.SQLiteOpenHelper.$$robo$$android_database_sqlite_SQLiteOpenHelper$getWritableDatabase(SQLiteOpenHelper.java:316)
+	at android.database.sqlite.SQLiteOpenHelper.getWritableDatabase(SQLiteOpenHelper.java)
+	at androidx.sqlite.db.framework.FrameworkSQLiteOpenHelper$OpenHelper.getWritableOrReadableDatabase(FrameworkSQLiteOpenHelper.kt:231)
+	at androidx.sqlite.db.framework.FrameworkSQLiteOpenHelper$OpenHelper.innerGetDatabase(FrameworkSQLiteOpenHelper.kt:176)
+	at androidx.sqlite.db.framework.FrameworkSQLiteOpenHelper$OpenHelper.getSupportDatabase(FrameworkSQLiteOpenHelper.kt:151)
+	at androidx.sqlite.db.framework.FrameworkSQLiteOpenHelper.getWritableDatabase(FrameworkSQLiteOpenHelper.kt:104)
+	at androidx.room.RoomDatabase.inTransaction(RoomDatabase.kt:629)
+	at androidx.room.RoomDatabase.assertNotSuspendingTransaction(RoomDatabase.kt:448)
+	at androidx.work.impl.model.SystemIdInfoDao_Impl.getWorkSpecIds(SystemIdInfoDao_Impl.java:165)
+	at androidx.work.impl.background.systemjob.SystemJobScheduler.reconcileJobs(SystemJobScheduler.java:310)
+	at androidx.work.impl.utils.ForceStopRunnable.cleanUp(ForceStopRunnable.java:289)
+	at androidx.work.impl.utils.ForceStopRunnable.forceStopRunnable(ForceStopRunnable.java:252)
+	at androidx.work.impl.utils.ForceStopRunnable.run(ForceStopRunnable.java:135)
+	at androidx.work.impl.utils.SerialExecutorImpl$Task.run(SerialExecutorImpl.java:96)
+	at androidx.work.testing.SynchronousExecutor.execute(SynchronousExecutor.java:30)
+	at androidx.work.impl.utils.SerialExecutorImpl.scheduleNext(SerialExecutorImpl.java:60)
+	at androidx.work.impl.utils.SerialExecutorImpl.execute(SerialExecutorImpl.java:51)
+	at androidx.work.impl.utils.taskexecutor.TaskExecutor.executeOnTaskThread(TaskExecutor.java:46)
+	at androidx.work.impl.WorkManagerImpl.<init>(WorkManagerImpl.java:252)
+	at androidx.work.impl.WorkManagerImplExtKt.createWorkManager(WorkManagerImplExt.kt:49)
+	at androidx.work.impl.WorkManagerImplExtKt.createWorkManager$default(WorkManagerImplExt.kt:29)
+	at androidx.work.testing.TestWorkManagerImplKt.createTestWorkManagerImpl(TestWorkManagerImpl.kt:45)
+	at androidx.work.testing.WorkManagerTestInitHelper.initializeTestWorkManager(WorkManagerTestInitHelper.java:131)
+	at androidx.work.testing.WorkManagerTestInitHelper.initializeTestWorkManager(WorkManagerTestInitHelper.java:64)
+	at androidx.work.testing.WorkManagerTestInitHelper.initializeTestWorkManager(WorkManagerTestInitHelper.java:50)
+	at com.lois.webtoontracker.Shots.prepare(Shots.java:37)
+	at com.lois.webtoontracker.UiShotsTest.setUp(UiShotsTest.java:34)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at org.junit.runners.model.FrameworkMethod$1.runReflectiveCall(FrameworkMethod.java:59)
+	at org.junit.internal.runners.model.ReflectiveCallable.run(ReflectiveCallable.java:12)
+	at org.junit.runners.model.FrameworkMethod.invokeExplosively(FrameworkMethod.java:56)
+	at org.junit.internal.runners.statements.RunBefores.invokeMethod(RunBefores.java:33)
+	at org.junit.internal.runners.statements.RunBefores.evaluate(RunBefores.java:24)
+	at org.junit.runners.ParentRunner$3.evaluate(ParentRunner.java:306)
+	at org.robolectric.RobolectricTestRunner$HelperTestRunner$1.evaluate(RobolectricTestRunner.java:502)
+	at org.robolectric.internal.SandboxTestRunner$2.lambda$evaluate$2(SandboxTestRunner.java:285)
+	at org.robolectric.internal.bytecode.Sandbox.lambda$runOnMainThread$0(Sandbox.java:104)
+	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:264)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1136)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:635)
+	at java.base/java.lang.Thread.run(Thread.java:840)
+
+Invalid ID 0x00000000.
+Invalid ID 0x00000000.
+Invalid ID 0x00000000.
+System.logW: A resource was acquired at attached stack trace but never released. See java.io.Closeable for information on avoiding resource leaks.
+java.lang.Throwable: Explicit termination method 'close' not called
+	at dalvik.system.CloseGuard.$$robo$$dalvik_system_CloseGuard$openWithCallSite(CloseGuard.java:288)
+	at dalvik.system.CloseGuard.openWithCallSite(CloseGuard.java)
+	at dalvik.system.CloseGuard.$$robo$$dalvik_system_CloseGuard$open(CloseGuard.java:257)
+	at jdk.internal.reflect.GeneratedMethodAccessor3.invoke(Unknown Source)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at org.robolectric.shadows.ShadowCloseGuard$CloseGuardReflector$$Reflector17.open(Unknown Source)
+	at org.robolectric.shadows.ShadowCloseGuard.open(ShadowCloseGuard.java:38)
+	at dalvik.system.CloseGuard.open(CloseGuard.java)
+	at android.database.sqlite.SQLiteDatabase.$$robo$$android_database_sqlite_SQLiteDatabase$openInner(SQLiteDatabase.java:1088)
+	at android.database.sqlite.SQLiteDatabase.openInner(SQLiteDatabase.java)
+	at android.database.sqlite.SQLiteDatabase.$$robo$$android_database_sqlite_SQLiteDatabase$open(SQLiteDatabase.java:1067)
+	at android.database.sqlite.SQLiteDatabase.open(SQLiteDatabase.java)
+	at android.database.sqlite.SQLiteDatabase.$$robo$$android_database_sqlite_SQLiteDatabase$openDatabase(SQLiteDatabase.java:931)
+	at android.database.sqlite.SQLiteDatabase.openDatabase(SQLiteDatabase.java)
+	at android.database.sqlite.SQLiteDatabase.$$robo$$android_database_sqlite_SQLiteDatabase$createInMemory(SQLiteDatabase.java:1127)
+	at android.database.sqlite.SQLiteDatabase.createInMemory(SQLiteDatabase.java)
+	at android.database.sqlite.SQLiteOpenHelper.$$robo$$android_database_sqlite_SQLiteOpenHelper$getDatabaseLocked(SQLiteOpenHelper.java:368)
+	at android.database.sqlite.SQLiteOpenHelper.getDatabaseLocked(SQLiteOpenHelper.java)
+	at android.database.sqlite.SQLiteOpenHelper.$$robo$$android_database_sqlite_SQLiteOpenHelper$getWritableDatabase(SQLiteOpenHelper.java:316)
+	at android.database.sqlite.SQLiteOpenHelper.getWritableDatabase(SQLiteOpenHelper.java)
+	at androidx.sqlite.db.framework.FrameworkSQLiteOpenHelper$OpenHelper.getWritableOrReadableDatabase(FrameworkSQLiteOpenHelper.kt:231)
+	at androidx.sqlite.db.framework.FrameworkSQLiteOpenHelper$OpenHelper.innerGetDatabase(FrameworkSQLiteOpenHelper.kt:176)
+	at androidx.sqlite.db.framework.FrameworkSQLiteOpenHelper$OpenHelper.getSupportDatabase(FrameworkSQLiteOpenHelper.kt:151)
+	at androidx.sqlite.db.framework.FrameworkSQLiteOpenHelper.getWritableDatabase(FrameworkSQLiteOpenHelper.kt:104)
+	at androidx.room.RoomDatabase.inTransaction(RoomDatabase.kt:629)
+	at androidx.room.RoomDatabase.assertNotSuspendingTransaction(RoomDatabase.kt:448)
+	at androidx.work.impl.model.SystemIdInfoDao_Impl.getWorkSpecIds(SystemIdInfoDao_Impl.java:165)
+	at androidx.work.impl.background.systemjob.SystemJobScheduler.reconcileJobs(SystemJobScheduler.java:310)
+	at androidx.work.impl.utils.ForceStopRunnable.cleanUp(ForceStopRunnable.java:289)
+	at androidx.work.impl.utils.ForceStopRunnable.forceStopRunnable(ForceStopRunnable.java:252)
+	at androidx.work.impl.utils.ForceStopRunnable.run(ForceStopRunnable.java:135)
+	at androidx.work.impl.utils.SerialExecutorImpl$Task.run(SerialExecutorImpl.java:96)
+	at androidx.work.testing.SynchronousExecutor.execute(SynchronousExecutor.java:30)
+	at androidx.work.impl.utils.SerialExecutorImpl.scheduleNext(SerialExecutorImpl.java:60)
+	at androidx.work.impl.utils.SerialExecutorImpl.execute(SerialExecutorImpl.java:51)
+	at androidx.work.impl.utils.taskexecutor.TaskExecutor.executeOnTaskThread(TaskExecutor.java:46)
+	at androidx.work.impl.WorkManagerImpl.<init>(WorkManagerImpl.java:252)
+	at androidx.work.impl.WorkManagerImplExtKt.createWorkManager(WorkManagerImplExt.kt:49)
+	at androidx.work.impl.WorkManagerImplExtKt.createWorkManager$default(WorkManagerImplExt.kt:29)
+	at androidx.work.testing.TestWorkManagerImplKt.createTestWorkManagerImpl(TestWorkManagerImpl.kt:45)
+	at androidx.work.testing.WorkManagerTestInitHelper.initializeTestWorkManager(WorkManagerTestInitHelper.java:131)
+	at androidx.work.testing.WorkManagerTestInitHelper.initializeTestWorkManager(WorkManagerTestInitHelper.java:64)
+	at androidx.work.testing.WorkManagerTestInitHelper.initializeTestWorkManager(WorkManagerTestInitHelper.java:50)
+	at com.lois.webtoontracker.Shots.prepare(Shots.java:37)
+	at com.lois.webtoontracker.UiShotsTest.setUp(UiShotsTest.java:34)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at org.junit.runners.model.FrameworkMethod$1.runReflectiveCall(FrameworkMethod.java:59)
+	at org.junit.internal.runners.model.ReflectiveCallable.run(ReflectiveCallable.java:12)
+	at org.junit.runners.model.FrameworkMethod.invokeExplosively(FrameworkMethod.java:56)
+	at org.junit.internal.runners.statements.RunBefores.invokeMethod(RunBefores.java:33)
+	at org.junit.internal.runners.statements.RunBefores.evaluate(RunBefores.java:24)
+	at org.junit.runners.ParentRunner$3.evaluate(ParentRunner.java:306)
+	at org.robolectric.RobolectricTestRunner$HelperTestRunner$1.evaluate(RobolectricTestRunner.java:502)
+	at org.robolectric.internal.SandboxTestRunner$2.lambda$evaluate$2(SandboxTestRunner.java:285)
+	at org.robolectric.internal.bytecode.Sandbox.lambda$runOnMainThread$0(Sandbox.java:104)
+	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:264)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1136)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:635)
+	at java.base/java.lang.Thread.run(Thread.java:840)
+
+System.logW: A resource was acquired at attached stack trace but never released. See java.io.Closeable for information on avoiding resource leaks.
+java.lang.Throwable: Explicit termination method 'close' not called
+	at dalvik.system.CloseGuard.$$robo$$dalvik_system_CloseGuard$openWithCallSite(CloseGuard.java:288)
+	at dalvik.system.CloseGuard.openWithCallSite(CloseGuard.java)
+	at dalvik.system.CloseGuard.$$robo$$dalvik_system_CloseGuard$open(CloseGuard.java:257)
+	at jdk.internal.reflect.GeneratedMethodAccessor3.invoke(Unknown Source)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at org.robolectric.shadows.ShadowCloseGuard$CloseGuardReflector$$Reflector17.open(Unknown Source)
+	at org.robolectric.shadows.ShadowCloseGuard.open(ShadowCloseGuard.java:38)
+	at dalvik.system.CloseGuard.open(CloseGuard.java)
+	at android.database.sqlite.SQLiteDatabase.$$robo$$android_database_sqlite_SQLiteDatabase$openInner(SQLiteDatabase.java:1088)
+	at android.database.sqlite.SQLiteDatabase.openInner(SQLiteDatabase.java)
+	at android.database.sqlite.SQLiteDatabase.$$robo$$android_database_sqlite_SQLiteDatabase$open(SQLiteDatabase.java:1067)
+	at android.database.sqlite.SQLiteDatabase.open(SQLiteDatabase.java)
+	at android.database.sqlite.SQLiteDatabase.$$robo$$android_database_sqlite_SQLiteDatabase$openDatabase(SQLiteDatabase.java:931)
+	at android.database.sqlite.SQLiteDatabase.openDatabase(SQLiteDatabase.java)
+	at android.database.sqlite.SQLiteDatabase.$$robo$$android_database_sqlite_SQLiteDatabase$openDatabase(SQLiteDatabase.java:920)
+	at android.database.sqlite.SQLiteDatabase.openDatabase(SQLiteDatabase.java)
+	at android.database.sqlite.SQLiteOpenHelper.$$robo$$android_database_sqlite_SQLiteOpenHelper$getDatabaseLocked(SQLiteOpenHelper.java:373)
+	at android.database.sqlite.SQLiteOpenHelper.getDatabaseLocked(SQLiteOpenHelper.java)
+	at android.database.sqlite.SQLiteOpenHelper.$$robo$$android_database_sqlite_SQLiteOpenHelper$getWritableDatabase(SQLiteOpenHelper.java:316)
+	at android.database.sqlite.SQLiteOpenHelper.getWritableDatabase(SQLiteOpenHelper.java)
+	at com.lois.webtoontracker.DbHelper.insertRead(DbHelper.java:310)
+	at com.lois.webtoontracker.Fixtures.seed(Fixtures.java:61)
+	at com.lois.webtoontracker.Shots.prepare(Shots.java:42)
+	at com.lois.webtoontracker.UiShotsTest.setUp(UiShotsTest.java:34)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at org.junit.runners.model.FrameworkMethod$1.runReflectiveCall(FrameworkMethod.java:59)
+	at org.junit.internal.runners.model.ReflectiveCallable.run(ReflectiveCallable.java:12)
+	at org.junit.runners.model.FrameworkMethod.invokeExplosively(FrameworkMethod.java:56)
+	at org.junit.internal.runners.statements.RunBefores.invokeMethod(RunBefores.java:33)
+	at org.junit.internal.runners.statements.RunBefores.evaluate(RunBefores.java:24)
+	at org.junit.runners.ParentRunner$3.evaluate(ParentRunner.java:306)
+	at org.robolectric.RobolectricTestRunner$HelperTestRunner$1.evaluate(RobolectricTestRunner.java:502)
+	at org.robolectric.internal.SandboxTestRunner$2.lambda$evaluate$2(SandboxTestRunner.java:285)
+	at org.robolectric.internal.bytecode.Sandbox.lambda$runOnMainThread$0(Sandbox.java:104)
+	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:264)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1136)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:635)
+	at java.base/java.lang.Thread.run(Thread.java:840)
+
+Invalid ID 0x00000000.
+Invalid ID 0x00000000.
+Invalid ID 0x00000000.
+Invalid ID 0x00000000.
+System.logW: A resource was acquired at attached stack trace but never released. See java.io.Closeable for information on avoiding resource leaks.
+java.lang.Throwable: Explicit termination method 'close' not called
+	at dalvik.system.CloseGuard.$$robo$$dalvik_system_CloseGuard$openWithCallSite(CloseGuard.java:288)
+	at dalvik.system.CloseGuard.openWithCallSite(CloseGuard.java)
+	at dalvik.system.CloseGuard.$$robo$$dalvik_system_CloseGuard$open(CloseGuard.java:257)
+	at jdk.internal.reflect.GeneratedMethodAccessor3.invoke(Unknown Source)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at org.robolectric.shadows.ShadowCloseGuard$CloseGuardReflector$$Reflector17.open(Unknown Source)
+	at org.robolectric.shadows.ShadowCloseGuard.open(ShadowCloseGuard.java:38)
+	at dalvik.system.CloseGuard.open(CloseGuard.java)
+	at android.database.sqlite.SQLiteDatabase.$$robo$$android_database_sqlite_SQLiteDatabase$openInner(SQLiteDatabase.java:1088)
+	at android.database.sqlite.SQLiteDatabase.openInner(SQLiteDatabase.java)
+	at android.database.sqlite.SQLiteDatabase.$$robo$$android_database_sqlite_SQLiteDatabase$open(SQLiteDatabase.java:1067)
+	at android.database.sqlite.SQLiteDatabase.open(SQLiteDatabase.java)
+	at android.database.sqlite.SQLiteDatabase.$$robo$$android_database_sqlite_SQLiteDatabase$openDatabase(SQLiteDatabase.java:931)
+	at android.database.sqlite.SQLiteDatabase.openDatabase(SQLiteDatabase.java)
+	at android.database.sqlite.SQLiteDatabase.$$robo$$android_database_sqlite_SQLiteDatabase$openDatabase(SQLiteDatabase.java:920)
+	at android.database.sqlite.SQLiteDatabase.openDatabase(SQLiteDatabase.java)
+	at android.database.sqlite.SQLiteOpenHelper.$$robo$$android_database_sqlite_SQLiteOpenHelper$getDatabaseLocked(SQLiteOpenHelper.java:373)
+	at android.database.sqlite.SQLiteOpenHelper.getDatabaseLocked(SQLiteOpenHelper.java)
+	at android.database.sqlite.SQLiteOpenHelper.$$robo$$android_database_sqlite_SQLiteOpenHelper$getWritableDatabase(SQLiteOpenHelper.java:316)
+	at android.database.sqlite.SQLiteOpenHelper.getWritableDatabase(SQLiteOpenHelper.java)
+	at com.lois.webtoontracker.DbHelper.insertRead(DbHelper.java:310)
+	at com.lois.webtoontracker.Fixtures.seed(Fixtures.java:61)
+	at com.lois.webtoontracker.Shots.prepare(Shots.java:42)
+	at com.lois.webtoontracker.UiShotsTest.setUp(UiShotsTest.java:34)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at org.junit.runners.model.FrameworkMethod$1.runReflectiveCall(FrameworkMethod.java:59)
+	at org.junit.internal.runners.model.ReflectiveCallable.run(ReflectiveCallable.java:12)
+	at org.junit.runners.model.FrameworkMethod.invokeExplosively(FrameworkMethod.java:56)
+	at org.junit.internal.runners.statements.RunBefores.invokeMethod(RunBefores.java:33)
+	at org.junit.internal.runners.statements.RunBefores.evaluate(RunBefores.java:24)
+	at org.junit.runners.ParentRunner$3.evaluate(ParentRunner.java:306)
+	at org.robolectric.RobolectricTestRunner$HelperTestRunner$1.evaluate(RobolectricTestRunner.java:502)
+	at org.robolectric.internal.SandboxTestRunner$2.lambda$evaluate$2(SandboxTestRunner.java:285)
+	at org.robolectric.internal.bytecode.Sandbox.lambda$runOnMainThread$0(Sandbox.java:104)
+	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:264)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1136)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:635)
+	at java.base/java.lang.Thread.run(Thread.java:840)
+
+System.logW: A resource was acquired at attached stack trace but never released. See java.io.Closeable for information on avoiding resource leaks.
+java.lang.Throwable: Explicit termination method 'close' not called
+	at dalvik.system.CloseGuard.$$robo$$dalvik_system_CloseGuard$openWithCallSite(CloseGuard.java:288)
+	at dalvik.system.CloseGuard.openWithCallSite(CloseGuard.java)
+	at dalvik.system.CloseGuard.$$robo$$dalvik_system_CloseGuard$open(CloseGuard.java:257)
+	at jdk.internal.reflect.GeneratedMethodAccessor3.invoke(Unknown Source)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at org.robolectric.shadows.ShadowCloseGuard$CloseGuardReflector$$Reflector17.open(Unknown Source)
+	at org.robolectric.shadows.ShadowCloseGuard.open(ShadowCloseGuard.java:38)
+	at dalvik.system.CloseGuard.open(CloseGuard.java)
+	at android.database.sqlite.SQLiteDatabase.$$robo$$android_database_sqlite_SQLiteDatabase$openInner(SQLiteDatabase.java:1088)
+	at android.database.sqlite.SQLiteDatabase.openInner(SQLiteDatabase.java)
+	at android.database.sqlite.SQLiteDatabase.$$robo$$android_database_sqlite_SQLiteDatabase$open(SQLiteDatabase.java:1067)
+	at android.database.sqlite.SQLiteDatabase.open(SQLiteDatabase.java)
+	at android.database.sqlite.SQLiteDatabase.$$robo$$android_database_sqlite_SQLiteDatabase$openDatabase(SQLiteDatabase.java:931)
+	at android.database.sqlite.SQLiteDatabase.openDatabase(SQLiteDatabase.java)
+	at android.database.sqlite.SQLiteDatabase.$$robo$$android_database_sqlite_SQLiteDatabase$createInMemory(SQLiteDatabase.java:1127)
+	at android.database.sqlite.SQLiteDatabase.createInMemory(SQLiteDatabase.java)
+	at android.database.sqlite.SQLiteOpenHelper.$$robo$$android_database_sqlite_SQLiteOpenHelper$getDatabaseLocked(SQLiteOpenHelper.java:368)
+	at android.database.sqlite.SQLiteOpenHelper.getDatabaseLocked(SQLiteOpenHelper.java)
+	at android.database.sqlite.SQLiteOpenHelper.$$robo$$android_database_sqlite_SQLiteOpenHelper$getWritableDatabase(SQLiteOpenHelper.java:316)
+	at android.database.sqlite.SQLiteOpenHelper.getWritableDatabase(SQLiteOpenHelper.java)
+	at androidx.sqlite.db.framework.FrameworkSQLiteOpenHelper$OpenHelper.getWritableOrReadableDatabase(FrameworkSQLiteOpenHelper.kt:231)
+	at androidx.sqlite.db.framework.FrameworkSQLiteOpenHelper$OpenHelper.innerGetDatabase(FrameworkSQLiteOpenHelper.kt:176)
+	at androidx.sqlite.db.framework.FrameworkSQLiteOpenHelper$OpenHelper.getSupportDatabase(FrameworkSQLiteOpenHelper.kt:151)
+	at androidx.sqlite.db.framework.FrameworkSQLiteOpenHelper.getWritableDatabase(FrameworkSQLiteOpenHelper.kt:104)
+	at androidx.room.RoomDatabase.inTransaction(RoomDatabase.kt:629)
+	at androidx.room.RoomDatabase.assertNotSuspendingTransaction(RoomDatabase.kt:448)
+	at androidx.work.impl.model.SystemIdInfoDao_Impl.getWorkSpecIds(SystemIdInfoDao_Impl.java:165)
+	at androidx.work.impl.background.systemjob.SystemJobScheduler.reconcileJobs(SystemJobScheduler.java:310)
+	at androidx.work.impl.utils.ForceStopRunnable.cleanUp(ForceStopRunnable.java:289)
+	at androidx.work.impl.utils.ForceStopRunnable.forceStopRunnable(ForceStopRunnable.java:252)
+	at androidx.work.impl.utils.ForceStopRunnable.run(ForceStopRunnable.java:135)
+	at androidx.work.impl.utils.SerialExecutorImpl$Task.run(SerialExecutorImpl.java:96)
+	at androidx.work.testing.SynchronousExecutor.execute(SynchronousExecutor.java:30)
+	at androidx.work.impl.utils.SerialExecutorImpl.scheduleNext(SerialExecutorImpl.java:60)
+	at androidx.work.impl.utils.SerialExecutorImpl.execute(SerialExecutorImpl.java:51)
+	at androidx.work.impl.utils.taskexecutor.TaskExecutor.executeOnTaskThread(TaskExecutor.java:46)
+	at androidx.work.impl.WorkManagerImpl.<init>(WorkManagerImpl.java:252)
+	at androidx.work.impl.WorkManagerImplExtKt.createWorkManager(WorkManagerImplExt.kt:49)
+	at androidx.work.impl.WorkManagerImplExtKt.createWorkManager$default(WorkManagerImplExt.kt:29)
+	at androidx.work.testing.TestWorkManagerImplKt.createTestWorkManagerImpl(TestWorkManagerImpl.kt:45)
+	at androidx.work.testing.WorkManagerTestInitHelper.initializeTestWorkManager(WorkManagerTestInitHelper.java:131)
+	at androidx.work.testing.WorkManagerTestInitHelper.initializeTestWorkManager(WorkManagerTestInitHelper.java:64)
+	at androidx.work.testing.WorkManagerTestInitHelper.initializeTestWorkManager(WorkManagerTestInitHelper.java:50)
+	at com.lois.webtoontracker.Shots.prepare(Shots.java:37)
+	at com.lois.webtoontracker.UiShotsTest.setUp(UiShotsTest.java:34)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at org.junit.runners.model.FrameworkMethod$1.runReflectiveCall(FrameworkMethod.java:59)
+	at org.junit.internal.runners.model.ReflectiveCallable.run(ReflectiveCallable.java:12)
+	at org.junit.runners.model.FrameworkMethod.invokeExplosively(FrameworkMethod.java:56)
+	at org.junit.internal.runners.statements.RunBefores.invokeMethod(RunBefores.java:33)
+	at org.junit.internal.runners.statements.RunBefores.evaluate(RunBefores.java:24)
+	at org.junit.runners.ParentRunner$3.evaluate(ParentRunner.java:306)
+	at org.robolectric.RobolectricTestRunner$HelperTestRunner$1.evaluate(RobolectricTestRunner.java:502)
+	at org.robolectric.internal.SandboxTestRunner$2.lambda$evaluate$2(SandboxTestRunner.java:285)
+	at org.robolectric.internal.bytecode.Sandbox.lambda$runOnMainThread$0(Sandbox.java:104)
+	at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:264)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1136)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:635)
+	at java.base/java.lang.Thread.run(Thread.java:840)
+
+Invalid ID 0x00000000.
+Invalid ID 0x00000000.
+]]></system-err>
+</testsuite>

@@ -1,0 +1,6 @@
+inter_regular path=res/font/inter_regular.ttf cookie=2 file=true weight=400 same=true
+inter_medium path=res/font/inter_medium.ttf cookie=2 file=true weight=500 same=true
+inter_semibold path=res/font/inter_semibold.ttf cookie=2 file=true weight=600 same=true
+inter_bold path=res/font/inter_bold.ttf cookie=2 file=true weight=700 same=true
+inter_display_bold path=res/font/inter_display_bold.ttf cookie=2 file=true weight=700 same=true
+inter_display_extrabold path=res/font/inter_display_extrabold.ttf cookie=2 file=true weight=800 same=true
