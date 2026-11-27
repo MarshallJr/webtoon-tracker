@@ -689,7 +689,7 @@ final class DiscoverPage {
         alt.setText(m.alt);
         TextView score = v.findViewById(R.id.dsScore);
         score.setVisibility(m.score > 0 ? View.VISIBLE : View.GONE);
-        score.setText("★ " + m.scoreText());
+        score.setText(m.scoreText());   // l'étoile dorée est l'icône de la pastille
         ((TextView) v.findViewById(R.id.dsType)).setText(m.type());
         TextView status = v.findViewById(R.id.dsStatus);
         String st = m.statusFr();
